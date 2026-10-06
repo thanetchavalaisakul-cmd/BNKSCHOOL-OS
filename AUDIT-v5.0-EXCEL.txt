@@ -1,0 +1,9 @@
+Excel audit summary
+- Workbook: 39 sheets
+- Master sheets: MyData, Personal, shop, กรอกข้อมูล
+- Document sheets: 29 (sheet 9–37)
+- Garuda image relationships found on document sheets: 9,11,12,13,14,17,20,21,22,23,31,32
+- Those map to: รายงานขอซื้อจ้าง, แบบสำรวจความต้องการ, บันทึกแต่งตั้ง TOR, คำสั่ง TOR, บันทึกเห็นชอบ TOR, คำสั่งกรรมการตรวจรับ, ประกาศ, อนุมัติ, อนุมัติแบบที่ 2, ใบสั่งซื้อ/จ้าง, เบิกจ่าย, เบิกจ่าย (2)
+- Inspection sheets explicitly contain 3 signature positions: ประธานกรรมการ / กรรมการ / กรรมการและเลขานุการ, with a 1-person conditional mode.
+- shop example detected: บริษัท นานาเชียงดาว จำกัด / นายอิศรา ถาวรรุ่งกิต / tax 0505559001207 / phone 0858659678 / address 537 หมู่ 4 ถนนโชตนา ต.เชียงดาว อ.เชียงดาว จ.เชียงใหม่
+- MyData/material names recovered from attachment sheets and seeded into the system.

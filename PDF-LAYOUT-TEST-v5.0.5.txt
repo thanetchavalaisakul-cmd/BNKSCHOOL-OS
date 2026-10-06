@@ -1,0 +1,13 @@
+BNK School OS v5.0.5 — Procurement PDF layout verification
+
+Static layout stress checks (Chromium layout engine):
+- Purchase-request page 1: horizontal overflow 0 px; vertical overflow 0 px; footer/body overlap: false.
+- Representative inspection page with 3 inspection signers + 4 internal signers + director: horizontal overflow 0 px; vertical overflow 0 px after compact four-signature row.
+- Three committee signature blocks: equal measured height.
+- Four internal signature blocks: equal measured height.
+- Dynamic member logic tested for 1, 2 and 3 selected TOR/inspection people.
+
+Runtime safeguards retained:
+- Long tables/pages still go through automatic continuation pagination.
+- PDF creation still asserts A4 overflow before export.
+- No page-wide transform scaling is used to hide overflow.

@@ -1,0 +1,4 @@
+Excel source: 431.2569วัสดุอุปกรณ์กิจกรรม Projcet Approach ปฐมวัย.xlsb
+Sheet MyData: 158 data rows (Excel rows 2-159)
+Sheet shop: 22 vendor rows (Excel rows 3-24)
+MyData duplicate names preserved: 1 duplicated name occurs twice

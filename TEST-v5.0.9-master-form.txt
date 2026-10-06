@@ -1,0 +1,17 @@
+QA v5.0.9 — Master Form Foundation
+
+[PASS] app.js syntax: node --check
+[PASS] PROCUREMENT_DOCUMENTS ยังคง 29 แบบเท่า v5.0.8
+[PASS] บล็อก PROCUREMENT_DOCUMENTS ตรงกับ v5.0.8 แบบ byte-for-byte
+[PASS] ฟังก์ชันแม่แบบ PDF legacy ไม่เปลี่ยนจาก v5.0.8
+[PASS] ฟังก์ชันแม่แบบ PDF current ไม่เปลี่ยนจาก v5.0.8
+[PASS] ฟังก์ชันสร้าง PDF รายใบ/ทั้งชุดไม่เปลี่ยนจาก v5.0.8
+[PASS] styles.css ไม่เปลี่ยนจาก v5.0.8
+[PASS] index/app cache version = 5.0.9
+[PASS] เพิ่ม field ที่ต้องใช้จาก PDF ตัวอย่างใน Master Form โดยไม่สร้างข้อมูลเดิมซ้ำ
+[PASS] vendor_code ใช้คอลัมน์ที่มีอยู่แล้วใน procurement_vendors; ไม่ต้อง migration ใหม่
+[PASS] ข้อมูลใหม่อยู่ใน form_data JSONB จึงไม่ต้องแก้ schema procurement_document_cases
+
+หมายเหตุ: ยังไม่ Deploy และยังไม่ทดสอบ PDF รอบถัดไปตามขอบเขตที่ผู้ใช้กำหนด
+[PASS] Local static HTTP: index.html และ app.js?v=5.0.9 ตอบ 200
+[INFO] Visual browser automation ไม่ได้รัน เพราะ environment นี้ไม่มี agent-browser CLI
