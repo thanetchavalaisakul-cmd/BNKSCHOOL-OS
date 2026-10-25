@@ -1,0 +1,12 @@
+BNK School OS v5.12.9.1 SQL security review
+
+Only the preschool v5.12.9 SQL was reviewed and corrected. Frontend app.js is identical to v5.12.9.
+No migration was run against Supabase in this preparation. Do not run SQL on production until a complete off-platform database backup is taken and verified.
+
+Changes:
+- Corrected ambiguous academic_year/semester references in preschool coverage RLS.
+- Corrected roster stage head academic-year policy lookup.
+- Included preschool stage head in coverage visibility conditions.
+- Included separate rollback script for emergency, WARNING: rollback removes new preschool data.
+
+Use `supabase-v5.12.9-preschool-units-group-substitutes.sql` from THIS ZIP for installation, not from the older v5.12.9 ZIP.

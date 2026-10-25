@@ -3,8 +3,8 @@ import html2canvas from "https://esm.sh/html2canvas@1.4.1";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
 import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
-import { PROCUREMENT_EXCEL_MASTER_TEXT } from "./procurement-excel-master-text.js?v=5.11.5";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, APP_NAME } from "./config.js?v=5.11.5";
+import { PROCUREMENT_EXCEL_MASTER_TEXT } from "./procurement-excel-master-text.js?v=5.12.6";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, APP_NAME } from "./config.js?v=5.12.6";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
@@ -16,7 +16,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 
 const app = document.querySelector("#app");
 const toastRoot = document.querySelector("#toast-root");
-const APP_BUILD = "5.11.5";
+const APP_BUILD = "5.12.9.9";
 const OFFICIAL_PDF_FONT = "TH SarabunIT๙";
 const OFFICIAL_PDF_FONT_ALIAS = "THSarabunIT๙";
 // BNK School OS global PDF font policy: every current/future official document must
@@ -139,6 +139,21 @@ const state = {
   subjectGroups: [],
   academicTerms: [],
   systemSettings: null,
+  dataCenterOverview: null,
+  dataCenterError: "",
+  dataCenterTab: "overview",
+  dataCenterSelectedCode: "leave",
+  dataCenterLastLoaded: "",
+  dataCenterResetScope: "preschool_units",
+  dataCenterResetYear: "2569",
+  dataCenterResetSemester: "1",
+  dataCenterResetPreview: null,
+  dataCenterResetHistory: null,
+  dataCenterBackupReference: "",
+  dataCenterBackupConfirmed: false,
+  dataCenterConfirmation: "",
+  dataCenterResetError: "",
+  dataCenterResetBusy: false,
   personnelOwnRecord: null,
   personnelRecords: [],
   personnelRoster: [],
@@ -181,6 +196,7 @@ const state = {
   leaveRoster: [],
   leavePersonnelRecords: [],
   leaveSubstituteLessons: [],
+  leavePreschoolCovers: [],
   selectedLeaveRequestId: null,
   leaveView: "mine",
   leaveReportAcademicYear: null,
@@ -210,11 +226,19 @@ const state = {
   timetablePeriodTemplates: [],
   timetablePeriodTemplateItems: [],
   timetableSubjects: [],
+  timetableSubjectOfferings: [],
+  timetableSubjectOfferingsError: "",
+  timetableSubjectMasterScope: null,
+  preschoolSharedUnits: [],
+  preschoolSharedUnitsError: "",
   timetableAssignments: [],
   timetableEntries: [],
   timetableHomerooms: [],
   timetableStageHeads: [],
   timetableTeachers: [],
+  preschoolUnits: [],
+  preschoolRoster: [],
+  preschoolUnitsError: "",
   timetableSelectedClassId: null,
   timetableView: "planner",
   timetableAcademicYear: null,
@@ -222,6 +246,7 @@ const state = {
   timetableExportClassId: null,
   timetableExportTeacherId: null,
   examSets: [],
+  examShowArchived: false,
   examItems: [],
   examTeachingAssignments: [],
   examClasses: [],
@@ -238,6 +263,11 @@ const state = {
   examAnalysisView: "entry",
   examAnalysisLoadError: "",
   substituteLessons: [],
+  preschoolCovers: [],
+  preschoolCoverMembers: [],
+  preschoolCoverLoadError: "",
+  selectedPreschoolCoverId: null,
+  targetPreschoolLeaveId: null,
   substituteActions: [],
   substituteView: "manage",
   selectedSubstituteLessonId: null,
@@ -368,9 +398,21 @@ const state = {
   procurementStatusFilter: "all",
   selectedProcurementCaseId: null,
   procurementLoadError: "",
-  procurementAccess: { can_access_control: false, can_access_documents: false },
+  procurementAccess: { can_access_control: false, can_access_documents: false, can_access_school_lunch: false },
   procurementPermissionRows: [],
   procurementPermissionError: "",
+  schoolLunchRounds: [],
+  schoolLunchDays: [],
+  schoolLunchVendors: [],
+  schoolLunchSettings: null,
+  schoolLunchStaff: [],
+  schoolLunchFiscalYear: null,
+  schoolLunchSearch: "",
+  schoolLunchStatusFilter: "active",
+  selectedSchoolLunchRoundId: null,
+  schoolLunchLoadError: "",
+  electricitySettings: null, electricityMeters: [], electricityPeriods: [], electricityReadings: [],
+  electricityStaff: [], electricityPeriodId: null, electricityTab: null, electricityError: "",
   academicRegistrationSkipNextLoad: false,
   academicSubmissionSection: "home",
   academicSubmissionHomeTab: "systems",
@@ -526,10 +568,11 @@ function procurementHasModuleAccess(code){
   const access=state.procurementAccess||{};
   if(code==="procurement_document_control")return !!access.can_access_control;
   if(code==="procurement_documents")return !!access.can_access_documents;
+  if(code==="school_lunch_documents")return !!access.can_access_school_lunch;
   return true;
 }
 function procurementAccessDeniedHtml(systemName){
-  return `<section class="panel"><div class="empty"><strong>ไม่มีสิทธิ์เข้าใช้งาน${escapeHtml(systemName||"ระบบนี้")}</strong><span>ระบบจัดซื้อจัดจ้างจำกัดเฉพาะผู้ที่ Super Admin อนุญาตเป็นรายบุคคล</span><small>หากต้องใช้งาน กรุณาติดต่อ Super Admin เพื่อเปิดสิทธิ์ใน ตั้งค่าระบบ → สิทธิ์การเข้าใช้งาน</small></div></section>`;
+  return `<section class="panel"><div class="empty"><strong>ไม่มีสิทธิ์เข้าใช้งาน${escapeHtml(systemName||"ระบบนี้")}</strong><span>ระบบนี้จำกัดเฉพาะผู้ที่ Super Admin อนุญาตเป็นรายบุคคล</span><small>หากต้องใช้งาน กรุณาติดต่อ Super Admin เพื่อเปิดสิทธิ์ใน ตั้งค่าระบบ → สิทธิ์การเข้าใช้งาน</small></div></section>`;
 }
 
 function canDeleteLessonPlanUi(p){
@@ -946,15 +989,15 @@ async function loadActiveUserData() {
     supabase.from("academic_registration_settings").select("*").eq("id",1).maybeSingle(),
     supabase.from("academic_certificate_settings").select("*").eq("id",1).maybeSingle(),
     supabase.from("academic_document_service_settings").select("*").eq("id",1).maybeSingle(),
-    supabase.from("procurement_module_permissions").select("user_id,can_access_control,can_access_documents").eq("user_id",state.user.id).maybeSingle(),
+    supabase.from("procurement_module_permissions").select("user_id,can_access_control,can_access_documents,can_access_school_lunch").eq("user_id",state.user.id).maybeSingle(),
   ]);
 
   state.departments = departmentsRes.data || [];
   state.modules = modulesRes.data || [];
   state.procurementPermissionError = procurementAccessRes.error ? (procurementAccessRes.error.message||String(procurementAccessRes.error)) : "";
   state.procurementAccess = isSuperAdminUser()
-    ? {can_access_control:true,can_access_documents:true}
-    : {can_access_control:!!procurementAccessRes.data?.can_access_control,can_access_documents:!!procurementAccessRes.data?.can_access_documents};
+    ? {can_access_control:true,can_access_documents:true,can_access_school_lunch:true}
+    : {can_access_control:!!procurementAccessRes.data?.can_access_control,can_access_documents:!!procurementAccessRes.data?.can_access_documents,can_access_school_lunch:!!procurementAccessRes.data?.can_access_school_lunch};
 
   // v4.0: keep the procurement subsystem visible under Plan & Budget even
   // before its migration has been run. The workspace itself will show the SQL
@@ -997,6 +1040,32 @@ async function loadActiveUserData() {
     });
     state.modules.sort((a,b) => Number(a.sort_order||0) - Number(b.sort_order||0));
   }
+  if (procurementDepartment && !state.modules.some(m => m.code === "school_lunch_documents")) {
+    state.modules.push({
+      id: "local-school-lunch-documents",
+      department_id: procurementDepartment.id,
+      code: "school_lunch_documents",
+      name_th: "ระบบจัดทำเอกสารอาหารกลางวัน",
+      name_en: "School Lunch Document Builder",
+      route: "/plan-budget/school-lunch-documents",
+      sort_order: 21,
+      is_active: true,
+      departments: {
+        code: procurementDepartment.code,
+        name_th: procurementDepartment.name_th,
+        name_en: procurementDepartment.name_en,
+      },
+      _local_fallback: true,
+    });
+    state.modules.sort((a,b) => Number(a.sort_order||0) - Number(b.sort_order||0));
+  }
+  const generalDepartment = state.departments.find(d=>d.code==="general");
+  if(generalDepartment&&!state.modules.some(m=>m.code==="housing_electricity")){
+    state.modules.push({id:"local-housing-electricity",department_id:generalDepartment.id,
+      code:"housing_electricity",name_th:"ระบบจัดการค่าไฟฟ้าบ้านพักบุคลากร",name_en:"Staff Housing Electricity",
+      route:"/general/housing-electricity",sort_order:30,is_active:true,
+      departments:{code:generalDepartment.code,name_th:generalDepartment.name_th,name_en:generalDepartment.name_en},_local_fallback:true});
+  }
   const academicDepartment = state.departments.find(d => d.code === "academic");
   if (academicDepartment && !state.modules.some(m => m.code === EXAM_MODULE_CODE)) {
     state.modules.push({
@@ -1027,7 +1096,7 @@ async function loadActiveUserData() {
       _local_fallback: true,
     });
   }
-  state.modules = state.modules.filter(m=>!['procurement_document_control','procurement_documents'].includes(m.code)||procurementHasModuleAccess(m.code));
+  state.modules = state.modules.filter(m=>!['procurement_document_control','procurement_documents','school_lunch_documents'].includes(m.code)||procurementHasModuleAccess(m.code));
   state.modules.sort((a,b) => Number(a.sort_order||0) - Number(b.sort_order||0));
   if(state.profile?.role === "pa_evaluator") {
     state.modules = state.modules.filter(m=>m.code === "personnel_pa");
@@ -1066,7 +1135,7 @@ async function loadActiveUserData() {
       .neq("account_status", "deleted")
       .order("created_at", { ascending: false });
     state.pendingUsers = data || [];
-    const permissionRes=await supabase.from("procurement_module_permissions").select("user_id,can_access_control,can_access_documents,updated_by,updated_at").order("updated_at",{ascending:false});
+    const permissionRes=await supabase.from("procurement_module_permissions").select("user_id,can_access_control,can_access_documents,can_access_school_lunch,updated_by,updated_at").order("updated_at",{ascending:false});
     state.procurementPermissionRows=permissionRes.error?[]:(permissionRes.data||[]);
     if(permissionRes.error)state.procurementPermissionError=permissionRes.error.message||String(permissionRes.error);
     const dutyPeriod=currentAcademicPeriod();
@@ -1220,7 +1289,7 @@ function sidebarHtml() {
       <button class="nav-item ${state.currentView === "dashboard" ? "active" : ""}" data-view="dashboard"><span class="nav-icon">⌂</span><span class="nav-label">Dashboard</span></button>
       ${state.approvalControlCenter?.can_access ? `<button class="nav-item ${state.currentView === "approval_center" ? "active" : ""}" data-view="approval_center"><span class="nav-icon">✓</span><span class="nav-label">ศูนย์อนุมัติและลายเซ็น</span></button>` : ""}
       <button class="nav-item ${state.currentView === "signature_settings" ? "active" : ""}" data-view="signature_settings"><span class="nav-icon">✍</span><span class="nav-label">ลายเซ็นของฉัน</span></button>
-      ${state.profile.role === "super_admin" ? `<button class="nav-item ${state.currentView === "users" ? "active" : ""}" data-view="users"><span class="nav-icon">♙</span><span class="nav-label">จัดการผู้ใช้งาน</span></button><button class="nav-item ${state.currentView === "settings" ? "active" : ""}" data-view="settings"><span class="nav-icon">⚙</span><span class="nav-label">ตั้งค่าระบบ</span></button>` : ""}
+      ${state.profile.role === "super_admin" ? `<button class="nav-item ${state.currentView === "users" ? "active" : ""}" data-view="users"><span class="nav-icon">♙</span><span class="nav-label">จัดการผู้ใช้งาน</span></button><button class="nav-item ${state.currentView === "settings" ? "active" : ""}" data-view="settings"><span class="nav-icon">⚙</span><span class="nav-label">ตั้งค่าระบบ</span></button><button class="nav-item ${state.currentView === "data_center" ? "active" : ""}" data-view="data_center"><span class="nav-icon">▤</span><span class="nav-label">ศูนย์จัดการข้อมูลระบบ</span></button>` : ""}
       <div class="nav-section-title">กลุ่มงาน</div>
       ${grouped || `<div class="empty" style="color:#94a3b8;border-color:#334155">ยังไม่มีระบบย่อยที่เปิดใช้งาน</div>`}
       <div class="sidebar-user">
@@ -1237,6 +1306,7 @@ function sidebarHtml() {
 }
 
 async function renderDashboard() {
+  if (state.currentView === "data_center" && state.profile?.role === "super_admin" && !state.dataCenterOverview && !state.dataCenterError) await loadDataCenterWorkspace();
   if (state.currentView === "approval_center") {
     await loadApprovalControlCenter();
   }
@@ -1265,6 +1335,10 @@ async function renderDashboard() {
   if (state.currentView === "module:procurement_documents" && procurementHasModuleAccess("procurement_documents")) {
     await loadProcurementWorkspace();
   }
+  if (state.currentView === "module:school_lunch_documents" && procurementHasModuleAccess("school_lunch_documents")) {
+    await loadSchoolLunchWorkspace();
+  }
+  if(state.currentView === "module:housing_electricity")await loadElectricityWorkspace();
   if (state.currentView === "module:lesson_plans") {
     await loadLessonPlanWorkspace();
   }
@@ -1311,6 +1385,8 @@ async function renderDashboard() {
     ? usersView()
     : state.currentView === "settings" && state.profile.role === "super_admin"
       ? settingsView()
+    : state.currentView === "data_center" && state.profile.role === "super_admin"
+      ? dataCenterView()
     : state.currentView === "approval_center" && state.approvalControlCenter?.can_access
       ? approvalCenterView()
     : state.currentView === "signature_settings"
@@ -1349,6 +1425,7 @@ async function renderDashboard() {
 function pageTitle() {
   if (state.currentView === "users") return "จัดการผู้ใช้งาน";
   if (state.currentView === "settings") return "ตั้งค่าระบบ";
+  if (state.currentView === "data_center" && state.profile?.role === "super_admin") return "ศูนย์จัดการข้อมูลระบบ";
   if (state.currentView === "approval_center") return "ศูนย์อนุมัติและลายเซ็น";
   if (state.currentView === "signature_settings") return "ลายเซ็นของฉัน";
   if (state.currentView.startsWith("module:")) {
@@ -1701,7 +1778,7 @@ function dashboardRoleCopy(metrics={}){
 function dashboardModuleIcon(code){
   const icons={
     official_attendance:"◷",personnel_pa:"PA",leave_management:"L",personnel_records:"ID",
-    project_management:"฿",procurement_document_control:"#",procurement_documents:"PO",
+    project_management:"฿",procurement_document_control:"#",procurement_documents:"PO",school_lunch_documents:"LM",housing_electricity:"⚡",
     academic_submissions:"✓",academic_registration:"REG",lesson_plans:"LP",exam_management:"EX",
     timetable_management:"TT",substitute_teaching:"ST",home_visit_management:"HV",student_registry:"SR",student_cards:"ID"
   };
@@ -1713,7 +1790,7 @@ function dashboardFeaturedModules(){
     teacher:["official_attendance","personnel_pa","leave_management","lesson_plans","academic_submissions","timetable_management"],
     department_head:["personnel_pa","official_attendance","project_management","academic_submissions","leave_management","lesson_plans"],
     director:["personnel_pa","project_management","academic_submissions","official_attendance","academic_registration","leave_management"],
-    super_admin:["personnel_pa","project_management","official_attendance","academic_submissions","academic_registration","procurement_documents"]
+    super_admin:["personnel_pa","project_management","official_attendance","academic_submissions","academic_registration","procurement_documents","school_lunch_documents"]
   }[role]||[];
   return [...state.modules].sort((a,b)=>{
     const ai=priority.indexOf(a.code),bi=priority.indexOf(b.code);
@@ -1895,6 +1972,7 @@ function usersView() {
 function settingsView() {
   const s = state.systemSettings || {};
   return `<section class="settings-layout">
+    <section class="panel data-center-settings-entry"><div class="panel-head"><div class="panel-title-wrap"><h3>ศูนย์จัดการข้อมูลระบบ</h3><p>เครื่องมือสำหรับแอดมินหลัก ใช้ดูจำนวนข้อมูลและความเสี่ยงก่อนจัดการข้อมูลทดลอง</p></div><button type="button" class="btn btn-primary" data-view="data_center">เปิดศูนย์จัดการข้อมูล →</button></div><div class="data-center-protect-mini">🔒 บัญชีรายชื่อนักเรียนและข้อมูลเชื่อมโยงได้รับการป้องกัน ไม่อยู่ในรายการรีเซต</div></section>
     <section class="panel settings-panel">
       <div class="panel-head">
         <div class="panel-title-wrap"><h3>ตั้งค่าชื่อและข้อมูลโรงเรียน</h3><p>ใช้กับหน้า Login, Sidebar และหัวเอกสาร A4 / Approved PDF</p></div>
@@ -4087,7 +4165,7 @@ function leaveRequestsForView() {
 
 async function loadLeaveWorkspace() {
   const reviewer = canSeeLeaveOverview();
-  const [requestsRes, actionsRes, typesRes, rosterRes, personnelRes, substituteRes] = await Promise.all([
+  const [requestsRes, actionsRes, typesRes, rosterRes, personnelRes, substituteRes, preschoolRes] = await Promise.all([
     supabase.from("leave_requests").select("*").order("created_at", { ascending: false }),
     supabase.from("leave_actions").select("*").order("created_at", { ascending: true }),
     supabase.from("leave_types").select("*").eq("is_active", true).order("sort_order"),
@@ -4103,6 +4181,7 @@ async function loadLeaveWorkspace() {
       ? supabase.from("personnel_records").select("user_id,position_title,first_appointment_date")
       : Promise.resolve({ data: state.personnelOwnRecord ? [state.personnelOwnRecord] : [], error: null }),
     supabase.from("substitute_lessons").select("*").order("leave_date").order("period_no"),
+    supabase.from("preschool_group_covers").select("*").eq("status","active"),
   ]);
 
   if (requestsRes.error) {
@@ -4119,6 +4198,7 @@ async function loadLeaveWorkspace() {
   state.leaveRoster = rosterRes.error ? [state.profile] : (rosterRes.data || []);
   state.leavePersonnelRecords = personnelRes.error ? [] : (personnelRes.data || []);
   state.leaveSubstituteLessons = substituteRes.error ? [] : (substituteRes.data || []);
+  state.leavePreschoolCovers = preschoolRes.error ? [] : (preschoolRes.data || []);
 
   if (!state.leaveReportAcademicYear) {
     state.leaveReportAcademicYear = currentAcademicPeriod().academicYear;
@@ -4185,6 +4265,8 @@ function leaveSubstituteStatusHtml(request) {
   if (!request.affects_teaching_schedule) return `<span class="pill neutral">ไม่ต้องจัด</span>`;
   if (request.status === "draft") return `<span class="pill neutral">รอส่งคำขอ</span>`;
   if (request.status === "rejected") return `<span class="pill suspended">ยกเลิกตามใบลา</span>`;
+  const covers=state.leavePreschoolCovers.filter(g=>g.leave_request_id===request.id);
+  if(covers.length)return `<span class="pill active">ฝากอนุบาลแบบกลุ่ม ${covers.length} วัน</span>`;
   const p=leaveSubstituteProgress(request.id);
   if(!p.total) return `<span class="pill neutral">ไม่พบคาบ / รอตาราง</span>`;
   return p.complete ? `<span class="pill active">จัดครบ ${p.assigned}/${p.total}</span>` : `<span class="pill pending">รอจัด ${p.assigned}/${p.total}</span>`;
@@ -5119,7 +5201,7 @@ async function loadTimetableWorkspace() {
   const canLoadRoster = isAcademicHead() || hasStageHeadCapability || ["director","super_admin"].includes(state.profile.role);
   const canLoadPeriodMaster = isAcademicHead() || hasStageHeadCapability || ["director","super_admin"].includes(state.profile.role);
 
-  const [classesRes, profilesRes, periodsRes, periodTemplatesRes, periodTemplateItemsRes, subjectsRes, assignmentsRes, entriesRes, homeroomsRes, stageHeadsRes, teachersRes] = await Promise.all([
+  const [classesRes, profilesRes, periodsRes, periodTemplatesRes, periodTemplateItemsRes, subjectsRes, assignmentsRes, entriesRes, homeroomsRes, stageHeadsRes, teachersRes, offeringsRes, sharedUnitsRes] = await Promise.all([
     supabase.from("school_classes").select("*").eq("is_active",true).order("academic_year",{ascending:false}).order("semester").order("sort_order").order("level_name").order("room_name"),
     supabase.from("timetable_profiles").select("*").order("created_at"),
     supabase.from("timetable_periods").select("*").order("sort_order"),
@@ -5139,6 +5221,8 @@ async function loadTimetableWorkspace() {
     canLoadRoster
       ? supabase.from("profiles").select("id,email,full_name,role,department_id").in("role",["teacher","department_head"]).eq("account_status","active").is("deleted_at",null).order("full_name")
       : Promise.resolve({ data: [{id:state.user.id,email:state.profile.email,full_name:state.profile.full_name,role:state.profile.role,department_id:state.profile.department_id}], error:null }),
+    supabase.from("academic_class_subject_offerings").select("*").order("created_at"),
+    supabase.from("preschool_shared_weekly_units").select("*").order("week_start"),
   ]);
 
   state.timetableClasses = classesRes.error ? [] : (classesRes.data || []);
@@ -5147,6 +5231,10 @@ async function loadTimetableWorkspace() {
   state.timetablePeriodTemplates = periodTemplatesRes.error ? [] : (periodTemplatesRes.data || []);
   state.timetablePeriodTemplateItems = periodTemplateItemsRes.error ? [] : (periodTemplateItemsRes.data || []);
   state.timetableSubjects = subjectsRes.error ? [] : (subjectsRes.data || []);
+  state.timetableSubjectOfferings = offeringsRes.error ? [] : (offeringsRes.data || []);
+  state.timetableSubjectOfferingsError = offeringsRes.error?.message || "";
+  state.preschoolSharedUnits = sharedUnitsRes.error ? [] : (sharedUnitsRes.data || []);
+  state.preschoolSharedUnitsError = sharedUnitsRes.error?.message || "";
   state.timetableAssignments = assignmentsRes.error ? [] : (assignmentsRes.data || []);
   state.timetableEntries = entriesRes.error ? [] : (entriesRes.data || []);
   state.timetableHomerooms = homeroomsRes.error ? [] : (homeroomsRes.data || []);
@@ -5183,6 +5271,13 @@ async function loadTimetableWorkspace() {
       : state.user.id;
   }
 
+  const [preschoolRes,preschoolRosterRes]=await Promise.all([
+    supabase.from("preschool_weekly_units").select("*").order("week_start"),
+    supabase.from("preschool_staff_roster").select("*").order("academic_year",{ascending:false})
+  ]);
+  state.preschoolRoster=preschoolRosterRes.error?[]:(preschoolRosterRes.data||[]);
+  state.preschoolUnits=preschoolRes.error?[]:(preschoolRes.data||[]);
+  state.preschoolUnitsError=preschoolRes.error ? preschoolRes.error.message : "";
   if (canManageTimetable() && !["setup","periods","planner","export","mine"].includes(state.timetableView)) {
     state.timetableView = "planner";
   }
@@ -5467,6 +5562,98 @@ function timetableSchoolPeriodTemplateModal() {
   });
 }
 
+
+// Preschool: one experience-learning unit per teaching week; no period-grid required.
+function preschoolClassUnits(classId){
+  const c=state.timetableClasses.find(row=>row.id===classId);
+  if(!c||c.stage_code!=="early_childhood")return [];
+  return state.preschoolSharedUnits.filter(u=>Number(u.academic_year)===Number(c.academic_year)&&Number(u.semester)===Number(c.semester))
+    .sort((a,b)=>Number(a.week_no)-Number(b.week_no));
+}
+
+function preschoolRosterModal(){
+  const c=selectedTimetableClass();if(!c||c.stage_code!=="early_childhood"||!canManageTimetableClassLocal(c))return;
+  const year=Number(c.academic_year),semester=Number(c.semester);
+  const explicit=new Set(state.preschoolRoster.filter(r=>r.academic_year===year&&r.semester===semester).map(r=>r.teacher_id));
+  const teachers=state.timetableTeachers.filter(t=>t.role==="teacher"||t.role==="department_head");
+  const autoIds=new Set([
+    ...state.timetableHomerooms.filter(h=>state.timetableClasses.some(cl=>cl.id===h.class_id&&cl.stage_code==="early_childhood"&&Number(cl.academic_year)===year&&cl.semester===semester)).map(h=>h.teacher_id),
+    ...state.timetableAssignments.filter(a=>a.is_active!==false&&state.timetableClasses.some(cl=>cl.id===a.class_id&&cl.stage_code==="early_childhood"&&Number(cl.academic_year)===year&&cl.semester===semester)).map(a=>a.teacher_id)
+  ]);
+  const modal=document.createElement("div");modal.className="modal-backdrop";
+  modal.innerHTML=`<div class="modal modal-wide"><div class="modal-head"><div><h3>รายชื่อครูระดับปฐมวัย</h3><p>ปีการศึกษา ${year} ภาคเรียน ${semester} · ใช้รายชื่อร่วมกันทุกห้องอนุบาลในช่วงนี้</p></div><button class="modal-close">×</button></div><div class="preschool-tip"><strong>เลือกครูปฐมวัยทุกคนให้ครบ</strong><span>ครูประจำชั้นหรือครูที่ได้รับมอบหมายสอนปฐมวัยจะถูกเพิ่มโดยอัตโนมัติ ส่วนครูอื่นสามารถกำหนดเพิ่มในหน้านี้ได้ โดยไม่เปลี่ยนสิทธิ์หรือหน้าที่ประจำชั้นเดิม</span></div><div class="field"><input class="input" id="preschool-staff-search" placeholder="ค้นหาชื่อครู..."></div><div class="preschool-roster-list">${teachers.map(t=>`<label class="preschool-staff-item" data-preschool-staff-name="${escapeHtml((t.full_name||t.email||"").toLowerCase())}"><input type="checkbox" data-preschool-roster-teacher="${t.id}" ${explicit.has(t.id)?"checked":""}><span><strong>${escapeHtml(t.full_name||t.email||"ครู")}</strong>${autoIds.has(t.id)?`<small>เชื่อมจากครูประจำชั้น / วิชาสอนปฐมวัยอยู่แล้ว</small>`:`<small>${explicit.has(t.id)?"เพิ่มในบัญชีครูปฐมวัยแล้ว":"ยังไม่เพิ่มในบัญชีครูปฐมวัย"}</small>`}</span></label>`).join("")}</div><div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="save-preschool-staff">บันทึกรายชื่อครู</button></div></div>`;
+  document.body.appendChild(modal);const close=()=>modal.remove();modal.querySelector(".modal-close").onclick=close;modal.querySelector(".modal-cancel").onclick=close;
+  modal.querySelector("#preschool-staff-search").oninput=e=>{const term=e.target.value.trim().toLowerCase();modal.querySelectorAll("[data-preschool-staff-name]").forEach(row=>{row.hidden=!row.dataset.preschoolStaffName.includes(term);});};
+  modal.querySelector("#save-preschool-staff").onclick=async e=>{
+    const picked=new Set([...modal.querySelectorAll("[data-preschool-roster-teacher]:checked")].map(el=>el.dataset.preschoolRosterTeacher));
+    buttonLoading(e.currentTarget,true,"กำลังบันทึก...");
+    try{
+      const {error}=await supabase.rpc("save_preschool_staff_roster",{
+        p_academic_year:year,p_semester:semester,p_teacher_ids:[...picked]
+      });
+      if(error)throw error;
+      close();toast("บันทึกรายชื่อครูปฐมวัยแล้ว",`เพิ่มตามรายชื่อที่เลือก ${picked.size} คน · ระบบซิงก์ใบฝากสอนใหม่แล้ว`,"success");await renderDashboard();
+    }catch(error){toast("บันทึกรายชื่อครูไม่ได้",error.message||String(error),"error");}
+    finally{buttonLoading(e.currentTarget,false);}
+  };
+}
+
+function preschoolWeekEnd(start){
+  if(!start)return "";
+  const d=new Date(start+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+6);return d.toISOString().slice(0,10);
+}
+function preschoolUnitForDate(classId,date){
+  return preschoolClassUnits(classId).find(u=>date>=u.week_start&&date<=preschoolWeekEnd(u.week_start));
+}
+function preschoolUnitTableHtml(classId,{readonly=false}={}){
+  const units=preschoolClassUnits(classId),c=state.timetableClasses.find(c=>c.id===classId);
+  if(state.preschoolSharedUnitsError)return `<div class="drive-permission-warning"><strong>ยังไม่พร้อมใช้หน่วยกลางปฐมวัย</strong><span>กรุณาติดตั้ง SQL v5.12.9.4 (${escapeHtml(state.preschoolSharedUnitsError)})</span></div>`;
+  return `<div class="table-wrap"><table class="table preschool-unit-table"><thead><tr><th style="width:80px">สัปดาห์</th><th style="width:220px">ช่วงวันที่</th><th>หน่วยการจัดประสบการณ์</th><th>สาระสำคัญ / กิจกรรม</th>${!readonly?"<th>จัดการ</th>":""}</tr></thead><tbody>
+    ${units.length?units.map(u=>`<tr><td><strong>${u.week_no}</strong></td><td>${thaiDateOnly(u.week_start)}<br><span class="table-muted">– ${thaiDateOnly(preschoolWeekEnd(u.week_start))}</span></td><td><strong>${escapeHtml(u.unit_title)}</strong></td><td>${escapeHtml(u.learning_focus||"—")}</td>${!readonly?`<td><div class="preschool-actions"><button class="btn btn-ghost" data-edit-preschool-unit="${u.id}">แก้ไข</button><button class="btn btn-ghost" data-delete-preschool-unit="${u.id}">ลบ</button></div></td>`:""}</tr>`).join(""):`<tr><td colspan="${readonly?4:5}" class="table-muted">ยังไม่ได้กำหนดหน่วยรายสัปดาห์${c?`สำหรับ ${escapeHtml(schoolClassLabel(c))}`:""}</td></tr>`}
+  </tbody></table></div>`;
+}
+function preschoolUnitPlannerHtml(c){
+  const count=preschoolClassUnits(c.id).length;
+  return `${timetableClassSelectorHtml()}<section class="panel preschool-planner-panel"><div class="panel-head"><div class="panel-title-wrap"><span class="eyebrow dark">Early Childhood · Weekly Units</span><h3>${escapeHtml(schoolClassLabel(c))} — หน่วยการจัดประสบการณ์</h3><p>1 หน่วยต่อ 1 สัปดาห์ · ใช้ร่วมกันทุกห้องอนุบาล · ปีการศึกษา ${c.academic_year} ภาคเรียน ${c.semester}</p></div><div class="preschool-actions"><button class="btn btn-secondary" id="preschool-staff-roster">👥 รายชื่อครูปฐมวัย</button><button class="btn btn-secondary" id="export-preschool-unit-list" ${count?"":"disabled"}>▤ Preview / PDF</button><button class="btn btn-primary" id="add-preschool-unit" ${state.preschoolSharedUnitsError?"disabled":""}>＋ เพิ่มหน่วยรายสัปดาห์</button></div></div><div class="preschool-tip"><strong>บันทึกหน่วยส่วนกลางแล้ว ${count} สัปดาห์</strong><span>กำหนดสัปดาห์ที่ วันจันทร์เริ่มต้น และชื่อหน่วยได้เอง · ระบบป้องกันการใช้สัปดาห์หรือวันที่ซ้ำ</span></div>${preschoolUnitTableHtml(c.id)}</section>`;
+}
+function preschoolUnitModal(id=null){
+  const c=selectedTimetableClass();if(!c||c.stage_code!=="early_childhood"||!canManageTimetableClassLocal(c))return;
+  const u=id?state.preschoolSharedUnits.find(x=>x.id===id&&Number(x.academic_year)===Number(c.academic_year)&&Number(x.semester)===Number(c.semester)):null;
+  const units=preschoolClassUnits(c.id),last=units.slice().sort((a,b)=>a.week_start.localeCompare(b.week_start)).at(-1);
+  const weekNo=u?.week_no||Math.min(60,Math.max(1,...units.map(u=>Number(u.week_no)+1)));
+  const initialMonday=()=>{const d=new Date();const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
+  const weekStart=u?.week_start||(last?(()=>{const d=new Date(last.week_start+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+7);return d.toISOString().slice(0,10);})():initialMonday());
+  const modal=document.createElement("div");modal.className="modal-backdrop";
+  modal.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>${u?"แก้ไข":"เพิ่ม"}หน่วยการเรียนรู้ปฐมวัย</h3><p>ทุกห้องอนุบาล · ปีการศึกษา ${c.academic_year} ภาคเรียน ${c.semester} · 1 หน่วยต่อ 1 สัปดาห์</p></div><button class="modal-close">×</button></div><form class="form-grid" id="preschool-unit-form"><div class="form-row"><div class="field"><label>สัปดาห์ที่</label><input class="input" type="number" name="week_no" min="1" max="60" required value="${weekNo}"></div><div class="field"><label>วันจันทร์ที่เริ่มสัปดาห์</label><input class="input" type="date" name="week_start" required value="${weekStart}"><small>ระบบนับถึงวันอาทิตย์ของสัปดาห์เดียวกัน</small></div></div><div class="field"><label>ชื่อหน่วยจัดประสบการณ์</label><input class="input" name="unit_title" maxlength="200" required placeholder="เช่น ปฐมนิเทศ / ตัวเรา" value="${escapeHtml(u?.unit_title||"")}"></div><div class="field"><label>สาระสำคัญ / กิจกรรม (ไม่บังคับ)</label><textarea class="textarea" name="learning_focus" rows="3" placeholder="กิจกรรมหลักของสัปดาห์">${escapeHtml(u?.learning_focus||"")}</textarea></div></form><div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="save-preschool-unit">บันทึกหน่วย</button></div></div>`;
+  document.body.appendChild(modal);const close=()=>modal.remove();modal.querySelector(".modal-close").onclick=close;modal.querySelector(".modal-cancel").onclick=close;
+  modal.querySelector("#save-preschool-unit").onclick=async e=>{
+    const form=modal.querySelector("#preschool-unit-form");if(!form.reportValidity())return;
+    const fd=new FormData(form);const start=String(fd.get("week_start"));
+    if(new Date(start+"T12:00:00Z").getUTCDay()!==1)return toast("วันที่ไม่ถูกต้อง","กรุณาเลือกวันจันทร์เป็นวันเริ่มสัปดาห์","error");
+    const values={academic_year:Number(c.academic_year),semester:Number(c.semester),week_no:Number(fd.get("week_no")),week_start:start,unit_title:String(fd.get("unit_title")).trim(),learning_focus:String(fd.get("learning_focus")||"").trim()||null};
+    if(!values.unit_title)return toast("กรุณากรอกชื่อหน่วย","","error");
+    buttonLoading(e.currentTarget,true,"กำลังบันทึก...");
+    const result=u?await supabase.from("preschool_shared_weekly_units").update(values).eq("id",u.id):await supabase.from("preschool_shared_weekly_units").insert({...values,created_by:state.user.id});
+    buttonLoading(e.currentTarget,false);
+    if(result.error)return toast("บันทึกหน่วยไม่สำเร็จ",result.error.code==="23505"?"สัปดาห์ที่หรือวันเริ่มต้นนี้มีหน่วยอยู่แล้ว":result.error.message,"error");
+    close();toast("บันทึกหน่วยเรียบร้อย",`สัปดาห์ที่ ${values.week_no} · ${values.unit_title}`,"success");await renderDashboard();
+  };
+}
+async function deletePreschoolUnit(id){
+  const u=state.preschoolSharedUnits.find(x=>x.id===id);
+  const c=state.timetableClasses.find(c=>c.stage_code==="early_childhood"&&Number(c.academic_year)===Number(u?.academic_year)&&Number(c.semester)===Number(u?.semester));
+  if(!u||!canManageTimetableClassLocal(c)||!confirm(`ลบหน่วยกลางสัปดาห์ที่ ${u.week_no}: ${u.unit_title} จากทุกห้องอนุบาลหรือไม่?`))return;
+  const {error}=await supabase.from("preschool_shared_weekly_units").delete().eq("id",id);
+  if(error)return toast("ลบหน่วยไม่สำเร็จ",error.message,"error");toast("ลบหน่วยแล้ว","","success");await renderDashboard();
+}
+function buildPreschoolUnitA4(classId,assets={}){
+  const c=state.timetableClasses.find(c=>c.id===classId),units=preschoolClassUnits(classId);
+  if(!c||!units.length)return "";
+  const homerooms=state.timetableHomerooms.filter(h=>h.class_id===classId).map(h=>timetableTeacherName(h.teacher_id)).filter(Boolean);
+  const tp=timetableProfileForClass(classId);
+  return `<article class="a4-document"><div class="a4-document-inner"><header class="tt-head">${assets.schoolLogo?`<img class="a4-school-logo" src="${assets.schoolLogo}" alt="ตราโรงเรียน">`:""}<h1>ตารางหน่วยการจัดประสบการณ์ระดับปฐมวัย</h1><h2>${escapeHtml(schoolName())} · ปีการศึกษา ${c.academic_year} ภาคเรียนที่ ${c.semester}</h2></header><div class="tt-owner">${escapeHtml(schoolClassLabel(c))} · ครูประจำชั้น ${escapeHtml(homerooms.join(" / ")||"—")}</div><table class="preschool-pdf-table"><thead><tr><th style="width:15mm">สัปดาห์</th><th style="width:56mm">ช่วงวันที่</th><th>หน่วยการจัดประสบการณ์</th><th>สาระสำคัญ / กิจกรรม</th></tr></thead><tbody>${units.map(u=>`<tr><td style="text-align:center">${u.week_no}</td><td>${thaiDateOnly(u.week_start)} – ${thaiDateOnly(preschoolWeekEnd(u.week_start))}</td><td><strong>${escapeHtml(u.unit_title)}</strong></td><td>${escapeHtml(u.learning_focus||"—")}</td></tr>`).join("")}</tbody></table><div class="preschool-pdf-foot">จำนวน ${units.length} หน่วย · จัดหน่วยละ 1 สัปดาห์</div><div class="tt-signatures">${timetableLiveSignature("ครูประจำชั้น",homerooms.join(" / ")||"—")}${timetableLiveSignature("หัวหน้ากลุ่มงานบริหารงานวิชาการ",tp?.academic_head_name)}${timetableLiveSignature("ผู้อำนวยการโรงเรียน",assets.directorSignature?.signer_name||tp?.director_name,"",assets.directorSignature?.image||null)}</div></div></article>`;
+}
+
 function timetableTabsHtml() {
   if (canManageTimetable()) {
     return `<div class="lesson-view-tabs timetable-tabs">
@@ -5491,7 +5678,7 @@ function timetableTabsHtml() {
 
 function timetableHeroHtml() {
   const managerCopy = isAcademicHead()
-    ? "กำหนดชั้น ห้อง วิชา ครู คาบเรียน แล้วลากรายวิชาลงตารางโดยระบบตรวจคาบชนให้อัตโนมัติ"
+    ? "จัดตารางรายคาบสำหรับประถมศึกษา และหน่วยจัดประสบการณ์รายสัปดาห์สำหรับปฐมวัย"
     : `จัดตารางได้เฉพาะ ${timetableManagerScopeLabel()} ตามสิทธิ์หัวหน้าช่วงชั้น พร้อมระบบตรวจคาบชน`;
   return `<section class="lesson-hero timetable-hero">
     <div><span class="eyebrow dark">Academic Scheduling</span><h2>ระบบจัดตารางสอน</h2><p>${canManageTimetable() ? escapeHtml(managerCopy) : "ดูตารางที่เผยแพร่ตามสิทธิ์ของคุณ และ Export ตารางสอน/ตารางเรียนที่รับผิดชอบ"}</p></div>
@@ -5516,6 +5703,7 @@ function timetableAssignmentProgress(a) {
 
 function timetableGridHtml({classId = state.timetableSelectedClassId, readonly = false} = {}) {
   const c = state.timetableClasses.find(x => x.id === classId);
+  if(c?.stage_code==="early_childhood")return preschoolUnitTableHtml(classId,{readonly:true});
   const profile = timetableProfileForClass(classId);
   if (!c || !profile) return `<div class="empty"><strong>ยังไม่มีตารางสำหรับชั้นนี้</strong><span>หัวหน้าวิชาการต้องสร้างชั้น/ห้องก่อน</span></div>`;
   const periods = timetablePeriodsFor(profile.id);
@@ -5557,6 +5745,7 @@ function timetableGridHtml({classId = state.timetableSelectedClassId, readonly =
 
 function timetablePlannerHtml() {
   const c = selectedTimetableClass();
+  if(c?.stage_code==="early_childhood")return preschoolUnitPlannerHtml(c);
   const profile = selectedTimetableProfile();
   const assignments = c ? timetableAssignmentsForClass(c.id) : [];
   const entries = profile ? timetableEntriesFor(profile.id) : [];
@@ -5587,6 +5776,34 @@ function timetablePlannerHtml() {
     </div>` : `<div class="empty"><strong>ยังไม่มีชั้น/ห้องในช่วงที่เลือก</strong><span>เริ่มจากเพิ่มชั้น/ห้อง แล้วตั้งคาบเรียน</span></div>`}`;
 }
 
+function timetableSubjectMasterScopeClass(){
+  const classes=timetableFilteredClasses();
+  if(state.timetableSubjectMasterScope==="preschool")return classes.find(c=>c.stage_code==="early_childhood")||null;
+  return classes.find(c=>c.id===state.timetableSubjectMasterScope)||selectedTimetableClass()||classes[0]||null;
+}
+function timetableSubjectsOfferedForClass(classId,{includeArchived=false}={}){
+  const offered=new Set(state.timetableSubjectOfferings.filter(row=>row.class_id===classId&&(includeArchived||row.is_active!==false)).map(row=>row.subject_id));
+  return state.timetableSubjects.filter(subject=>offered.has(subject.id));
+}
+function timetableMasterSubjectPanel(classes){
+  const c=timetableSubjectMasterScopeClass();
+  const preschool=!!c&&c.stage_code==="early_childhood";
+  const list=preschool?preschoolClassUnits(c.id):c?timetableSubjectsOfferedForClass(c.id):[];
+  const archived=c&&!preschool?state.timetableSubjectOfferings.filter(x=>x.class_id===c.id&&x.is_active===false&&state.timetableSubjects.some(s=>s.id===x.subject_id)):[];
+  return `<section class="panel timetable-subject-scope-panel">
+    <div class="panel-head"><div class="panel-title-wrap"><h3>${preschool?"หน่วยการเรียนรู้ร่วมกัน (อนุบาล)":"Master รายวิชาที่เปิดสอน"}</h3><p>${preschool?"หน่วยรายสัปดาห์ชุดเดียวสำหรับทุกห้องอนุบาล":"รายวิชาแยกตามชั้น/ห้อง ไม่ปะปนกัน"}</p></div>
+    ${!preschool&&canManageSchoolTimetableMaster()?`<button class="btn btn-primary" id="new-timetable-subject" ${c&&!state.timetableSubjectOfferingsError?"":"disabled"}>＋ เพิ่มวิชาห้องนี้</button>`:""}</div>
+    <div class="field" style="margin-bottom:12px"><label>เลือกชั้น / ห้อง</label><select class="select" id="timetable-master-class-select">
+      ${classes.some(c=>c.stage_code==="early_childhood")?`<option value="preschool" ${preschool?"selected":""}>อนุบาล — ดูหน่วยร่วมกันทุกห้อง</option>`:""}
+      ${classes.filter(x=>x.stage_code!=="early_childhood").map(row=>`<option value="${row.id}" ${!preschool&&c?.id===row.id?"selected":""}>${escapeHtml(schoolClassLabel(row))}</option>`).join("")}
+    </select></div>
+    ${state.timetableSubjectOfferingsError&&!preschool?`<div class="drive-permission-warning">กรุณาติดตั้ง SQL v5.12.9.4 ก่อน (${escapeHtml(state.timetableSubjectOfferingsError)})</div>`:""}
+    ${preschool?`${preschoolUnitTableHtml(c.id,{readonly:true})}<div class="preschool-tip">แก้ไขหน่วยได้ที่แท็บ “จัดตาราง” โดยเลือกห้องอนุบาลใดก็ได้ การแก้ไขจะสะท้อนทุกห้อง</div>`:
+    `<div class="list timetable-master-list">${list.length?list.map(s=>`<div class="list-item"><div class="list-body"><strong>${escapeHtml(s.subject_name)}</strong><p>${escapeHtml(s.subject_code||"ไม่มีรหัสวิชา")}</p></div>${canManageSchoolTimetableMaster()?`<button class="btn btn-danger" data-delete-timetable-subject="${s.id}" data-subject-class="${c.id}">นำออกจากห้อง</button>`:""}</div>`).join(""):`<div class="empty"><strong>ห้องนี้ยังไม่มีรายวิชาที่เปิดสอน</strong><span>กดเพิ่มรายวิชาเพื่อผูกกับห้องที่เลือก</span></div>`}</div>
+     ${archived.length&&canManageSchoolTimetableMaster()?`<details style="margin-top:10px"><summary>รายการที่นำออกจากห้อง (${archived.length})</summary><div class="list">${archived.map(row=>{const s=state.timetableSubjects.find(x=>x.id===row.subject_id);return `<div class="list-item"><span>${escapeHtml(s.subject_name)}</span><button class="btn btn-ghost" data-restore-timetable-subject="${s.id}" data-subject-class="${c.id}">คืนรายการ</button></div>`;}).join("")}</div></details>`:""}`}
+  </section>`;
+}
+
 function timetableSetupHtml() {
   const classes = timetableFilteredClasses();
   const currentClass = selectedTimetableClass() || classes[0] || null;
@@ -5600,17 +5817,14 @@ function timetableSetupHtml() {
         return `<div class="list-item"><div class="list-body"><strong>${escapeHtml(schoolClassLabel(c))}</strong><p>${escapeHtml(TIMETABLE_STAGE_LABEL[c.stage_code]||c.stage_code)} · ${tp?.status==="published"?"เผยแพร่แล้ว":"ฉบับร่าง"} · ${escapeHtml(timetablePeriodModeLabel(tp))}</p></div><div class="admin-actions"><button class="btn btn-ghost" data-select-timetable-class="${c.id}">เลือก</button><button class="btn btn-danger" data-delete-timetable-class="${c.id}">ลบ</button></div></div>`;
       }).join("")}</div>`:`<div class="empty"><strong>ยังไม่มีชั้น/ห้อง</strong></div>`}
     </section>
-    <section class="panel">
-      <div class="panel-head"><div class="panel-title-wrap"><h3>รายวิชา</h3><p>${canManageSchoolTimetableMaster() ? "Master รายวิชาที่เปิดสอน" : "ใช้ Master รายวิชาที่หัวหน้าวิชาการกำหนดไว้"}</p></div>${canManageSchoolTimetableMaster()?`<button class="btn btn-primary" id="new-timetable-subject">＋ เพิ่ม</button>`:""}</div>
-      ${state.timetableSubjects.length?`<div class="list timetable-master-list">${state.timetableSubjects.map(s=>`<div class="list-item"><div class="list-body"><strong>${escapeHtml(s.subject_name)}</strong><p>${escapeHtml(s.subject_code||"ไม่มีรหัสวิชา")}</p></div>${canManageSchoolTimetableMaster()?`<button class="btn btn-danger" data-delete-timetable-subject="${s.id}">ลบ</button>`:""}</div>`).join("")}</div>`:`<div class="empty"><strong>ยังไม่มีรายวิชา</strong><span>${canManageSchoolTimetableMaster()?"เพิ่ม Master รายวิชาก่อน":"กรุณาให้หัวหน้าวิชาการเพิ่ม Master รายวิชาก่อน"}</span></div>`}
-    </section>
+    ${timetableMasterSubjectPanel(classes)}
   </div>
   <section class="panel" style="margin-top:16px">
-    <div class="panel-head"><div class="panel-title-wrap"><h3>วิชา + ชั้น/ห้อง + ครูผู้สอน</h3><p>${currentClass?`กำลังดู ${escapeHtml(schoolClassLabel(currentClass))}`:"เลือกชั้น/ห้องก่อน"}</p></div><button class="btn btn-primary" id="new-teaching-assignment" ${currentClass?"":"disabled"}>＋ กำหนดการสอน</button></div>
-    ${currentClass ? (assignments.length?`<div class="table-wrap"><table class="table"><thead><tr><th>วิชา</th><th>ครูผู้สอน</th><th>คาบ/สัปดาห์</th><th>จัดแล้ว</th><th></th></tr></thead><tbody>${assignments.map(a=>{
+    <div class="panel-head"><div class="panel-title-wrap"><h3>${currentClass?.stage_code==="early_childhood"?"การจัดประสบการณ์ปฐมวัย":"วิชา + ชั้น/ห้อง + ครูผู้สอน"}</h3><p>${currentClass?`กำลังดู ${escapeHtml(schoolClassLabel(currentClass))}`:"เลือกชั้น/ห้องก่อน"}</p></div>${currentClass?.stage_code!=="early_childhood"?`<button class="btn btn-primary" id="new-teaching-assignment" ${currentClass?"":"disabled"}>＋ กำหนดการสอน</button>`:""}</div>
+    ${currentClass?.stage_code==="early_childhood"?`<div class="preschool-tip"><strong>ไม่ต้องกำหนดวิชาเป็นคาบ</strong><span>ใช้หน่วยจัดประสบการณ์รายสัปดาห์ร่วมกันทุกห้องอนุบาล จัดการได้ที่แท็บ “จัดตาราง”</span></div>`:(currentClass ? (assignments.length?`<div class="table-wrap"><table class="table"><thead><tr><th>วิชา</th><th>ครูผู้สอน</th><th>คาบ/สัปดาห์</th><th>จัดแล้ว</th><th></th></tr></thead><tbody>${assignments.map(a=>{
       const s=state.timetableSubjects.find(x=>x.id===a.subject_id); const p=timetableAssignmentProgress(a);
-      return `<tr><td><strong>${escapeHtml(s?.subject_name||"—")}</strong><br><span class="table-muted">${escapeHtml(s?.subject_code||"")}</span></td><td>${escapeHtml(a.teacher_name||"ครูผู้สอน")}</td><td>${a.periods_per_week}</td><td>${p.used}/${p.target}</td><td><button class="btn btn-danger" data-delete-teaching-assignment="${a.id}">ลบ</button></td></tr>`;
-    }).join("")}</tbody></table></div>`:`<div class="empty"><strong>ยังไม่มีการกำหนดวิชา/ครู</strong></div>`) : `<div class="empty"><strong>เลือกชั้น/ห้อง</strong></div>`}
+      return `<tr><td><strong>${escapeHtml(s?.subject_name||"—")}</strong><br><span class="table-muted">${escapeHtml(s?.subject_code||"")}</span></td><td>${escapeHtml(a.teacher_name||"ครูผู้สอน")}</td><td>${a.periods_per_week}</td><td>${p.used}/${p.target}</td><td><button class="btn btn-danger" data-delete-teaching-assignment="${a.id}">ยกเลิก</button></td></tr>`;
+    }).join("")}</tbody></table></div>`:`<div class="empty"><strong>ยังไม่มีการกำหนดวิชา/ครู</strong></div>`) : `<div class="empty"><strong>เลือกชั้น/ห้อง</strong></div>`)}
   </section>`;
 }
 
@@ -5668,7 +5882,9 @@ function timetableMineHtml() {
       const c=state.timetableClasses.find(x=>x.id===id); return `<div class="timetable-responsible-card"><div><strong>${escapeHtml(schoolClassLabel(c))}</strong><span>${escapeHtml(TIMETABLE_STAGE_LABEL[c?.stage_code]||"")}</span></div><div><button class="btn btn-ghost" data-preview-class-timetable="${id}">ดูตาราง</button><button class="btn btn-primary" data-export-class-timetable="${id}">พิมพ์ / PDF</button></div></div>`;
     }).join(""):`<div class="empty"><strong>ยังไม่มีห้องที่รับผิดชอบ</strong></div>`}</section>`;
   }
-  return `${timetablePeriodFiltersHtml()}<section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ตารางสอนของฉัน</h3><p>ปีการศึกษา ${p.academicYear} ภาคเรียน ${p.semester}</p></div><button class="btn btn-primary" data-export-teacher-timetable="${state.user.id}">พิมพ์ / PDF</button></div>${teacherScheduleGridHtml(state.user.id)}</section>`;
+  const preschoolRooms=responsible.map(id=>state.timetableClasses.find(c=>c.id===id)).filter(c=>c?.stage_code==="early_childhood");
+  const preschoolSection=preschoolRooms.map(c=>`<section class="panel" style="margin-top:14px"><div class="panel-head"><div class="panel-title-wrap"><h3>หน่วยจัดประสบการณ์ ${escapeHtml(schoolClassLabel(c))}</h3><p>หน่วยการเรียนรู้ชุดเดียวกันสำหรับทุกห้องอนุบาลในปี/ภาคเรียนนี้</p></div><button class="btn btn-primary" data-export-class-timetable="${c.id}">พิมพ์ / PDF</button></div>${preschoolUnitTableHtml(c.id,{readonly:true})}</section>`).join("");
+  return `${timetablePeriodFiltersHtml()}${preschoolSection}<section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ตารางสอนของฉัน</h3><p>ปีการศึกษา ${p.academicYear} ภาคเรียน ${p.semester}</p></div><button class="btn btn-primary" data-export-teacher-timetable="${state.user.id}">พิมพ์ / PDF</button></div>${teacherScheduleGridHtml(state.user.id)}</section>`;
 }
 
 function timetableOverviewHtml() {
@@ -5746,8 +5962,8 @@ function timetableClassModal() {
     });
     buttonLoading(e.currentTarget,false);
     if(profile.error){await supabase.from("school_classes").delete().eq("id",data.id);return toast("สร้างตารางไม่สำเร็จ",profile.error.message,"error");}
-    state.timetableAcademicYear=Number(data.academic_year); state.timetableSemester=Number(data.semester); state.timetableSelectedClassId=data.id; state.timetableView="periods"; close();
-    toast("สร้างชั้น/ห้องแล้ว","ขั้นตอนถัดไป: เลือกว่าจะใช้คาบกลางของโรงเรียนหรือกำหนดคาบเฉพาะห้อง","success");
+    state.timetableAcademicYear=Number(data.academic_year); state.timetableSemester=Number(data.semester); state.timetableSelectedClassId=data.id; state.timetableView=data.stage_code==="early_childhood"?"planner":"periods"; close();
+    toast("สร้างชั้น/ห้องแล้ว",data.stage_code==="early_childhood"?"เพิ่มหน่วยประสบการณ์สัปดาห์ละ 1 หน่วยได้ทันที":"ขั้นตอนถัดไป: ตั้งค่าคาบเรียน","success");
     await renderDashboard();
   });
 }
@@ -5851,21 +6067,105 @@ function timetablePeriodModal(classId) {
   });
 }
 
-function timetableSubjectModal() {
-  const modal=document.createElement("div"); modal.className="modal-backdrop";
-  modal.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>เพิ่มรายวิชา</h3><p>สร้าง Master รายวิชาเพื่อใช้กับหลายชั้นได้</p></div><button class="modal-close">×</button></div><form id="subject-form" class="form-grid"><div class="form-row"><div class="field"><label>รหัสวิชา <span class="optional">(ไม่บังคับ)</span></label><input class="input" name="subject_code"></div><div class="field"><label>ชื่อวิชา</label><input class="input" name="subject_name" required></div></div><div class="field"><label>กลุ่มสาระ</label><select class="select" name="subject_group_id"><option value="">ไม่ระบุ</option>${state.subjectGroups.map(s=>`<option value="${s.id}">${escapeHtml(s.name_th)}</option>`).join("")}</select></div></form><div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="save-subject">บันทึก</button></div></div>`;
-  document.body.appendChild(modal); const close=()=>modal.remove(); modal.querySelector(".modal-close").addEventListener("click",close); modal.querySelector(".modal-cancel").addEventListener("click",close);
-  modal.querySelector("#save-subject").addEventListener("click",async e=>{const f=modal.querySelector("#subject-form");if(!f.reportValidity())return;const fd=new FormData(f);buttonLoading(e.currentTarget,true);const {error}=await supabase.from("academic_subjects").insert({subject_code:String(fd.get("subject_code")||"").trim()||null,subject_name:String(fd.get("subject_name")).trim(),subject_group_id:fd.get("subject_group_id")||null,created_by:state.user.id});buttonLoading(e.currentTarget,false);if(error)return toast("เพิ่มรายวิชาไม่สำเร็จ",error.message,"error");close();await renderDashboard();});
+function timetableSubjectModal(){
+  const c=timetableSubjectMasterScopeClass();
+  if(!c||c.stage_code==="early_childhood")return toast("เลือกห้องประถมหรือมัธยมก่อน","อนุบาลใช้หน่วยร่วมกันแทนรายวิชารายคาบ","error");
+  if(!canManageSchoolTimetableMaster())return;
+  const existing=state.timetableSubjects.filter(s=>!state.timetableSubjectOfferings.some(o=>o.class_id===c.id&&o.subject_id===s.id&&o.is_active!==false));
+  const modal=document.createElement("div");modal.className="modal-backdrop";
+  modal.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>เพิ่มรายวิชาให้ ${escapeHtml(schoolClassLabel(c))}</h3><p>รายการนี้จะปรากฏเฉพาะห้องที่เลือก ไม่กระทบห้องอื่น</p></div><button class="modal-close">×</button></div>
+    <form id="subject-form" class="form-grid"><div class="field"><label>เลือกรายวิชาที่มีอยู่แล้ว (ถ้าต้องการ)</label><select class="select" name="existing_subject"><option value="">— สร้างรายวิชาใหม่ —</option>${existing.map(s=>`<option value="${s.id}">${escapeHtml(s.subject_name)} ${escapeHtml(s.subject_code||"")}</option>`).join("")}</select></div>
+    <div class="form-row"><div class="field"><label>รหัสวิชา (ไม่บังคับ)</label><input class="input" name="subject_code"></div><div class="field"><label>ชื่อวิชาใหม่</label><input class="input" name="subject_name"></div></div>
+    <div class="field"><label>กลุ่มสาระ</label><select class="select" name="subject_group_id"><option value="">ไม่ระบุ</option>${state.subjectGroups.map(s=>`<option value="${s.id}">${escapeHtml(s.name_th)}</option>`).join("")}</select></div></form>
+    <div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="save-subject">บันทึกรายวิชา</button></div></div>`;
+  document.body.appendChild(modal);const close=()=>modal.remove();modal.querySelector(".modal-close").onclick=close;modal.querySelector(".modal-cancel").onclick=close;
+  modal.querySelector("#save-subject").onclick=async e=>{
+    const fd=new FormData(modal.querySelector("#subject-form"));let id=String(fd.get("existing_subject")||"").trim();
+    const name=String(fd.get("subject_name")||"").trim();
+    if(!id&&!name)return toast("กรุณาระบุรายวิชา","เลือกวิชาที่มีอยู่หรือกรอกชื่อวิชาใหม่","error");
+    buttonLoading(e.currentTarget,true,"กำลังบันทึก...");let newlyCreated=null;
+    try{
+      if(!id){
+        const res=await supabase.from("academic_subjects").insert({subject_code:String(fd.get("subject_code")||"").trim()||null,subject_name:name,subject_group_id:fd.get("subject_group_id")||null,created_by:state.user.id}).select("id").single();
+        if(res.error)throw res.error;id=res.data.id;newlyCreated=id;
+      }
+      const already=state.timetableSubjectOfferings.find(x=>x.class_id===c.id&&x.subject_id===id);
+      const result=already?await supabase.from("academic_class_subject_offerings").update({is_active:true}).eq("class_id",c.id).eq("subject_id",id)
+        :await supabase.from("academic_class_subject_offerings").insert({class_id:c.id,subject_id:id,created_by:state.user.id});
+      if(result.error)throw result.error;
+      close();toast("บันทึกวิชาของห้องแล้ว",schoolClassLabel(c),"success");await renderDashboard();
+    }catch(error){
+      if(newlyCreated){await supabase.from("academic_subjects").delete().eq("id",newlyCreated);}
+      toast("เพิ่มรายวิชาไม่ได้",error.message||String(error),"error");
+    }finally{buttonLoading(e.currentTarget,false);}
+  };
 }
 
 function teachingAssignmentModal() {
-  const classes=timetableFilteredClasses(); const selected=selectedTimetableClass()||classes[0];
-  if(!classes.length)return toast("ยังไม่มีชั้น/ห้อง","สร้างชั้น/ห้องก่อน","error");
-  if(!state.timetableSubjects.length)return toast("ยังไม่มีรายวิชา","เพิ่มรายวิชาก่อน","error");
+  const classes=timetableFilteredClasses().filter(c=>c.stage_code!=="early_childhood"); const selected=classes.find(c=>c.id===state.timetableSelectedClassId)||classes[0];
+  if(!classes.length)return toast("ยังไม่มีชั้น/ห้อง ป.1–ม.3","สร้างชั้น/ห้องก่อน","error");
+  if(selected?.stage_code==="early_childhood")return toast("อนุบาลใช้หน่วยรายสัปดาห์","ไม่จำเป็นต้องกำหนดรายคาบ","error");
+  if(!timetableSubjectsOfferedForClass(selected.id).length)return toast("ห้องนี้ยังไม่มีรายวิชา","เพิ่มใน Master รายวิชาของห้องนี้ก่อน","error");
   const modal=document.createElement("div");modal.className="modal-backdrop";
-  modal.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>กำหนดวิชา / ครูผู้สอน</h3><p>ระบุจำนวนคาบต่อสัปดาห์ก่อนนำไปลากวาง</p></div><button class="modal-close">×</button></div><form id="assignment-form" class="form-grid"><div class="field"><label>ชั้น / ห้อง</label><select class="select" name="class_id">${classes.map(c=>`<option value="${c.id}" ${c.id===selected?.id?"selected":""}>${escapeHtml(schoolClassLabel(c))}</option>`).join("")}</select></div><div class="field"><label>รายวิชา</label><select class="select" name="subject_id">${state.timetableSubjects.map(s=>`<option value="${s.id}">${escapeHtml(s.subject_name)}${s.subject_code?` (${escapeHtml(s.subject_code)})`:""}</option>`).join("")}</select></div><div class="field"><label>ครูผู้สอน</label><select class="select" name="teacher_id">${state.timetableTeachers.map(t=>`<option value="${t.id}">${escapeHtml(t.full_name||t.email||"ครูผู้สอน")}</option>`).join("")}</select></div><div class="field"><label>จำนวนคาบต่อสัปดาห์</label><input class="input" name="periods_per_week" type="number" min="1" max="40" value="1" required></div></form><div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="save-assignment">บันทึก</button></div></div>`;
+  modal.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>กำหนดวิชา / ครูผู้สอน</h3><p>ระบุจำนวนคาบต่อสัปดาห์ก่อนนำไปลากวาง</p></div><button class="modal-close">×</button></div><form id="assignment-form" class="form-grid"><div class="field"><label>ชั้น / ห้อง</label><select class="select" name="class_id">${classes.filter(c=>c.stage_code!=="early_childhood").map(c=>`<option value="${c.id}" ${c.id===selected?.id?"selected":""}>${escapeHtml(schoolClassLabel(c))}</option>`).join("")}</select></div><div class="field"><label>รายวิชา</label><select class="select" name="subject_id">${timetableSubjectsOfferedForClass(selected.id).map(s=>`<option value="${s.id}">${escapeHtml(s.subject_name)}${s.subject_code?` (${escapeHtml(s.subject_code)})`:""}</option>`).join("")}</select></div><div class="field"><label>ครูผู้สอน</label><select class="select" name="teacher_id">${state.timetableTeachers.map(t=>`<option value="${t.id}">${escapeHtml(t.full_name||t.email||"ครูผู้สอน")}</option>`).join("")}</select></div><div class="field"><label>จำนวนคาบต่อสัปดาห์</label><input class="input" name="periods_per_week" type="number" min="1" max="40" value="1" required></div></form><div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="save-assignment">บันทึก</button></div></div>`;
   document.body.appendChild(modal);const close=()=>modal.remove();modal.querySelector(".modal-close").addEventListener("click",close);modal.querySelector(".modal-cancel").addEventListener("click",close);
-  modal.querySelector("#save-assignment").addEventListener("click",async e=>{const f=modal.querySelector("#assignment-form");if(!f.reportValidity())return;const fd=new FormData(f);buttonLoading(e.currentTarget,true);const {error}=await supabase.from("teaching_assignments").insert({class_id:fd.get("class_id"),subject_id:fd.get("subject_id"),teacher_id:fd.get("teacher_id"),periods_per_week:Number(fd.get("periods_per_week")),created_by:state.user.id});buttonLoading(e.currentTarget,false);if(error)return toast("กำหนดการสอนไม่สำเร็จ",error.message,"error");state.timetableSelectedClassId=fd.get("class_id");close();await renderDashboard();});
+  const classSelect=modal.querySelector('[name="class_id"]'),subjectSelect=modal.querySelector('[name="subject_id"]');
+  classSelect.addEventListener("change",()=>{const offered=timetableSubjectsOfferedForClass(classSelect.value);subjectSelect.innerHTML=offered.map(s=>`<option value="${s.id}">${escapeHtml(s.subject_name)} ${escapeHtml(s.subject_code||"")}</option>`).join("");});
+  modal.querySelector("#save-assignment").addEventListener("click",async e=>{
+    const f=modal.querySelector("#assignment-form"); if(!f.reportValidity())return;
+    const fd=new FormData(f), classId=String(fd.get("class_id")||"");
+    if(!timetableSubjectsOfferedForClass(classId).some(s=>s.id===fd.get("subject_id")))
+      return toast("ห้องนี้ไม่มีรายวิชาดังกล่าว","เลือกรายวิชาที่เปิดสอนในห้องนี้เท่านั้น","error");
+    buttonLoading(e.currentTarget,true,"กำลังบันทึก...");
+    try {
+      const result=await saveOrRestoreTeachingAssignment({
+        class_id:classId,subject_id:String(fd.get("subject_id")),teacher_id:String(fd.get("teacher_id")),
+        periods_per_week:Number(fd.get("periods_per_week")),created_by:state.user.id
+      });
+      if(result.error)return toast("กำหนดการสอนไม่สำเร็จ",result.error.message,"error");
+      if(result.duplicate)return toast("มีการกำหนดการสอนนี้อยู่แล้ว","เลือกวิชา/ครูคนอื่น หรือยกเลิกการกำหนดเดิมก่อน","error");
+      state.timetableSelectedClassId=classId;
+      close();
+      toast(result.restored?"คืนการกำหนดการสอนแล้ว":"กำหนดการสอนสำเร็จ",
+        result.restored?"ใช้ข้อมูลรายการเดิมเพื่อรักษาความเชื่อมโยงข้อสอบและผลสอบ":"","success");
+      await renderDashboard();
+    } catch(error) { toast("กำหนดการสอนไม่สำเร็จ",error?.message||"เกิดข้อผิดพลาด","error"); }
+    finally { buttonLoading(e.currentTarget,false); }
+  });
+}
+
+// Preserve exam sets and attempts: reactivating an existing assignment must not create a new ID.
+async function saveOrRestoreTeachingAssignment(input){
+  const existing=await supabase.from("teaching_assignments")
+    .select("id,is_active")
+    .eq("class_id",input.class_id).eq("subject_id",input.subject_id)
+    .eq("teacher_id",input.teacher_id).maybeSingle();
+  if(existing.error)return {error:existing.error};
+  if(existing.data?.is_active)return {duplicate:true};
+  if(existing.data){
+    const restored=await supabase.from("teaching_assignments")
+      .update({is_active:true,periods_per_week:input.periods_per_week})
+      .eq("id",existing.data.id).eq("is_active",false).select("id").maybeSingle();
+    if(restored.error)return {error:restored.error};
+    if(!restored.data)return {error:{message:"ไม่สามารถคืนรายการเดิมได้ กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง"}};
+    return {restored:true};
+  }
+  const created=await supabase.from("teaching_assignments").insert(input);
+  return created.error?{error:created.error}:{created:true};
+}
+
+// A timetable must be cleared separately; archived assignments remain linked to historical exams.
+async function archiveTeachingAssignment(assignmentId){
+  const slots=await supabase.from("timetable_entries")
+    .select("id",{count:"exact",head:true}).eq("assignment_id",assignmentId);
+  if(slots.error)return {error:slots.error};
+  if((slots.count||0)>0)return {blocked:true,periods:slots.count};
+  const archived=await supabase.from("teaching_assignments")
+    .update({is_active:false}).eq("id",assignmentId).eq("is_active",true)
+    .select("id").maybeSingle();
+  if(archived.error)return {error:archived.error};
+  if(!archived.data)return {error:{message:"ไม่พบรายการที่ยังเปิดใช้งาน หรือคุณไม่มีสิทธิ์แก้ไข กรุณาโหลดหน้าใหม่"}};
+  return {archived:true};
 }
 
 async function dropTimetableItem(payload,day,periodId) {
@@ -5903,6 +6203,13 @@ function timetableLiveSignature(title,name,subtitle="",image=null) {
 
 function timetableA4Styles() {
   return `${a4DocumentStyles()}
+    .preschool-pdf-table{width:100%;border-collapse:collapse;font-size:15.5pt;table-layout:fixed}
+    .preschool-pdf-table th,.preschool-pdf-table td{border:1px solid #333;padding:2mm 2.5mm;vertical-align:middle;overflow-wrap:anywhere}
+    .preschool-pdf-table th{background:#f4f7f1;font-weight:700}
+    .preschool-pdf-table tbody tr{break-inside:avoid;page-break-inside:avoid}
+    .preschool-pdf-table thead{display:table-header-group}
+    .preschool-pdf-foot{font-size:14pt;margin-top:5mm}
+    .preschool-pdf-table .preschool-detail{display:block;font-size:13pt}
     @page{size:A4 landscape;margin:8mm;}
     .a4-document{width:277mm;min-height:190mm;padding:0;box-shadow:none;}
     .a4-document-inner{padding:7mm 8mm;}
@@ -5955,6 +6262,7 @@ function buildTimetablePdfTable(data) {
 }
 
 function buildClassTimetableA4(classId,assets={}) {
+  if(state.timetableClasses.find(c=>c.id===classId)?.stage_code==="early_childhood")return buildPreschoolUnitA4(classId,assets);
   const data=timetableClassPdfData(classId);if(!data)return "";
   const homeroomIds=state.timetableHomerooms.filter(h=>h.class_id===classId).map(h=>h.teacher_id);
   const homeroomNames=homeroomIds.map(timetableTeacherName).filter(Boolean);
@@ -6128,7 +6436,7 @@ function canViewSubstituteOverview() {
 }
 
 function substituteAcademicYears() {
-  const values = new Set(state.substituteLessons.map(x => Number(x.academic_year)).filter(Boolean));
+  const values = new Set([...state.substituteLessons,...state.preschoolCovers].map(x => Number(x.academic_year)).filter(Boolean));
   values.add(currentAcademicPeriod().academicYear);
   return [...values].sort((a,b) => b-a);
 }
@@ -6184,6 +6492,27 @@ async function loadSubstituteWorkspace() {
   ]);
   state.substituteLessons=lessonsRes.error?[]:(lessonsRes.data||[]);
   state.substituteActions=actionsRes.error?[]:(actionsRes.data||[]);
+  const [coverRes,unitRes,classesRes]=await Promise.all([
+    supabase.from("preschool_group_covers").select("*").order("leave_date",{ascending:false}).limit(1500),
+    supabase.from("preschool_shared_weekly_units").select("*").order("week_start"),
+    supabase.from("school_classes").select("*").eq("is_active",true)
+  ]);
+  if(!classesRes.error)state.timetableClasses=classesRes.data||[];
+  state.preschoolSharedUnits=unitRes.error?[]:(unitRes.data||[]);
+  state.preschoolSharedUnitsError=unitRes.error?.message||"";
+  state.preschoolCovers=coverRes.error?[]:(coverRes.data||[]);
+  state.preschoolCoverLoadError=coverRes.error?coverRes.error.message:"";
+  if(!coverRes.error&&state.preschoolCovers.length){
+    const ids=state.preschoolCovers.map(g=>g.id);
+    const memberRes=await supabase.from("preschool_group_cover_members").select("*").in("cover_id",ids).order("teacher_name").limit(4000);
+    state.preschoolCoverMembers=memberRes.error?[]:(memberRes.data||[]);
+    if(memberRes.error)state.preschoolCoverLoadError=memberRes.error.message;
+  }else state.preschoolCoverMembers=[];
+  if(state.targetPreschoolLeaveId){
+    const target=state.preschoolCovers.find(g=>g.leave_request_id===state.targetPreschoolLeaveId&&g.status==="active");
+    if(target){state.substituteView="preschool";state.selectedPreschoolCoverId=target.id;state.selectedSubstituteLeaveId=null;}
+    state.targetPreschoolLeaveId=null;
+  }
   const current=currentAcademicPeriod();
   if(!state.substituteAcademicYear)state.substituteAcademicYear=current.academicYear;
   if(!state.substituteSemester)state.substituteSemester=current.semester;
@@ -6193,10 +6522,10 @@ async function loadSubstituteWorkspace() {
     if(!state.selectedSubstituteDate||!dates.includes(state.selectedSubstituteDate))state.selectedSubstituteDate=dates[0]||null;
   }
   if(canManageSubstituteTeaching()){
-    if(!["manage","pending","mine","absent"].includes(state.substituteView))state.substituteView="manage";
+    if(!["manage","pending","mine","absent","preschool"].includes(state.substituteView))state.substituteView="manage";
   }else if(canViewSubstituteOverview()){
-    if(!["manage","pending","mine","absent"].includes(state.substituteView))state.substituteView="manage";
-  }else if(!["mine","absent"].includes(state.substituteView))state.substituteView="absent";
+    if(!["manage","pending","mine","absent","preschool"].includes(state.substituteView))state.substituteView="manage";
+  }else if(!["mine","absent","preschool"].includes(state.substituteView))state.substituteView="absent";
 }
 
 function substitutePeriodFilterHtml() {
@@ -6204,10 +6533,14 @@ function substitutePeriodFilterHtml() {
   return `<div class="substitute-filter-row"><div class="field"><label>ปีการศึกษา</label><select class="select" id="substitute-year">${substituteAcademicYearsForUser().map(y=>`<option value="${y}" ${y===p.academicYear?"selected":""}>${y}</option>`).join("")}</select></div><div class="field"><label>ภาคเรียน</label><select class="select" id="substitute-semester"><option value="1" ${p.semester===1?"selected":""}>1</option><option value="2" ${p.semester===2?"selected":""}>2</option><option value="3" ${p.semester===3?"selected":""}>3</option></select></div></div>`;
 }
 
-function substituteTabsHtml() {
+function substituteLegacyTabsHtml() {
   if(canManageSubstituteTeaching())return `<div class="lesson-view-tabs substitute-tabs"><button class="lesson-view-tab ${state.substituteView==="manage"?"active":""}" data-substitute-view="manage">รายการตามใบลา</button><button class="lesson-view-tab ${state.substituteView==="pending"?"active":""}" data-substitute-view="pending">รอจัดครู</button><button class="lesson-view-tab ${state.substituteView==="absent"?"active":""}" data-substitute-view="absent">การลาของฉัน</button><button class="lesson-view-tab ${state.substituteView==="mine"?"active":""}" data-substitute-view="mine">งานสอนแทนของฉัน</button></div>`;
   if(canViewSubstituteOverview())return `<div class="lesson-view-tabs substitute-tabs"><button class="lesson-view-tab ${state.substituteView==="manage"?"active":""}" data-substitute-view="manage">สถานะการจัดสอนแทน</button>${state.profile.role==="department_head"?`<button class="lesson-view-tab ${state.substituteView==="absent"?"active":""}" data-substitute-view="absent">การลาของฉัน</button>`:""}</div>`;
   return `<div class="lesson-view-tabs substitute-tabs"><button class="lesson-view-tab ${state.substituteView==="absent"?"active":""}" data-substitute-view="absent">จัดสอนแทนของฉัน</button><button class="lesson-view-tab ${state.substituteView==="mine"?"active":""}" data-substitute-view="mine">งานสอนแทนที่ได้รับ</button></div>`;
+}
+
+function substituteTabsHtml() {
+  return substituteLegacyTabsHtml().replace("</div>",`<button class="lesson-view-tab ${state.substituteView==="preschool"?"active":""}" data-substitute-view="preschool">ฝากสอนปฐมวัย (แบบกลุ่ม)</button></div>`);
 }
 
 function substituteManagerScopeText() {
@@ -6338,6 +6671,118 @@ async function syncSubstituteTeaching() {
   toast("ซิงก์ระบบสอนแทนแล้ว",Number(data||0)?`พบคาบใหม่ ${data} รายการ`:"ไม่มีคาบใหม่ที่ต้องเพิ่ม","success"); await renderDashboard();
 }
 
+
+function preschoolCoverMembers(coverId){return state.preschoolCoverMembers.filter(m=>m.cover_id===coverId&&m.is_current_staff!==false);}
+function preschoolCoverUnitLabel(g){
+  const u=preschoolUnitForDate(g.class_id,g.leave_date);
+  return u?`สัปดาห์ที่ ${u.week_no} · ${u.unit_title}`:"ยังไม่ได้กำหนดหน่วยของสัปดาห์นี้";
+}
+function preschoolCoverProgress(g){
+  const members=preschoolCoverMembers(g.id),eligible=members.filter(m=>m.is_available);
+  return {members,eligible,done:eligible.filter(m=>m.acknowledged_at).length,pending:eligible.filter(m=>!m.acknowledged_at).length};
+}
+function canSyncPreschoolCovers(){
+  return isAcademicHead()||["director","super_admin"].includes(state.profile?.role)
+    ||state.timetableStageHeads.some(sh=>sh.teacher_id===state.user.id&&sh.stage_code==="early_childhood"&&String(sh.academic_year)===String(substituteCurrentPeriod().academicYear));
+}
+function preschoolCoverWorkspaceHtml(){
+  const p=substituteCurrentPeriod(),rows=state.preschoolCovers.filter(g=>g.academic_year===p.academicYear&&g.semester===p.semester&&g.status==="active").sort((a,b)=>a.leave_date.localeCompare(b.leave_date));
+  const selected=state.preschoolCovers.find(g=>g.id===state.selectedPreschoolCoverId&&g.status==="active");
+  const top=`${substituteHeroHtml()}${substituteTabsHtml()}${substitutePeriodFilterHtml()}`;
+  if(state.preschoolCoverLoadError)return `${top}<section class="panel"><div class="drive-permission-warning"><strong>ยังไม่ได้เปิดใช้ระบบฝากสอนปฐมวัย</strong><span>ต้องรันไฟล์ SQL v5.12.9 ใน Supabase โปรเจกต์ BNK School OS ก่อน · ${escapeHtml(state.preschoolCoverLoadError)}</span></div></section>`;
+  if(selected){
+    const prog=preschoolCoverProgress(selected),me=prog.members.find(m=>m.teacher_id===state.user.id);
+    return `${top}<section class="panel preschool-cover-panel"><div class="panel-head"><div class="panel-title-wrap"><button class="type-back-link" id="preschool-cover-back">← กลับรายการ</button><h3>ใบฝากดูแลชั้นอนุบาล · ${escapeHtml(selected.class_label)}</h3><p>${thaiDateOnly(selected.leave_date)} · ผู้ลา ${escapeHtml(selected.absent_teacher_name)}</p></div><button class="btn btn-primary" id="preschool-cover-export">▤ Preview / PDF</button></div><div class="preschool-tip"><strong>หน่วยการเรียนรู้: ${escapeHtml(preschoolCoverUnitLabel(selected))}</strong><span>ครูอนุบาลที่ไม่ได้ลา รับทราบแล้ว ${prog.done}/${prog.eligible.length} คน · แสดงรายชื่อทุกคนที่อยู่ในทีม พร้อมสถานะผู้ลาคนอื่น</span></div>${prog.members.length?`<div class="table-wrap"><table class="table"><thead><tr><th>ที่</th><th>รายชื่อครูอนุบาล</th><th>สถานะ</th><th>วันเวลารับทราบ</th><th></th></tr></thead><tbody>${prog.members.map((m,i)=>`<tr><td>${i+1}</td><td><strong>${escapeHtml(m.teacher_name)}</strong></td><td><span class="pill ${!m.is_available?"suspended":m.acknowledged_at?"active":"pending"}">${!m.is_available?"ลา / ไม่สามารถรับฝาก":m.acknowledged_at?"รับทราบแล้ว":"รอรับทราบ"}</span></td><td>${m.acknowledged_at?formatDate(m.acknowledged_at):"—"}</td><td>${m.teacher_id===state.user.id&&m.is_available?`<button class="btn ${m.acknowledged_at?"btn-ghost":"btn-primary"}" data-preschool-ack="${selected.id}" data-ack-value="${m.acknowledged_at?"false":"true"}">${m.acknowledged_at?"ยกเลิกการรับทราบ":"รับทราบ / รับฝาก"}</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:`<div class="empty"><strong>ยังไม่มีรายชื่อครูอนุบาลที่เชื่อมกับชั้นเรียน</strong><span>กรุณากำหนดครูประจำชั้นและผู้สอนระดับปฐมวัยในเมนูจัดการหน้าที่ครู แล้วกดซิงก์</span></div>`}${me?.acknowledged_at?`<p class="table-muted">คุณรับทราบการฝากดูแลแล้วเมื่อ ${formatDate(me.acknowledged_at)} (ระบบบันทึกเวลาอัตโนมัติ)</p>`:""}</section>`;
+  }
+  return `${top}<section class="panel preschool-cover-panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ฝากดูแลและจัดประสบการณ์ปฐมวัย (แบบกลุ่ม)</h3><p>ไม่ต้องเลือกคาบ · ครูอนุบาลทุกคนที่กำหนดหน้าที่ไว้จะแสดงในใบฝากดูแลรายวัน</p></div>${canSyncPreschoolCovers()?`<button class="btn btn-secondary" id="sync-preschool-covers">↻ ซิงก์ใบลาปฐมวัย</button>`:""}</div><div class="preschool-tip"><strong>หลักการทำงาน</strong><span>เมื่อครูประจำชั้นอนุบาลส่งใบลา ระบบสร้างใบฝากดูแลรายวันอัตโนมัติ · ผู้รับฝากทุกคนกดรับทราบและลงชื่อบนใบ PDF ได้</span></div>${rows.length?`<div class="preschool-cover-cards">${rows.map(g=>{const x=preschoolCoverProgress(g);return `<article class="preschool-cover-card"><div><span class="eyebrow dark">${thaiDateOnly(g.leave_date)} · ${escapeHtml(g.class_label)}</span><h3>${escapeHtml(g.absent_teacher_name)}</h3><p>${escapeHtml(preschoolCoverUnitLabel(g))}</p></div><div class="preschool-cover-side"><span class="pill ${x.pending?"pending":"active"}">รับทราบ ${x.done}/${x.eligible.length} คน</span><button class="btn btn-primary" data-preschool-cover-open="${g.id}">เปิดใบฝากสอน</button></div></article>`}).join("")}</div>`:`<div class="empty"><strong>ยังไม่มีใบฝากสอนปฐมวัยในภาคเรียนนี้</strong><span>เมื่อครูอนุบาลที่มีหน้าที่ครูประจำชั้นยื่นใบลา ระบบจะสร้างรายการให้อัตโนมัติ</span></div>`}</section>`;
+}
+async function syncPreschoolCovers(){
+  if(!canSyncPreschoolCovers())return;
+  const p=substituteCurrentPeriod(),btn=document.querySelector("#sync-preschool-covers");buttonLoading(btn,true,"กำลังซิงก์...");
+  const {data,error}=await supabase.rpc("sync_preschool_group_covers",{p_academic_year:p.academicYear,p_semester:p.semester});buttonLoading(btn,false);
+  if(error)return toast("ซิงก์ไม่ได้",error.message,"error");
+  toast("ซิงก์ใบฝากปฐมวัยแล้ว",`ตรวจพบรายการประจำวันที่เข้าเงื่อนไข ${data||0} รายการ`,"success");await renderDashboard();
+}
+async function acknowledgePreschoolCover(id,ack,button){
+  if(!ack&&!confirm("ยกเลิกการรับทราบใบฝากสอนนี้หรือไม่?"))return;
+  buttonLoading(button,true,"กำลังบันทึก...");
+  const {error}=await supabase.rpc("acknowledge_preschool_group_cover",{p_cover_id:id,p_acknowledge:ack});buttonLoading(button,false);
+  if(error)return toast("บันทึกการรับทราบไม่ได้",error.message,"error");
+  toast(ack?"รับทราบใบฝากสอนแล้ว":"ยกเลิกการรับทราบแล้ว","บันทึกสถานะไว้ในระบบแล้ว","success");await renderDashboard();
+}
+function preschoolCoverDocStyles(){
+  return `${a4DocumentStyles()} @page{size:A4 portrait;margin:13mm;}
+  .a4-document{width:184mm;min-height:260mm;padding:0;box-shadow:none;font-size:16pt;}
+  .a4-document-inner{padding:5mm;}
+  .ps-doc-title{text-align:center;line-height:1.2;margin-bottom:5mm}
+  .ps-doc-title h1{font-size:20pt;margin:2mm 0}
+  .ps-doc-summary{font-size:16pt;line-height:1.35;margin:3mm 0 6mm}
+  .ps-doc-table{width:100%;border-collapse:collapse;font-size:16pt;table-layout:fixed}
+  .ps-doc-table th,.ps-doc-table td{border:1px solid #333;padding:1.7mm;vertical-align:middle}
+  .ps-doc-table th{background:#fafafa;font-weight:700;text-align:center}
+  .ps-doc-table thead{display:table-header-group}
+  .ps-doc-table tbody tr{break-inside:avoid;page-break-inside:avoid}
+  .ps-sign-date{font-size:11pt;color:#444}
+  .ps-doc-sign-block{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:9mm;row-gap:5mm;margin-top:8mm;break-inside:avoid;page-break-inside:avoid}
+  .ps-doc-sign-card{text-align:center;font-size:15pt;line-height:1.25;min-width:0;break-inside:avoid}
+  .ps-doc-sign-space{height:8mm}
+  .ps-doc-sign-card strong,.ps-doc-sign-card span{display:block}
+  .ps-doc-sign-card .ps-doc-signer-name{min-height:6mm;overflow-wrap:anywhere}
+  .ps-doc-foot{margin-top:4mm;font-size:12pt}`;
+}
+// Names come from existing personnel / timetable data; no new SQL is needed.
+// If the current user cannot read a profile, retain a handwritten name line.
+async function preschoolCoverDocumentSigners(g){
+  const tp=(state.timetableProfiles||[]).find(row=>row.class_id===g.class_id)||{};
+  const signers={
+    stage_head_name:"",
+    academic_head_name:tp.academic_head_name||"",
+    director_name:tp.director_name||"",
+  };
+  const active=q=>q.eq("account_status","active").is("deleted_at",null);
+  const academicDept=academicDepartmentId();
+  const calls=[
+    academicDept?active(supabase.from("profiles").select("full_name,email").eq("role","department_head").eq("department_id",academicDept)).order("approved_at",{ascending:true}).limit(1):Promise.resolve({data:[]}),
+    active(supabase.from("profiles").select("full_name,email").eq("role","director")).order("approved_at",{ascending:true}).limit(1),
+    supabase.from("stage_heads").select("teacher_id").eq("stage_code","early_childhood").eq("academic_year",String(g.academic_year)).limit(1),
+  ];
+  try{
+    const [headRes,directorRes,stageRes]=await Promise.all(calls);
+    const head=headRes.data?.[0];
+    const director=directorRes.data?.[0];
+    if(head)signers.academic_head_name=head.full_name||head.email||signers.academic_head_name;
+    if(director)signers.director_name=director.full_name||director.email||signers.director_name;
+    const stageHeadId=stageRes.data?.[0]?.teacher_id;
+    if(stageHeadId){
+      const cached=(state.timetableTeachers||[]).find(p=>p.id===stageHeadId);
+      signers.stage_head_name=cached?.full_name||cached?.email||"";
+      if(!signers.stage_head_name){
+        const {data:stageProfile}=await supabase.from("profiles").select("full_name,email").eq("id",stageHeadId).maybeSingle();
+        signers.stage_head_name=stageProfile?.full_name||stageProfile?.email||"";
+      }
+    }
+  }catch(error){console.warn("Unable to resolve preschool document signers",error);}
+  return signers;
+}
+function preschoolCoverWetSignature(title,name){
+  return `<div class="ps-doc-sign-card"><div class="ps-doc-sign-space"></div><div>ลงชื่อ................................................</div><span class="ps-doc-signer-name">(${escapeHtml(name||"........................................")})</span><strong>${escapeHtml(title)}</strong></div>`;
+}
+function buildPreschoolCoverDocument(g,assets={}){
+  const members=preschoolCoverMembers(g.id);
+  const unit=preschoolUnitForDate(g.class_id,g.leave_date);
+  return `<article class="a4-document"><div class="a4-document-inner"><header class="ps-doc-title">${assets.schoolLogo?`<img class="a4-school-logo" src="${assets.schoolLogo}" style="height:19mm" alt="ตราโรงเรียน">`:""}<div>${escapeHtml(schoolName())}</div><h1>บันทึกการฝากดูแลและจัดประสบการณ์ระดับปฐมวัย</h1><div>ระบบจัดการสอนแทน · ภาคเรียนที่ ${g.semester} ปีการศึกษา ${g.academic_year}</div></header><div class="ps-doc-summary"><div>ผู้ฝาก: <strong>${escapeHtml(g.absent_teacher_name)}</strong> &nbsp; ชั้นเรียน: <strong>${escapeHtml(g.class_label)}</strong></div><div>วันที่ฝากดูแล: <strong>${thaiDateOnly(g.leave_date)}</strong></div><div>หน่วยการจัดประสบการณ์: <strong>${escapeHtml(unit?.unit_title||"ยังไม่กำหนดหน่วย")}</strong>${unit?` (สัปดาห์ที่ ${unit.week_no})`:""}</div><div>ขอความร่วมมือคณะครูระดับปฐมวัยร่วมดูแลเด็กและดำเนินกิจกรรมตามหน่วยการจัดประสบการณ์ในวันที่ระบุ</div></div><table class="ps-doc-table"><thead><tr><th style="width:10mm">ที่</th><th>รายชื่อครูอนุบาลผู้รับฝาก</th><th style="width:30mm">สถานะ</th><th style="width:48mm">ลายมือชื่อ</th></tr></thead><tbody>${members.length?members.map((m,i)=>`<tr><td style="text-align:center">${i+1}</td><td>${escapeHtml(m.teacher_name)}</td><td style="text-align:center">${!m.is_available?"ลา":m.acknowledged_at?"รับทราบแล้ว":"รอลงชื่อ"}</td><td style="height:12mm">${m.acknowledged_at?`<span class="ps-sign-date">รับทราบในระบบ ${thaiDateOnly(m.acknowledged_at.slice(0,10))}</span>`:""}</td></tr>`).join(""):`<tr><td colspan="4">ยังไม่พบรายชื่อครูปฐมวัย กรุณากำหนดหน้าที่ครูในระบบ</td></tr>`}</tbody></table><div class="ps-doc-sign-block">${preschoolCoverWetSignature("ผู้ฝากดูแลชั้นเรียน",g.absent_teacher_name)}${preschoolCoverWetSignature("หัวหน้าช่วงชั้นปฐมวัย",assets.signers?.stage_head_name)}${preschoolCoverWetSignature("หัวหน้ากลุ่มงานบริหารงานวิชาการ",assets.signers?.academic_head_name)}${preschoolCoverWetSignature("ผู้อำนวยการโรงเรียน",assets.signers?.director_name)}</div><div class="ps-doc-foot">หมายเหตุ: ผู้รับฝากสามารถลงลายมือชื่อบนเอกสารฉบับพิมพ์ได้ ส่วนสถานะ “รับทราบแล้ว” คือการยืนยันในระบบพร้อมวันเวลา ไม่ใช่ลายเซ็นภาพ</div></div></article>`;
+}
+async function preschoolCoverPdfPreview(id){
+  const g=state.preschoolCovers.find(x=>x.id===id);if(!g)return toast("ไม่พบข้อมูล","","error");
+  const [schoolLogo,signers]=await Promise.all([schoolLogoDataUrl(),preschoolCoverDocumentSigners(g)]);
+  const body=buildPreschoolCoverDocument(g,{schoolLogo,signers}),css=preschoolCoverDocStyles();
+  const modal=document.createElement("div");modal.className="modal-backdrop a4-preview-backdrop";
+  modal.innerHTML=`<div class="a4-preview-shell"><div class="a4-preview-toolbar"><div><strong>ใบฝากดูแลระดับปฐมวัย ${escapeHtml(g.class_label)}</strong><span>A4 แนวตั้ง · TH SarabunIT๙ · รายชื่อคณะครูทุกคนที่มีหน้าที่ระดับปฐมวัย</span></div><div class="a4-preview-actions"><button class="btn btn-ghost" id="ps-close">ปิด</button><button class="btn btn-primary" id="ps-print">พิมพ์ / บันทึก PDF</button></div></div><div class="a4-preview-scroll"><style>${css}</style>${body}</div></div>`;
+  document.body.appendChild(modal);modal.querySelector("#ps-close").onclick=()=>modal.remove();
+  modal.querySelector("#ps-print").onclick=()=>{const w=window.open("","_blank");if(!w)return toast("เปิดหน้าพิมพ์ไม่ได้","กรุณาอนุญาต Pop-up","error");
+    w.document.write(`<!doctype html><html lang="th"><head><meta charset="UTF-8"><title>ใบฝากดูแลปฐมวัย</title><style>${css}</style></head><body class="a4-print-body">${body}<script>window.addEventListener('load',()=>{(document.fonts?document.fonts.ready:Promise.resolve()).finally(()=>setTimeout(()=>window.print(),250));});<\/script></body></html>`);w.document.close();};
+}
+
 function substituteDocumentStyles() {
   return `${a4DocumentStyles()} @page{size:A4 landscape;margin:7mm;} .a4-document{width:277mm;min-height:190mm;padding:0;box-shadow:none;font-size:13pt;} .a4-document-inner{padding:5mm 7mm;} .sub-doc-head{text-align:center;margin-bottom:3mm;} .sub-doc-head .a4-school-logo{height:20mm;max-width:30mm;margin-bottom:1mm;} .sub-doc-head .school{font-size:17pt;font-weight:700;line-height:1.05;} .sub-doc-head .meta{font-size:11.5pt;line-height:1.08;} .sub-doc-head h1{font-size:19pt;margin:1.5mm 0 .5mm;} .sub-doc-sub{display:flex;justify-content:center;gap:8mm;font-size:12.5pt;margin-bottom:2mm;} .sub-doc-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:11.5pt;} .sub-doc-table th,.sub-doc-table td{border:1px solid #222;padding:1.2mm 1mm;text-align:center;vertical-align:middle;line-height:1.08;height:10.5mm;} .sub-doc-table th{font-weight:700;background:#fafafa;} .sub-doc-table .sig-cell{height:12mm;} .sub-doc-signatures{display:grid;grid-template-columns:repeat(4,1fr);gap:5mm;margin-top:7mm;page-break-inside:avoid;} .sub-doc-sign{text-align:center;font-size:11.5pt;line-height:1.25;} .sub-doc-sign-image{display:block;max-width:45mm;height:12mm;object-fit:contain;margin:0 auto .5mm}.sub-doc-sign-space{height:12mm}.sub-doc-sign strong,.sub-doc-sign span,.sub-doc-sign small{display:block;} .sub-doc-foot{font-size:9.5pt;color:#555;margin-top:3mm;text-align:right;}`;
 }
@@ -6359,6 +6804,7 @@ async function substitutePdfPreview(leaveRequestId,leaveDate) {
 }
 
 function substituteWorkspaceHtml(module) {
+  if(state.substituteView==="preschool")return preschoolCoverWorkspaceHtml();
   const selectedLesson=state.substituteLessons.find(x=>x.id===state.selectedSubstituteLessonId); if(selectedLesson)return substituteDetailHtml(selectedLesson);
   if(state.selectedSubstituteLeaveId&&state.selectedSubstituteDate)return substituteDayPlannerHtml();
   const rows=substituteRowsForView(),title=state.substituteView==="pending"?"ใบลาที่มีคาบรอจัดครู":state.substituteView==="mine"?"งานสอนแทนที่ได้รับ":state.substituteView==="absent"?"การจัดสอนแทนของฉัน":"สถานะการจัดสอนแทน";
@@ -11475,7 +11921,7 @@ function procurementControlFieldHtml(key,label,f,val){
   if(key==="inspection_order_number")return `<div class="field procurement-control-derived"><label>${escapeHtml(label)}</label><input class="input" name="inspection_order_number" readonly value="${escapeHtml(ord?.primary_number||String(val||""))}" placeholder="มาจากเลขคุมชุด 2"><small class="helper">แต่งตั้งตรวจรับใช้เลขคุมชุด 2 เดียวกับเอกสาร TOR</small></div>`;
   if(key==="purchase_order_number")return procurementControlDerivedField(label,"control_purchase_order_id",poId,"purchase_order_number",po?.primary_number||String(val||""),"Auto-match ชุด 3 จากเรื่องเดียวกับชุด 1","procurement-control-purchase-order");
   if(key==="disbursement_no")return procurementControlDerivedField(label,"control_disbursement_id",disbId,"disbursement_no",disb?.primary_number||String(val||""),"Auto-match ชุด 4 จากเรื่องเดียวกับชุด 1","procurement-control-disbursement");
-  if(key==="issue_no")return `<div class="field procurement-control-picker procurement-inventory-control-field" data-inventory-control-field><label>${escapeHtml(label)}</label><select class="select" id="procurement-control-inventory" name="control_inventory_issue_id">${procurementControlOptionsHtml("inventory_issue",inventoryId,"",budgetYear)}</select><input type="hidden" name="issue_no" value="${escapeHtml(inventory?.primary_number||String(val||""))}"><small class="helper">ชุด 5 รันเลขอิสระจากชุด 1–4 และเลือกได้เฉพาะเมื่อเปิด “มีการเบิกพัสดุ”</small></div>`;
+  if(key==="issue_no")return `<div class="field procurement-control-picker procurement-inventory-control-field" data-inventory-control-field><label>${escapeHtml(label)}</label><select class="select" id="procurement-control-inventory" name="control_inventory_issue_id">${procurementControlOptionsHtml("inventory_issue",inventoryId,"",budgetYear)}</select><input type="hidden" name="issue_no" value="${escapeHtml(inventory?.primary_number||String(val||""))}"><small class="helper">ชุด 5 เป็นเลขอิสระจากชุด 1–4 และเลือกได้เฉพาะเมื่อเปิด “มีการเบิกพัสดุ”</small></div>`;
   return null;
 }
 function procurementSyncControlSelectors(formEl,refreshLive,currentCaseId=""){
@@ -11642,7 +12088,7 @@ function procurementFormModal(c=null,focusKey=""){
   formEl.onsubmit=async e=>{e.preventDefault();const btn=e.submitter,form=currentForm(),controlError=procurementValidateControlForm(form);if(controlError)return toast("เลขคุมเอกสารไม่สัมพันธ์กัน",controlError,"error");const cleanItems=cleanCurrentItems(),cleanQuotes=cleanQuotations();form.quotations=cleanQuotes;form.inventory_issue_enabled=procurementInventoryIssueEnabled(form);if(!form.inventory_issue_enabled){form.control_inventory_issue_id="";form.issue_no="";}const winner=cleanQuotes.find(x=>x.selected);if(winner){const vw=procurementVendorById(winner.vendor_id);form.vendor_id=winner.vendor_id||form.vendor_id||null;form.vendor_name=winner.vendor_name||vw?.vendor_name||form.vendor_name||"";form.vendor_type=vw?.vendor_type||form.vendor_type||"";form.quote_total=winner.amount||form.quote_total||0;form.quote_date=winner.quote_date||form.quote_date||null;form.quote_number=winner.quote_no||form.quote_number||"";}const sum=procurementCalcSummary(cleanItems,form),project=procurementProjectById(form.project_id),activity=procurementActivityById(form.activity_id),vendor=procurementVendorById(form.vendor_id);if(vendor&&!form.vendor_type)form.vendor_type=vendor.vendor_type||"";const taxDecision=procurementWithholdingDecision(form,sum.total);form.withholding_tax=taxDecision.value;if(!form.withholding_tax_type&&taxDecision.taxType)form.withholding_tax_type=taxDecision.taxType;form.cash_advance_address=procurementCashAdvanceAddress(form);form.master_schema_version="5.2.0";form.financial_summary=procurementMasterFinancialSnapshot(cleanItems,form);if(vendor?.vendor_code&&!form.vendor_code)form.vendor_code=vendor.vendor_code;const signerSnapshot={requester:procurementPersonnelById(form.requester_user_id),receiver:procurementPersonnelById(form.receiver_user_id),issuer:procurementPersonnelById(form.issuer_user_id),goods_requester:procurementPersonnelById(form.goods_requester_user_id),cash_advance:procurementPersonnelById(form.cash_advance_user_id),tor:[1,2,3].map(i=>procurementPersonnelById(form[`tor_member_${i}_user_id`])).filter(Boolean),inspection:[1,2,3].map(i=>procurementPersonnelById(form[`inspection_member_${i}_user_id`])).filter(Boolean),case_override:form.signer_override_mode==="override"?{director:procurementPersonnelById(form.case_director_user_id),head:procurementPersonnelById(form.case_head_user_id),deputy:procurementPersonnelById(form.case_deputy_user_id),officer:procurementPersonnelById(form.case_officer_user_id),finance:procurementPersonnelById(form.case_finance_user_id),financeHead:procurementPersonnelById(form.case_finance_head_user_id)}:null};const payload={academic_year:String(state.procurementAcademicYear||currentAcademicPeriod().academicYear),title:form.title||"รายการจัดซื้อจัดจ้าง",procurement_kind:String(form.signing_document||"").includes("จ้าง")?"hire":"purchase",total_amount:sum.total,project_id:form.project_id||null,activity_id:form.activity_id||null,vendor_id:form.vendor_id||null,control_request_approval_id:form.control_request_approval_id||null,control_order_id:form.control_order_id||null,control_purchase_order_id:form.control_purchase_order_id||null,control_disbursement_id:form.control_disbursement_id||null,control_inventory_issue_id:form.control_inventory_issue_id||null,form_data:form,items:cleanItems,master_snapshot:{project:project?{id:project.id,project_no:project.project_no,project_name:project.project_name,budget_amount:project.budget_amount,department_code:project.department_code,department_custom:project.department_custom}:null,activity:activity?{id:activity.id,activity_no:activity.activity_no,activity_name:activity.activity_name,budget_amount:activity.budget_amount}:null,vendor:vendor?{id:vendor.id,vendor_code:vendor.vendor_code,vendor_name:vendor.vendor_name,contact_name:vendor.contact_name,address:vendor.address,phone:vendor.phone,tax_id:vendor.tax_id,bank_account:vendor.bank_account,account_name:vendor.account_name,bank_name:vendor.bank_name,bank_branch:vendor.bank_branch}:null,items:cleanItems},signer_snapshot:signerSnapshot,updated_by:state.user.id};buttonLoading(btn,true,"กำลังบันทึก...");let res;if(editing){res=await procurementUpdateCaseWithRetry(c.id,payload);}else{try{res=await supabase.from("procurement_document_cases").insert({...payload,created_by:state.user.id,status:"draft"}).select().single();}catch(error){res={data:null,error};}}buttonLoading(btn,false);if(res.error){const msg=procurementIsTransientFetchError(res.error)?"การเชื่อมต่อ Supabase ขัดข้องชั่วคราว ระบบลองบันทึกซ้ำแล้วแต่ยังไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ตแล้วกดบันทึกอีกครั้ง":(res.error.message||String(res.error));return toast("บันทึกไม่สำเร็จ",msg,"error");}const savedId=editing?c.id:res.data?.id;if(!savedId)return toast("บันทึกไม่สำเร็จ","ไม่พบรหัสรายการหลังบันทึก","error");close();state.selectedProcurementCaseId=savedId;await loadProcurementWorkspace();const savedCase=procurementCaseById(savedId)||res.data||{...c,...payload,id:savedId};toast(editing?"บันทึกข้อมูลกลางแล้ว":"สร้างรายการแล้ว",`เอกสาร ${procurementDocumentsReadyCount(savedCase)}/${procurementApplicableDocumentCount(savedCase)} แบบพร้อมจากข้อมูลปัจจุบัน`,'success');await renderDashboard();};
 }
 
-function procurementSettingsModal(){
+function procurementSettingsModal(initialTab="officials"){
   const m=document.createElement("div");m.className="modal-backdrop";
   m.innerHTML=`<div class="modal modal-extra-wide procurement-settings-modal"><div class="modal-head"><div><span class="eyebrow dark">Procurement Settings · Excel shop / MyData / Personal</span><h3>ตั้งค่าระบบจัดซื้อจัดจ้างและพัสดุ</h3><p>กำหนด Master Data ผู้ปฏิบัติงาน ข้อมูลหน่วยงาน และสิทธิ์ผู้ใช้งานจากจุดเดียว · เอกสาร Procurement ใช้การพิมพ์และเซ็นสดเท่านั้น</p></div><button class="modal-close">×</button></div><div class="procurement-settings-tabs"><button class="btn btn-primary" data-ps-tab="officials">ผู้ปฏิบัติงาน / ผู้ลงนาม</button><button class="btn btn-secondary" data-ps-tab="agency">ข้อมูลหน่วยงาน</button><button class="btn btn-secondary" data-ps-tab="vendors">ร้านค้า / ผู้ขาย (${academicRegThaiDigits((state.procurementVendors||[]).length)})</button><button class="btn btn-secondary" data-ps-tab="items">รายการวัสดุ / งาน (${academicRegThaiDigits((state.procurementItemCatalog||[]).length)})</button><button class="btn btn-secondary" data-ps-tab="links">เชื่อมระบบใหญ่</button>${isSuperAdminUser()?`<button class="btn btn-secondary" data-ps-tab="permissions">สิทธิ์การเข้าใช้งาน</button>`:""}</div><div id="procurement-settings-body"></div><div class="modal-actions"><button class="btn btn-ghost modal-close-bottom">ปิด</button></div></div>`;
   document.body.appendChild(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-close-bottom").onclick=close;const body=m.querySelector("#procurement-settings-body");
@@ -11660,7 +12106,7 @@ function procurementSettingsModal(){
       else{
         const map=new Map((state.procurementPermissionRows||[]).map(r=>[r.user_id,r]));
         const users=(state.pendingUsers||[]).filter(u=>u.account_status==="active"&&u.deleted_at==null).sort((a,b)=>String(a.full_name||a.email||"").localeCompare(String(b.full_name||b.email||""),"th"));
-        body.innerHTML=`<section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>สิทธิ์การเข้าใช้งาน Procurement</h3><p>Super Admin กำหนดสิทธิ์เป็นรายบุคคลแยก 2 ระบบ · เมื่ออนุญาตแล้ว ผู้ใช้จะใช้งานฟีเจอร์ของโมดูลนั้นได้เต็มสิทธิ์และเห็นข้อมูลกลางร่วมกันทั้งหมด · ผู้ที่ไม่ได้รับอนุญาตจะถูกปฏิเสธทั้งหน้าเมนูและฐานข้อมูล</p></div></div>${state.procurementPermissionError?`<div class="project-paper-note warn"><strong>ฐานข้อมูลสิทธิ์ยังไม่พร้อม</strong><span>${escapeHtml(state.procurementPermissionError)} · ให้รัน supabase-v5.0.13-procurement-access-control.sql</span></div>`:""}<div class="table-wrap"><table class="table procurement-permission-table"><thead><tr><th>ผู้ใช้งาน</th><th>บทบาท</th><th>ระบบเลขคุมเอกสารฯ</th><th>ระบบจัดทำเอกสารฯ</th></tr></thead><tbody>${users.map(u=>{const r=map.get(u.id)||{},superUser=u.role==="super_admin";return `<tr data-procurement-permission-user="${u.id}"><td><strong>${escapeHtml(u.full_name||u.email||"—")}</strong><br><small>${escapeHtml(u.email||"")}</small></td><td>${escapeHtml(ROLE_LABEL[u.role]||u.role||"—")}${superUser?`<br><small>สิทธิ์ถาวร</small>`:""}</td><td><label class="procurement-permission-switch"><input type="checkbox" data-procurement-permission-control ${superUser||r.can_access_control?"checked":""} ${superUser?"disabled":""}><span>${superUser?"อนุญาตอัตโนมัติ":"อนุญาต"}</span></label></td><td><label class="procurement-permission-switch"><input type="checkbox" data-procurement-permission-documents ${superUser||r.can_access_documents?"checked":""} ${superUser?"disabled":""}><span>${superUser?"อนุญาตอัตโนมัติ":"อนุญาต"}</span></label></td></tr>`;}).join("")}</tbody></table></div><div class="project-paper-note"><strong>การมีผลของสิทธิ์</strong><span>ผู้ใช้ที่กำลังเปิดระบบอยู่ควรรีเฟรชหน้า 1 ครั้งหลัง Super Admin เปลี่ยนสิทธิ์ · สิทธิ์ที่เปิดให้เป็นสิทธิ์เต็มของโมดูลนั้น แต่สิทธิ์จัดการผู้ใช้งานยังเป็นของ Super Admin เท่านั้น</span></div><div class="procurement-settings-save-row"><button class="btn btn-primary" id="procurement-permissions-save">บันทึกสิทธิ์ผู้ใช้งาน</button></div></section>`;
+        body.innerHTML=`<section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>สิทธิ์การเข้าใช้งานจัดซื้อจัดจ้างและอาหารกลางวัน</h3><p>Super Admin กำหนดสิทธิ์เป็นรายบุคคลแยก 3 ระบบ · เมื่ออนุญาตแล้ว ผู้ใช้จะใช้งานฟีเจอร์ของโมดูลนั้นได้เต็มสิทธิ์และเห็นข้อมูลกลางร่วมกันทั้งหมด · ผู้ที่ไม่ได้รับอนุญาตจะถูกปฏิเสธทั้งหน้าเมนูและฐานข้อมูล</p></div></div>${state.procurementPermissionError?`<div class="project-paper-note warn"><strong>ฐานข้อมูลสิทธิ์ยังไม่พร้อม</strong><span>${escapeHtml(state.procurementPermissionError)} · ให้รัน supabase-v5.12.9.3-school-lunch-access-control.sql</span></div>`:""}<div class="table-wrap"><table class="table procurement-permission-table"><thead><tr><th>ผู้ใช้งาน</th><th>บทบาท</th><th>ระบบเลขคุมเอกสารฯ</th><th>ระบบจัดทำเอกสารฯ</th><th>ระบบอาหารกลางวัน</th></tr></thead><tbody>${users.map(u=>{const r=map.get(u.id)||{},superUser=u.role==="super_admin";return `<tr data-procurement-permission-user="${u.id}"><td><strong>${escapeHtml(u.full_name||u.email||"—")}</strong><br><small>${escapeHtml(u.email||"")}</small></td><td>${escapeHtml(ROLE_LABEL[u.role]||u.role||"—")}${superUser?`<br><small>สิทธิ์ถาวร</small>`:""}</td><td><label class="procurement-permission-switch"><input type="checkbox" data-procurement-permission-control ${superUser||r.can_access_control?"checked":""} ${superUser?"disabled":""}><span>${superUser?"อนุญาตอัตโนมัติ":"อนุญาต"}</span></label></td><td><label class="procurement-permission-switch"><input type="checkbox" data-procurement-permission-documents ${superUser||r.can_access_documents?"checked":""} ${superUser?"disabled":""}><span>${superUser?"อนุญาตอัตโนมัติ":"อนุญาต"}</span></label></td><td><label class="procurement-permission-switch"><input type="checkbox" data-procurement-permission-school-lunch ${superUser||r.can_access_school_lunch?"checked":""} ${superUser?"disabled":""}><span>${superUser?"อนุญาตอัตโนมัติ":"อนุญาต"}</span></label></td></tr>`;}).join("")}</tbody></table></div><div class="project-paper-note"><strong>การมีผลของสิทธิ์</strong><span>ผู้ใช้ที่กำลังเปิดระบบอยู่ควรรีเฟรชหน้า 1 ครั้งหลัง Super Admin เปลี่ยนสิทธิ์ · สิทธิ์ที่เปิดให้เป็นสิทธิ์เต็มของโมดูลนั้น แต่สิทธิ์จัดการผู้ใช้งานยังเป็นของ Super Admin เท่านั้น</span></div><div class="procurement-settings-save-row"><button class="btn btn-primary" id="procurement-permissions-save">บันทึกสิทธิ์ผู้ใช้งาน</button></div></section>`;
       }
     }else body.innerHTML=`<section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>การเชื่อมข้อมูลจาก BNK School OS</h3><p>ข้อมูลที่ระบบใหญ่มีก่อนแล้วจะไม่สร้างฐานซ้ำ</p></div></div><div class="procurement-link-grid"><article><span>โครงการปี ${escapeHtml(String(state.procurementAcademicYear))}</span><strong>${academicRegThaiDigits((state.procurementProjects||[]).length)}</strong><small>school_projects · ปีการศึกษา</small></article><article><span>กิจกรรม</span><strong>${academicRegThaiDigits((state.procurementActivities||[]).length)}</strong><small>project_activities</small></article><article><span>บุคลากร</span><strong>${academicRegThaiDigits((state.procurementPersonnel||[]).length)}</strong><small>personnel_public_directory</small></article><article><span>การลงนาม</span><strong>เซ็นสด</strong><small>PDF เว้นช่องลงชื่อ · ไม่ดึงภาพลายเซ็นดิจิทัล</small></article></div><div class="project-paper-note success"><strong>หลัก Snapshot</strong><span>เมื่อเลือกโครงการ ร้านค้า วัสดุ หรือบุคลากร ระบบจะคัดลอกค่าที่ใช้ในงานนั้นเก็บไว้ด้วย เพื่อไม่ให้เอกสารเก่าเปลี่ยนย้อนหลัง</span></div></section>`;
     bind();
@@ -11672,19 +12118,19 @@ function procurementSettingsModal(){
     body.querySelector("#procurement-permissions-save")?.addEventListener("click",async e=>{
       if(!isSuperAdminUser())return toast("ไม่มีสิทธิ์","เฉพาะ Super Admin เท่านั้นที่กำหนดสิทธิ์ Procurement ได้","error");
       const rows=[...body.querySelectorAll("[data-procurement-permission-user]")].filter(row=>!row.querySelector("[data-procurement-permission-control]")?.disabled);
-      const payload=rows.map(row=>({user_id:row.dataset.procurementPermissionUser,can_access_control:!!row.querySelector("[data-procurement-permission-control]")?.checked,can_access_documents:!!row.querySelector("[data-procurement-permission-documents]")?.checked,updated_by:state.user.id,updated_at:new Date().toISOString()}));
+      const payload=rows.map(row=>({user_id:row.dataset.procurementPermissionUser,can_access_control:!!row.querySelector("[data-procurement-permission-control]")?.checked,can_access_documents:!!row.querySelector("[data-procurement-permission-documents]")?.checked,can_access_school_lunch:!!row.querySelector("[data-procurement-permission-school-lunch]")?.checked,updated_by:state.user.id,updated_at:new Date().toISOString()}));
       buttonLoading(e.currentTarget,true,"กำลังบันทึก...");
       const {error}=payload.length?await supabase.from("procurement_module_permissions").upsert(payload,{onConflict:"user_id"}):{error:null};
       buttonLoading(e.currentTarget,false);
       if(error)return toast("บันทึกสิทธิ์ไม่สำเร็จ",error.message,"error");
-      const {data,error:reloadError}=await supabase.from("procurement_module_permissions").select("user_id,can_access_control,can_access_documents,updated_by,updated_at").order("updated_at",{ascending:false});
+      const {data,error:reloadError}=await supabase.from("procurement_module_permissions").select("user_id,can_access_control,can_access_documents,can_access_school_lunch,updated_by,updated_at").order("updated_at",{ascending:false});
       if(!reloadError){state.procurementPermissionRows=data||[];state.procurementPermissionError="";}
       toast("บันทึกสิทธิ์แล้ว","สิทธิ์จะถูกบังคับทั้งเมนูและฐานข้อมูล ผู้ใช้ที่กำลังเปิดระบบควรรีเฟรชหน้า","success");
       render("permissions");
     });
     const af=body.querySelector("#procurement-agency-settings");if(af)body.querySelector("#procurement-agency-settings-save")?.addEventListener("click",e=>saveSettings(af,["unit_name","supervising_office","address_no","moo","road","subdistrict","district","province","postal_code","phone","tax_id"],e.currentTarget));
   };
-  m.querySelectorAll("[data-ps-tab]").forEach(b=>b.onclick=()=>render(b.dataset.psTab));render("officials");
+  m.querySelectorAll("[data-ps-tab]").forEach(b=>b.onclick=()=>render(b.dataset.psTab));render(isSuperAdminUser()?initialTab:"officials");
 }
 
 function procurementVendorEditor(v,done){const x=v||{},m=document.createElement("div");m.className="modal-backdrop modal-layer-2";m.innerHTML=`<div class="modal modal-wide"><div class="modal-head"><div><h3>${v?"แก้ไข":"เพิ่ม"}ร้านค้า / ผู้ขาย</h3><p>Master Data จากแนวคิดชีต shop</p></div><button class="modal-close">×</button></div><form id="proc-vendor-form" class="form-grid"><div class="form-row"><div class="field"><label>รหัสผู้ขาย</label><input class="input" name="vendor_code" value="${escapeHtml(x.vendor_code||"")}" placeholder="เช่นรหัสผู้ขายจากระบบการเงิน"></div><div class="field"><label>ชื่อร้าน / ผู้ขาย</label><input class="input" name="vendor_name" required value="${escapeHtml(x.vendor_name||"")}"></div></div><div class="form-row"><div class="field"><label>ประเภท</label><input class="input" name="vendor_type" value="${escapeHtml(x.vendor_type||"")}"></div><div class="field"><label>ผู้ติดต่อ</label><input class="input" name="contact_name" value="${escapeHtml(x.contact_name||"")}"></div></div><div class="field"><label>ตำแหน่งผู้ติดต่อ</label><input class="input" name="contact_position" value="${escapeHtml(x.contact_position||"")}"></div><div class="field"><label>ที่อยู่</label><textarea class="input textarea" name="address">${escapeHtml(x.address||"")}</textarea></div><div class="form-row"><div class="field"><label>โทรศัพท์</label><input class="input" name="phone" value="${escapeHtml(x.phone||"")}"></div><div class="field"><label>เลขประจำตัวผู้เสียภาษี / เลขบัตรประชาชน</label><input class="input" name="tax_id" value="${escapeHtml(x.tax_id||"")}"></div></div><div class="form-row"><div class="field"><label>เลขที่บัญชี</label><input class="input" name="bank_account" value="${escapeHtml(x.bank_account||"")}"></div><div class="field"><label>ชื่อบัญชี</label><input class="input" name="account_name" value="${escapeHtml(x.account_name||"")}"></div></div><div class="form-row"><div class="field"><label>ธนาคาร</label><input class="input" name="bank_name" value="${escapeHtml(x.bank_name||"")}"></div><div class="field"><label>สาขา</label><input class="input" name="bank_branch" value="${escapeHtml(x.bank_branch||"")}"></div></div><label class="automation-toggle"><div><strong>เปิดใช้งาน</strong><span>ปิดใช้งานได้โดยไม่ลบประวัติเอกสาร</span></div><input type="checkbox" name="is_active" ${x.is_active!==false?"checked":""}></label></form><div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="proc-vendor-save">บันทึก</button></div></div>`;document.body.appendChild(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;m.querySelector("#proc-vendor-save").onclick=async e=>{const form=m.querySelector("#proc-vendor-form");if(!form.reportValidity())return;const fd=new FormData(form),payload={vendor_code:String(fd.get("vendor_code")||"").trim()||null,vendor_name:String(fd.get("vendor_name")||"").trim(),vendor_type:String(fd.get("vendor_type")||"").trim()||null,contact_name:String(fd.get("contact_name")||"").trim()||null,contact_position:String(fd.get("contact_position")||"").trim()||null,address:String(fd.get("address")||"").trim()||null,phone:String(fd.get("phone")||"").trim()||null,tax_id:String(fd.get("tax_id")||"").trim()||null,bank_account:String(fd.get("bank_account")||"").trim()||null,account_name:String(fd.get("account_name")||"").trim()||null,bank_name:String(fd.get("bank_name")||"").trim()||null,bank_branch:String(fd.get("bank_branch")||"").trim()||null,is_active:!!form.querySelector('[name="is_active"]').checked,source:v?.source||"system",updated_by:state.user.id};buttonLoading(e.currentTarget,true);const res=v?await supabase.from("procurement_vendors").update(payload).eq("id",v.id):await supabase.from("procurement_vendors").insert({...payload,created_by:state.user.id});buttonLoading(e.currentTarget,false);if(res.error)return toast("บันทึกร้านค้าไม่สำเร็จ",res.error.message,"error");close();await done?.();};}
@@ -12009,57 +12455,57 @@ async function loadProcurementControlWorkspace(){
   state.procurementControlNumbers=numbersRes.data||[];state.procurementControlSeriesSettings=settingsRes.data||[];state.procurementControlCases=casesRes.data||[];
 }
 function procurementControlSetting(series,year=state.procurementControlYear){return (state.procurementControlSeriesSettings||[]).find(x=>x.series===series&&Number(x.control_year)===Number(year))||null;}
-function procurementControlNextText(meta){const s=procurementControlSetting(meta.series),start=Number(s?.start_number||1),last=Number(s?.last_number||0),first=last<start?start:last+1;return meta.pair?`${first}/${state.procurementControlYear} + ${first+1}/${state.procurementControlYear}`:`${first}/${state.procurementControlYear}`;}
+function procurementControlNextText(meta){return meta.pair?"กรอกเลขรายงาน + เลขอนุมัติเอง":"กรอกเลขคุมเอง";}
 function procurementControlSeriesLabel(series){return procurementControlMeta(series).label;}
 function procurementControlKindLabel(kind){return kind==="hire"?"จ้าง":kind==="purchase"?"ซื้อ":"—";}
 function procurementControlWorkspaceHtml(){
   if(!procurementCanAccessControl())return procurementAccessDeniedHtml("ระบบเลขคุมเอกสารจัดซื้อจัดจ้างและพัสดุ");
-  if(state.procurementControlLoadError)return `<section class="panel"><div class="empty"><strong>ยังเปิดระบบเลขคุมเอกสารไม่ได้</strong><span>${escapeHtml(state.procurementControlLoadError)}</span><small>หากเพิ่งอัปเดต ให้รัน SQL ตามลำดับจนถึง supabase-v5.1.5-procurement-control-release.sql ก่อน</small></div></section>`;
+  if(state.procurementControlLoadError)return `<section class="panel"><div class="empty"><strong>ยังเปิดระบบเลขคุมเอกสารไม่ได้</strong><span>${escapeHtml(state.procurementControlLoadError)}</span><small>หากเพิ่งอัปเดต ให้ตรวจ Migration ของระบบเลขคุมใน Supabase Production</small></div></section>`;
   const q=String(state.procurementControlSearch||"").trim().toLowerCase(),status=state.procurementControlStatusFilter||"active";
   const rows=(state.procurementControlNumbers||[]).filter(r=>(status==="all"||r.status===status)&&(!q||[r.primary_number,r.secondary_number,r.subject,procurementControlSeriesLabel(r.series)].some(v=>String(v||"").toLowerCase().includes(q))));
-  const cards=PROCUREMENT_CONTROL_SERIES.map(meta=>{const seriesRows=(state.procurementControlNumbers||[]).filter(r=>r.series===meta.series),issued=seriesRows.length,used=seriesRows.filter(r=>!!procurementControlLinkedCase(r)).length,released=seriesRows.filter(r=>r.status==="released").length;return `<article class="procurement-control-card"><div><span>ชุด ${meta.set}</span><h3>${escapeHtml(meta.label.replace(/^ชุด \d+ · /,""))}</h3></div><strong>${escapeHtml(procurementControlNextText(meta))}</strong><small>เลขถัดไป · ออกแล้ว ${academicRegThaiDigits(issued)} รายการ · ใช้แล้ว ${academicRegThaiDigits(used)}${released?` · รอจัดการ ${academicRegThaiDigits(released)}`:""}</small><div class="procurement-control-card-actions">${procurementCanOperateControl()?`<button class="btn btn-primary" data-procurement-control-issue="${meta.series}">ออกเลขชุด ${meta.set}</button>`:""}<button class="btn btn-secondary" data-procurement-control-register="${meta.series}">PDF ทะเบียนปีนี้</button></div></article>`;}).join("");
-  const table=rows.length?`<div class="table-wrap"><table class="table procurement-control-table"><thead><tr><th>ชุด</th><th>เลขคุม</th><th>เรื่องต้นทาง</th><th>ประเภท</th><th>เชื่อมรายการ</th><th>สถานะเลข</th><th>ออกเมื่อ</th><th>จัดการ</th></tr></thead><tbody>${rows.map(r=>{const c=procurementControlLinkedCase(r),releasedLabel=procurementControlReleasedCaseLabel(r),stateLabel=r.status==="cancelled"?"ยกเลิก":r.status==="released"?"รายการต้นทางถูกลบ":c?"ใช้แล้ว":"ยังไม่ใช้",stateClass=r.status==="cancelled"?"danger":r.status==="released"?"warn":c?"success":"warn",actions=procurementCanOperateControl()&&!c?(r.status==="active"||r.status==="released"?`<div class="procurement-control-row-actions"><button class="btn btn-danger btn-small" data-procurement-control-delete="${r.id}">ลบเลข</button><button class="btn btn-ghost btn-small" data-procurement-control-cancel="${r.id}">ยกเลิกเลข</button></div>`:r.status==="cancelled"?`<div class="procurement-control-row-actions"><button class="btn btn-danger btn-small" data-procurement-control-delete="${r.id}">ลบเลข</button></div>`:""):"";const linkedText=c?`${escapeHtml(c.case_code||"")} · ${escapeHtml(c.title||"")}`:releasedLabel?`<span title="เลขนี้ถูกปลดจากรายการที่ลบแล้ว">${escapeHtml(releasedLabel)}</span>`:"—";return `<tr><td>${procurementControlMeta(r.series).set}</td><td><strong>${escapeHtml(procurementControlDisplay(r))}</strong></td><td>${escapeHtml(r.subject||"—")}</td><td>${escapeHtml(procurementControlKindLabel(r.procurement_kind))}</td><td>${linkedText}</td><td><span class="pill ${stateClass}">${stateLabel}</span></td><td>${formatDate(r.created_at)}</td><td>${actions}</td></tr>`;}).join("")}</tbody></table></div>`:`<div class="empty"><strong>ยังไม่มีเลขคุมในปีงบประมาณ พ.ศ. ${escapeHtml(String(state.procurementControlYear))}</strong><span>เริ่มจากตั้งค่าปีงบประมาณ แล้วออกเลขชุด 1 หรือชุด 5 ตามประเภททะเบียนที่ต้องการ</span></div>`;
-  return `<section class="procurement-control-workspace"><section class="procurement-control-hero"><div><span class="eyebrow">ทะเบียนเลขคุม · ประจำปีงบประมาณ</span><h2>ระบบเลขคุมเอกสารจัดซื้อจัดจ้างและพัสดุ</h2><p>5 ชุดเลขแยก Counter กัน · ชุด 1 เป็นเรื่องต้นทางของชุด 2–4 · ชุด 5 เบิกพัสดุรันเลขอิสระ</p></div><div class="procurement-control-hero-actions"><select class="select" id="procurement-control-year">${procurementControlYearOptions(state.procurementControlYear)}</select>${procurementCanManageControlSettings()?`<button class="btn procurement-control-action" id="procurement-control-fiscal-year-settings">ตั้งค่าปีงบประมาณ</button><button class="btn procurement-control-action" id="procurement-control-settings">ตั้งค่าเลขเริ่มต้น</button>`:""}</div></section><div class="procurement-control-cards">${cards}</div><section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ทะเบียนเลขคุม ปีงบประมาณ พ.ศ. ${escapeHtml(String(state.procurementControlYear))}</h3><p>เลขที่ผูกกับ Master Form แล้วจะไม่ให้รายการใหม่เลือกซ้ำ · ถ้ารายการต้นทางถูกลบ เลขจะถูกพักสถานะ “รายการต้นทางถูกลบ” และไม่ถูกนำกลับมาใช้เอง · จากนั้นเลือกยกเลิกหรือลบเลขได้ตามต้องการ</p></div><div class="procurement-toolbar"><select class="select" id="procurement-control-status"><option value="active" ${status==="active"?"selected":""}>ใช้งาน/ยังไม่ใช้</option><option value="released" ${status==="released"?"selected":""}>รายการต้นทางถูกลบ / รอจัดการ</option><option value="cancelled" ${status==="cancelled"?"selected":""}>ยกเลิก</option><option value="all" ${status==="all"?"selected":""}>ทั้งหมด</option></select><input class="input" id="procurement-control-search" value="${escapeHtml(state.procurementControlSearch||"")}" placeholder="ค้นหาเลขคุม / เรื่อง"></div></div>${table}</section></section>`;
+  const cards=PROCUREMENT_CONTROL_SERIES.map(meta=>{const seriesRows=(state.procurementControlNumbers||[]).filter(r=>r.series===meta.series&&Number(r.control_year)===Number(state.procurementControlYear)),issued=seriesRows.length,used=seriesRows.filter(r=>!!procurementControlLinkedCase(r)).length,returned=seriesRows.filter(r=>r.status==="released"||r.status==="cancelled").length;return `<article class="procurement-control-card"><div><span>ชุด ${meta.set}</span><h3>${escapeHtml(meta.label.replace(/^ชุด \d+ · /,""))}</h3></div><strong>${escapeHtml(procurementControlNextText(meta))}</strong><small>กรอกเลขเอง · มีในทะเบียน ${academicRegThaiDigits(issued)} รายการ · ใช้อยู่ ${academicRegThaiDigits(used)}${returned?` · คืนเลขแล้ว ${academicRegThaiDigits(returned)}`:""}</small><div class="procurement-control-card-actions">${procurementCanOperateControl()?`<button class="btn btn-primary" data-procurement-control-issue="${meta.series}">เพิ่มเลขชุด ${meta.set}</button>`:""}<button class="btn btn-secondary" data-procurement-control-register="${meta.series}">PDF ทะเบียนปีนี้</button></div></article>`;}).join("");
+  const table=rows.length?`<div class="table-wrap"><table class="table procurement-control-table"><thead><tr><th>ชุด</th><th>เลขคุม</th><th>เรื่องต้นทาง</th><th>ประเภท</th><th>เชื่อมรายการ</th><th>สถานะเลข</th><th>บันทึกเมื่อ</th><th>จัดการ</th></tr></thead><tbody>${rows.map(r=>{const c=procurementControlLinkedCase(r),releasedLabel=procurementControlReleasedCaseLabel(r),stateLabel=r.status==="cancelled"?"ยกเลิก / คืนเลขแล้ว":r.status==="released"?"คืนเลขแล้ว (รายการเดิมถูกลบ)":c?"ใช้แล้ว":"ยังไม่ใช้",stateClass=r.status==="cancelled"?"danger":r.status==="released"?"warn":c?"success":"warn";let actions="";if(procurementCanOperateControl()){if(r.status==="active"||r.status==="released"){actions=`<div class="procurement-control-row-actions">${!c?`<button class="btn btn-danger btn-small" data-procurement-control-delete="${r.id}">ลบประวัติ</button>`:""}<button class="btn btn-ghost btn-small" data-procurement-control-cancel="${r.id}">ยกเลิก / คืนเลข</button></div>`;}else if(r.status==="cancelled"&&!c){actions=`<div class="procurement-control-row-actions"><button class="btn btn-danger btn-small" data-procurement-control-delete="${r.id}">ลบประวัติ</button></div>`;}}const linkedText=c?`${escapeHtml(c.case_code||"")} · ${escapeHtml(c.title||"")}`:releasedLabel?`<span title="เก็บเป็นประวัติเดิม แต่เลขสามารถนำไปใช้ใหม่ได้">${escapeHtml(releasedLabel)}</span>`:"—";return `<tr><td>${procurementControlMeta(r.series).set}</td><td><strong>${escapeHtml(procurementControlDisplay(r))}</strong></td><td>${escapeHtml(r.subject||"—")}</td><td>${escapeHtml(procurementControlKindLabel(r.procurement_kind))}</td><td>${linkedText}</td><td><span class="pill ${stateClass}">${stateLabel}</span></td><td>${formatDate(r.created_at)}</td><td>${actions}</td></tr>`;}).join("")}</tbody></table></div>`:`<div class="empty"><strong>ยังไม่มีเลขคุมในปีงบประมาณ พ.ศ. ${escapeHtml(String(state.procurementControlYear))}</strong><span>กด “เพิ่มเลขชุด” แล้วกรอกเลขจริง เช่น 1/${escapeHtml(String(state.procurementControlYear))}</span></div>`;
+  return `<section class="procurement-control-workspace"><section class="procurement-control-hero"><div><span class="eyebrow">ทะเบียนเลขคุม · ประจำปีงบประมาณ</span><h2>ระบบเลขคุมเอกสารจัดซื้อจัดจ้างและพัสดุ</h2><p>เลขคุมทั้ง 5 ชุดกรอกเอง · ชุด 1 เป็นเรื่องต้นทางของชุด 2–4 · ชุด 5 เบิกพัสดุเป็นอิสระ · ยกเลิกแล้วคืนเลขไปใช้กับโครงการอื่นได้</p></div><div class="procurement-control-hero-actions"><select class="select" id="procurement-control-year">${procurementControlYearOptions(state.procurementControlYear)}</select>${procurementCanManageControlSettings()?`<button class="btn procurement-control-action" id="procurement-control-fiscal-year-settings">ตั้งค่าปีงบประมาณ</button>`:""}</div></section><div class="procurement-control-cards">${cards}</div><section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ทะเบียนเลขคุม ปีงบประมาณ พ.ศ. ${escapeHtml(String(state.procurementControlYear))}</h3><p>ผู้ใช้กรอกเลขเอง เช่น 1/${escapeHtml(String(state.procurementControlYear))} · เลขที่กำลังใช้งานจะเลือกซ้ำในชุดเดียวกันไม่ได้ · เมื่อยกเลิกหรือรายการต้นทางถูกลบ เลขจะคืนให้ใช้ใหม่ได้ แต่ประวัติเดิมยังคงอยู่เพื่อตรวจสอบย้อนหลัง</p></div><div class="procurement-toolbar"><select class="select" id="procurement-control-status"><option value="active" ${status==="active"?"selected":""}>ใช้งาน/ยังไม่ใช้</option><option value="released" ${status==="released"?"selected":""}>คืนเลขแล้วจากรายการที่ลบ</option><option value="cancelled" ${status==="cancelled"?"selected":""}>ยกเลิก / คืนเลขแล้ว</option><option value="all" ${status==="all"?"selected":""}>ทั้งหมด</option></select><input class="input" id="procurement-control-search" value="${escapeHtml(state.procurementControlSearch||"")}" placeholder="ค้นหาเลขคุม / เรื่อง"></div></div>${table}</section></section>`;
 }
-
 function procurementControlIssueModal(series){
   const meta=procurementControlMeta(series),parents=(state.procurementControlNumbers||[]).filter(r=>r.series==="request_approval"&&r.status==="active"&&Number(r.control_year)===Number(state.procurementControlYear));
   const m=document.createElement("div");m.className="modal-backdrop";
+  const numberFields=meta.pair?`<div class="form-row"><div class="field"><label>เลขรายงานขอซื้อ/ขอจ้าง</label><input class="input" name="primary_number" inputmode="numeric" required placeholder="เช่น 1/${escapeHtml(String(state.procurementControlYear))}"><small class="helper">กรอกเลขจริงเองในรูปแบบ เลข/ปีงบประมาณ</small></div><div class="field"><label>เลขอนุมัติ</label><input class="input" name="secondary_number" inputmode="numeric" required placeholder="เช่น 2/${escapeHtml(String(state.procurementControlYear))}"><small class="helper">เลขนี้ใช้กับอนุมัติและเอกสารที่อ้างเลขอนุมัติของชุด 1</small></div></div>`:`<div class="field"><label>เลขคุมชุด ${meta.set}</label><input class="input" name="primary_number" inputmode="numeric" required placeholder="เช่น 1/${escapeHtml(String(state.procurementControlYear))}"><small class="helper">กรอกเลขจริงเอง เช่น 1/${escapeHtml(String(state.procurementControlYear))} · ปีหลังเครื่องหมาย / ต้องตรงกับปีงบประมาณที่เลือก</small></div>`;
   const rootBody=`<div class="field"><label>ชื่อเรื่องของงาน</label><textarea class="input textarea" name="subject" required placeholder="ใช้สำหรับทะเบียน/ค้นหา ไม่เปลี่ยนข้อความราชการใน PDF"></textarea></div>`;
-  const body=series==="request_approval"?`${rootBody}<div class="field"><label>ประเภทงาน</label><select class="select" name="procurement_kind" required><option value="purchase">ซื้อ</option><option value="hire">จ้าง</option></select></div>`:series==="inventory_issue"?`${rootBody}<div class="project-paper-note"><strong>ชุด 5 เป็น Counter อิสระ</strong><span>เลขชุดนี้ไม่ผูกลำดับกับชุด 1–4 และจะถูกเลือกใน Master Form เฉพาะกรณีเปิด “มีการเบิกพัสดุ”</span></div>`:`<div class="field"><label>เลือกเรื่องจากเลขคุมชุด 1</label><select class="select" name="parent_control_id" required><option value="">— เลือกเรื่องต้นทาง —</option>${parents.map(r=>`<option value="${r.id}">${escapeHtml(procurementControlOptionLabel(r))}</option>`).join("")}</select></div><div class="project-paper-note"><strong>ระบบเชื่อมด้วย ID ของชุด 1</strong><span>Master Form จะ Auto-match เลขชุด ${meta.set} ให้อัตโนมัติเมื่อเลือกชุด 1 จึงลดการกดเลขผิดเรื่อง</span></div>`;
-  m.innerHTML=`<div class="modal"><div class="modal-head"><div><span class="eyebrow dark">เลขคุมชุด ${meta.set}</span><h3>ออกเลข ${escapeHtml(meta.label.replace(/^ชุด \d+ · /,""))}</h3><p>เลขถัดไป ${escapeHtml(procurementControlNextText(meta))} · ปีงบประมาณ พ.ศ. ${escapeHtml(String(state.procurementControlYear))}</p></div><button class="modal-close">×</button></div><form id="procurement-control-issue-form" class="form-grid">${body}<div class="field"><label>หมายเหตุภายใน (ถ้ามี)</label><textarea class="input textarea" name="notes"></textarea></div><div class="modal-actions"><button type="button" class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" type="submit">ยืนยันออกเลข</button></div></form></div>`;
+  const body=series==="request_approval"?`${rootBody}<div class="field"><label>ประเภทงาน</label><select class="select" name="procurement_kind" required><option value="purchase">ซื้อ</option><option value="hire">จ้าง</option></select></div>`:series==="inventory_issue"?`${rootBody}<div class="project-paper-note"><strong>ชุด 5 เป็นเลขอิสระ</strong><span>กรอกเลขเองและเลือกใน Master Form เฉพาะกรณีเปิด “มีการเบิกพัสดุ”</span></div>`:`<div class="field"><label>เลือกเรื่องจากเลขคุมชุด 1</label><select class="select" name="parent_control_id" required><option value="">— เลือกเรื่องต้นทาง —</option>${parents.map(r=>`<option value="${r.id}">${escapeHtml(procurementControlOptionLabel(r))}</option>`).join("")}</select></div><div class="project-paper-note"><strong>ยังเชื่อมด้วย ID ของชุด 1</strong><span>เลขชุด ${meta.set} ที่กรอกเองจะผูกกับเรื่องที่เลือก และ Master Form จะ Auto-match ให้กับเรื่องเดียวกันเหมือนเดิม</span></div>`;
+  m.innerHTML=`<div class="modal"><div class="modal-head"><div><span class="eyebrow dark">เลขคุมชุด ${meta.set}</span><h3>เพิ่มเลข ${escapeHtml(meta.label.replace(/^ชุด \d+ · /,""))}</h3><p>กรอกเลขเอง · ปีงบประมาณ พ.ศ. ${escapeHtml(String(state.procurementControlYear))}</p></div><button class="modal-close">×</button></div><form id="procurement-control-issue-form" class="form-grid">${numberFields}${body}<div class="field"><label>หมายเหตุภายใน (ถ้ามี)</label><textarea class="input textarea" name="notes"></textarea></div><div class="modal-actions"><button type="button" class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" type="submit">บันทึกเลขคุม</button></div></form></div>`;
   document.body.appendChild(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;
-  m.querySelector("form").onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),parentId=fd.get("parent_control_id")||null;if(!["request_approval","inventory_issue"].includes(series)&&parentId&&(state.procurementControlNumbers||[]).some(r=>r.series===series&&r.parent_control_id===parentId&&r.status==="active"))return toast("มีเลขคุมชุดนี้แล้ว","เรื่องที่เลือกมีเลขคุมชุดนี้ที่ยังใช้งานอยู่","error");const btn=e.submitter;buttonLoading(btn,true,"กำลังออกเลข...");const {data,error}=await supabase.rpc("create_procurement_control_number",{p_series:series,p_control_year:Number(state.procurementControlYear),p_subject:["request_approval","inventory_issue"].includes(series)?String(fd.get("subject")||"").trim():null,p_parent_control_id:parentId,p_procurement_kind:series==="request_approval"?String(fd.get("procurement_kind")||""):null,p_notes:String(fd.get("notes")||"").trim()||null});buttonLoading(btn,false);if(error)return toast("ออกเลขไม่สำเร็จ",error.message,"error");close();toast("ออกเลขคุมแล้ว",procurementControlDisplay(Array.isArray(data)?data[0]:data),"success");await loadProcurementControlWorkspace();renderDashboard();};
+  m.querySelector("form").onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),parentId=fd.get("parent_control_id")||null;if(!["request_approval","inventory_issue"].includes(series)&&parentId&&(state.procurementControlNumbers||[]).some(r=>r.series===series&&r.parent_control_id===parentId&&r.status==="active"))return toast("มีเลขคุมชุดนี้แล้ว","เรื่องที่เลือกมีเลขคุมชุดนี้ที่ยังใช้งานอยู่","error");const primary=String(fd.get("primary_number")||"").trim(),secondary=meta.pair?String(fd.get("secondary_number")||"").trim():null,btn=e.submitter;buttonLoading(btn,true,"กำลังบันทึกเลข...");const {data,error}=await supabase.rpc("create_procurement_control_number",{p_series:series,p_control_year:Number(state.procurementControlYear),p_primary_number:primary,p_secondary_number:secondary,p_subject:["request_approval","inventory_issue"].includes(series)?String(fd.get("subject")||"").trim():null,p_parent_control_id:parentId,p_procurement_kind:series==="request_approval"?String(fd.get("procurement_kind")||""):null,p_notes:String(fd.get("notes")||"").trim()||null});buttonLoading(btn,false);if(error)return toast("บันทึกเลขไม่สำเร็จ",error.message,"error");close();toast("บันทึกเลขคุมแล้ว",procurementControlDisplay(Array.isArray(data)?data[0]:data),"success");await loadProcurementControlWorkspace();renderDashboard();};
 }
-
 function procurementControlFiscalYearModal(){
   const m=document.createElement("div");m.className="modal-backdrop";
   const configured=[...new Set((state.procurementControlSeriesSettings||[]).map(x=>Number(x.control_year)).filter(Boolean))].sort((a,b)=>b-a);
-  m.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>ตั้งค่าปีงบประมาณ</h3><p>ระบบเลขคุมและระบบเบิกจ่ายใช้ปีงบประมาณ ส่วนระบบโครงการยังใช้ปีการศึกษาแยกจากกัน</p></div><button class="modal-close">×</button></div><form id="procurement-control-fiscal-year-form" class="form-grid"><div class="field"><label>ปีงบประมาณ พ.ศ.</label><input class="input" name="control_year" type="number" min="2500" max="3000" step="1" required value="${Number(state.procurementControlYear||procurementCurrentFiscalYear())}"><small class="helper">เช่น 2570 · หากเป็นปีใหม่ ระบบจะสร้างพื้นที่เลขคุมชุด 1–5 ของปีนั้นโดยเริ่มต้นที่ 1 และสามารถเปลี่ยนเลขเริ่มต้นภายหลังได้ก่อนออกเลข</small></div>${configured.length?`<div class="project-paper-note"><strong>ปีงบประมาณที่ตั้งค่าแล้ว</strong><span>${configured.map(y=>`พ.ศ. ${academicRegThaiDigits(y)}`).join(" · ")}</span></div>`:""}<div class="modal-actions"><button type="button" class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" type="submit">บันทึกปีงบประมาณ</button></div></form></div>`;
+  m.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>ตั้งค่าปีงบประมาณ</h3><p>ระบบเลขคุมและระบบเบิกจ่ายใช้ปีงบประมาณ ส่วนระบบโครงการยังใช้ปีการศึกษาแยกจากกัน</p></div><button class="modal-close">×</button></div><form id="procurement-control-fiscal-year-form" class="form-grid"><div class="field"><label>ปีงบประมาณ พ.ศ.</label><input class="input" name="control_year" type="number" min="2500" max="3000" step="1" required value="${Number(state.procurementControlYear||procurementCurrentFiscalYear())}"><small class="helper">เช่น 2570 · หากเป็นปีใหม่ ระบบจะสร้างปีงบประมาณสำหรับเลขคุมชุด 1–5 จากนั้นผู้ใช้กรอกเลขจริงเองทุกชุด</small></div>${configured.length?`<div class="project-paper-note"><strong>ปีงบประมาณที่ตั้งค่าแล้ว</strong><span>${configured.map(y=>`พ.ศ. ${academicRegThaiDigits(y)}`).join(" · ")}</span></div>`:""}<div class="modal-actions"><button type="button" class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" type="submit">บันทึกปีงบประมาณ</button></div></form></div>`;
   document.body.appendChild(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;
-  m.querySelector("form").onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),year=Number(fd.get("control_year")),btn=e.submitter;if(!Number.isInteger(year)||year<2500||year>3000)return toast("ปีงบประมาณไม่ถูกต้อง","กรุณาระบุ พ.ศ. 2500–3000","error");buttonLoading(btn,true,"กำลังตั้งค่าปี...");for(const meta of PROCUREMENT_CONTROL_SERIES){if(procurementControlSetting(meta.series,year))continue;const {error}=await supabase.rpc("configure_procurement_control_series",{p_series:meta.series,p_control_year:year,p_start_number:1});if(error){buttonLoading(btn,false);return toast("ตั้งค่าปีงบประมาณไม่สำเร็จ",error.message,"error");}}buttonLoading(btn,false);state.procurementControlYear=year;state.budgetFiscalYear=year;close();toast("ตั้งค่าปีงบประมาณแล้ว",`พ.ศ. ${year} · เลขคุมชุด 1–5 พร้อมตั้งเลขเริ่มต้น` ,"success");await loadProcurementControlWorkspace();renderDashboard();};
+  m.querySelector("form").onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),year=Number(fd.get("control_year")),btn=e.submitter;if(!Number.isInteger(year)||year<2500||year>3000)return toast("ปีงบประมาณไม่ถูกต้อง","กรุณาระบุ พ.ศ. 2500–3000","error");buttonLoading(btn,true,"กำลังตั้งค่าปี...");for(const meta of PROCUREMENT_CONTROL_SERIES){if(procurementControlSetting(meta.series,year))continue;const {error}=await supabase.rpc("configure_procurement_control_series",{p_series:meta.series,p_control_year:year,p_start_number:1});if(error){buttonLoading(btn,false);return toast("ตั้งค่าปีงบประมาณไม่สำเร็จ",error.message,"error");}}buttonLoading(btn,false);state.procurementControlYear=year;state.budgetFiscalYear=year;close();toast("ตั้งค่าปีงบประมาณแล้ว",`พ.ศ. ${year} · พร้อมกรอกเลขคุมชุด 1–5 ด้วยตนเอง` ,"success");await loadProcurementControlWorkspace();renderDashboard();};
 }
 
 function procurementControlSettingsModal(){
-  const m=document.createElement("div");m.className="modal-backdrop";m.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>ตั้งค่าเลขเริ่มต้น ปีงบประมาณ พ.ศ. ${escapeHtml(String(state.procurementControlYear))}</h3><p>เปลี่ยนได้เฉพาะชุดที่ยังไม่เคยออกเลขในปีนี้</p></div><button class="modal-close">×</button></div><form id="procurement-control-settings-form" class="form-grid">${PROCUREMENT_CONTROL_SERIES.map(meta=>{const setting=procurementControlSetting(meta.series),has=(state.procurementControlNumbers||[]).some(r=>r.series===meta.series&&Number(r.control_year)===Number(state.procurementControlYear));return `<div class="field"><label>${escapeHtml(meta.label)}</label><input class="input" type="number" min="1" name="${meta.series}" value="${Number(setting?.start_number||1)}" ${has?"disabled":""}><small class="helper">${has?"มีการออกเลขแล้วในปีงบประมาณนี้ จึงล็อกเลขเริ่มต้น":"กำหนดเลขแรกของชุดนี้"}</small></div>`;}).join("")}<div class="modal-actions"><button type="button" class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" type="submit">บันทึก</button></div></form></div>`;document.body.appendChild(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;m.querySelector("form").onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),btn=e.submitter;buttonLoading(btn,true,"กำลังบันทึก...");for(const meta of PROCUREMENT_CONTROL_SERIES){if(!fd.has(meta.series))continue;const {error}=await supabase.rpc("configure_procurement_control_series",{p_series:meta.series,p_control_year:Number(state.procurementControlYear),p_start_number:Number(fd.get(meta.series)||1)});if(error){buttonLoading(btn,false);return toast("บันทึกไม่สำเร็จ",error.message,"error");}}buttonLoading(btn,false);close();toast("บันทึกเลขเริ่มต้นแล้ว","","success");await loadProcurementControlWorkspace();renderDashboard();};
+  toast("ไม่ต้องตั้งค่าเลขเริ่มต้น","ระบบเลขคุมเวอร์ชันนี้ให้กรอกเลขจริงเอง เช่น 1/2569","info");
 }
+
 async function procurementControlDelete(id){
   const row=procurementControlById(id);if(!row)return;
-  const linked=procurementControlLinkedCase(row);if(linked)return toast("ลบเลขไม่ได้","เลขนี้ยังถูกผูกกับรายการจัดซื้อจัดจ้างที่ใช้งานอยู่","error");
-  const released=row.status==="released"?`\n\nเลขนี้เคยผูกกับ ${procurementControlReleasedCaseLabel(row)} ซึ่งถูกลบแล้ว การลบเลขครั้งนี้จะลบเลขออกจากทะเบียนจริงและคำนวณ Counter ใหม่`:"";
-  if(!confirm(`ยืนยันลบเลขคุม ${procurementControlDisplay(row)} ?${released}\n\nระบบจะคำนวณ Counter ของชุด ${procurementControlMeta(row.series).set} ใหม่จากเลขล่าสุดที่ยังเหลืออยู่`))return;
-  const {data,error}=await supabase.rpc("delete_procurement_control_number",{p_control_id:id});if(error)return toast("ลบเลขไม่สำเร็จ",error.message,"error");
-  const result=Array.isArray(data)?data[0]:data;toast("ลบเลขคุมแล้ว",result?.next_number?`เลขถัดไป ${result.next_number}`:"Counter ถูกคำนวณใหม่แล้ว","success");await loadProcurementControlWorkspace();renderDashboard();
+  const linked=procurementControlLinkedCase(row);if(linked)return toast("ลบประวัติไม่ได้","เลขนี้ยังถูกผูกกับรายการจัดซื้อจัดจ้าง กรุณาใช้ “ยกเลิก / คืนเลข” ก่อน","error");
+  const released=procurementControlReleasedCaseLabel(row)?`\n\nประวัติเดิม: ${procurementControlReleasedCaseLabel(row)}`:"";
+  if(!confirm(`ยืนยันลบประวัติเลขคุม ${procurementControlDisplay(row)} ?${released}\n\nการลบนี้ลบแถวประวัติออกจากทะเบียน ไม่เกี่ยวกับการคืนเลข เพราะเลขที่ยกเลิก/ปล่อยแล้วสามารถใช้ใหม่ได้อยู่แล้ว`))return;
+  const {error}=await supabase.rpc("delete_procurement_control_number",{p_control_id:id});if(error)return toast("ลบประวัติไม่สำเร็จ",error.message,"error");
+  toast("ลบประวัติเลขคุมแล้ว","เลขที่ว่างยังสามารถกรอกใช้กับงานอื่นได้ตามปกติ","success");await loadProcurementControlWorkspace();renderDashboard();
 }
 async function procurementControlCancel(id){
   const row=procurementControlById(id);if(!row)return;
-  const released=row.status==="released"?`\nเลขนี้เคยผูกกับ ${procurementControlReleasedCaseLabel(row)} ซึ่งถูกลบแล้ว`:"";
-  if(!confirm(`ยืนยันยกเลิกเลข ${procurementControlDisplay(row)} ?${released}\nเลขยกเลิกจะคงอยู่ในทะเบียนและจะไม่ถูกนำกลับมาใช้`))return;
-  const {error}=await supabase.rpc("cancel_procurement_control_number",{p_control_id:id});if(error)return toast("ยกเลิกเลขไม่สำเร็จ",error.message,"error");toast("ยกเลิกเลขคุมแล้ว","เลขเดิมยังคงอยู่ในประวัติทะเบียนและไม่วนกลับมาใช้","success");await loadProcurementControlWorkspace();renderDashboard();
+  const linked=procurementControlLinkedCase(row),linkedText=linked?`\nเลขนี้กำลังผูกกับ ${linked.case_code||""} · ${linked.title||""}\nระบบจะปลดเลขออกจากรายการและจาก PDF ของรายการนั้นก่อนคืนเลข`:"";
+  if(!confirm(`ยืนยันยกเลิก / คืนเลข ${procurementControlDisplay(row)} ?${linkedText}\n\nเลขเดิมจะเก็บไว้เป็นประวัติ “ยกเลิก” แต่สามารถกรอกเลขเดียวกันไปใช้กับโครงการอื่นได้ทันที`))return;
+  const {error}=await supabase.rpc("cancel_procurement_control_number",{p_control_id:id});if(error)return toast("คืนเลขไม่สำเร็จ",error.message,"error");toast("ยกเลิกและคืนเลขแล้ว","เลขนี้สามารถนำไปกรอกใช้กับโครงการอื่นได้ โดยประวัติเดิมยังคงอยู่","success");await loadProcurementControlWorkspace();renderDashboard();
 }
 function procurementControlRegistryDocumentText(series,secondary=false){if(series==="request_approval")return secondary?"อนุมัติ / อนุมัติแบบที่ 2 / แจ้งคณะกรรมการตรวจรับพัสดุ / รายงานผลการตรวจรับพัสดุ":"รายงานขอซื้อ/ขอจ้าง / แนบรายงานขอซื้อ/จ้าง / แบบสำรวจความต้องการ / แนบเสนอราคา";if(series==="order")return "บันทึกแต่งตั้ง TOR / คำสั่ง TOR / บันทึกเห็นชอบ TOR / แนบ TOR / แต่งตั้งตรวจรับ";if(series==="purchase_order")return "ใบสั่งซื้อ/ใบสั่งจ้าง / แนบใบสั่งซื้อ/ใบสั่งจ้าง";if(series==="disbursement")return "ส่งเบิกเงิน / เบิกจ่าย / เบิกจ่าย (2)";return "เบิกพัสดุ / เบิกพัสดุ (2)";}
 function procurementControlRegistryDate(row,c,secondary=false){const f=procurementFormData(c),fallback=String(row.created_at||"").slice(0,10);if(row.series==="request_approval")return secondary?(f.approval_date||f.post_delivery_memo_date||fallback):(f.request_date||fallback);if(row.series==="order")return f.inspection_order_date||f.tor_request_date||fallback;if(row.series==="purchase_order")return f.purchase_order_date||fallback;if(row.series==="disbursement")return f.disbursement_date||f.post_delivery_memo_date||fallback;if(row.series==="inventory_issue")return f.issue_date||fallback;return fallback;}
-function procurementControlRegistryRows(series){const base=(state.procurementControlNumbers||[]).filter(r=>r.series===series&&Number(r.control_year)===Number(state.procurementControlYear)).sort((a,b)=>Number(a.primary_sequence||0)-Number(b.primary_sequence||0)),rows=[];for(const r of base){const c=procurementControlLinkedCase(r),releasedLabel=procurementControlReleasedCaseLabel(r),status=r.status==="cancelled"?"ยกเลิก":r.status==="released"?"รายการต้นทางถูกลบ":c?"ใช้แล้ว":"ยังไม่ใช้",subject=c?.title||r.released_from_case_title||r.subject||"—",note=c?.case_code||r.released_from_case_code||r.notes||"";rows.push({number:r.primary_number,documents:procurementControlRegistryDocumentText(series,false),subject,date:procurementControlRegistryDate(r,c,false),status,note});if(series==="request_approval"&&r.secondary_number)rows.push({number:r.secondary_number,documents:procurementControlRegistryDocumentText(series,true),subject,date:procurementControlRegistryDate(r,c,true),status,note});}return rows;}
+function procurementControlRegistryRows(series){const base=(state.procurementControlNumbers||[]).filter(r=>r.series===series&&Number(r.control_year)===Number(state.procurementControlYear)).sort((a,b)=>Number(a.primary_sequence||0)-Number(b.primary_sequence||0)),rows=[];for(const r of base){const c=procurementControlLinkedCase(r),releasedLabel=procurementControlReleasedCaseLabel(r),status=r.status==="cancelled"?"ยกเลิก / คืนเลขแล้ว":r.status==="released"?"คืนเลขแล้ว (รายการต้นทางถูกลบ)":c?"ใช้แล้ว":"ยังไม่ใช้",subject=c?.title||r.released_from_case_title||r.subject||"—",note=c?.case_code||r.released_from_case_code||r.notes||"";rows.push({number:r.primary_number,documents:procurementControlRegistryDocumentText(series,false),subject,date:procurementControlRegistryDate(r,c,false),status,note});if(series==="request_approval"&&r.secondary_number)rows.push({number:r.secondary_number,documents:procurementControlRegistryDocumentText(series,true),subject,date:procurementControlRegistryDate(r,c,true),status,note});}return rows;}
 async function procurementBuildControlRegistryPdf(series){const meta=procurementControlMeta(series),rows=procurementControlRegistryRows(series);if(!rows.length)throw new Error(`ยังไม่มีเลขคุมชุด ${meta.set} ในปีงบประมาณนี้`);await ensureOfficialPdfFont("16pt");const logo=await schoolLogoDataUrl(),chunks=[];for(let i=0;i<rows.length;i+=12)chunks.push(rows.slice(i,i+12));const host=document.createElement("div");host.className="procurement-control-register-host";host.innerHTML=chunks.map((chunk,pageIndex)=>`<article class="procurement-control-register-page"><header><div class="procurement-control-register-logo">${logo?`<img src="${logo}" alt="โลโก้โรงเรียน">`:""}</div><div><h1>ทะเบียนคุมเลขที่เอกสารจัดซื้อจัดจ้าง</h1><h2>${escapeHtml(schoolName())}</h2><h3>${escapeHtml(meta.label)}</h3><p>ประจำปีงบประมาณ พ.ศ. ${escapeHtml(String(state.procurementControlYear))}</p></div></header><table><thead><tr><th class="no">ลำดับ</th><th class="number">เลขคุม</th><th class="docs">ใช้กับเอกสาร</th><th>เรื่อง / รายการ</th><th class="date">วันที่</th><th class="status">สถานะ</th><th class="note">หมายเหตุ</th></tr></thead><tbody>${chunk.map((r,i)=>`<tr><td>${academicRegThaiDigits(pageIndex*12+i+1)}</td><td><strong>${escapeHtml(r.number||"—")}</strong></td><td>${escapeHtml(r.documents)}</td><td>${escapeHtml(r.subject)}</td><td>${r.date?escapeHtml(thaiDateOnly(r.date)):"—"}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.note||"")}</td></tr>`).join("")}</tbody></table><footer><span>${escapeHtml(schoolName())}</span><span>หน้า ${academicRegThaiDigits(pageIndex+1)} / ${academicRegThaiDigits(chunks.length)}</span></footer></article>`).join("");document.body.appendChild(host);try{await Promise.all([...host.querySelectorAll("img")].map(img=>img.complete?Promise.resolve():new Promise(r=>{img.onload=img.onerror=r;})));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const pages=[...host.querySelectorAll(".procurement-control-register-page")],pdf=new jsPDF({orientation:"landscape",unit:"mm",format:"a4",compress:true});for(let i=0;i<pages.length;i++){if(i)pdf.addPage("a4","landscape");const canvas=await html2canvas(pages[i],{scale:2.15,useCORS:true,backgroundColor:"#fff",logging:false});pdf.addImage(canvas.toDataURL("image/jpeg",.97),"JPEG",0,0,297,210,undefined,"FAST");}return {blob:pdf.output("blob"),filename:`ทะเบียนเลขคุมชุด${meta.set}_ปีงบประมาณ_${state.procurementControlYear}.pdf`,rowCount:rows.length,pageCount:pages.length};}finally{host.remove();}}
 async function procurementOpenControlRegistryPdf(series){const meta=procurementControlMeta(series);try{const built=await procurementBuildControlRegistryPdf(series);openPdfPreviewModal({title:`ทะเบียนเลขคุมชุด ${meta.set} — ปีงบประมาณ พ.ศ. ${state.procurementControlYear}`,subtitle:`เอกสารทางการ ${built.rowCount} รายการ · ${built.pageCount} หน้า · มีโลโก้โรงเรียน`,blob:built.blob,filename:built.filename});}catch(err){console.error(err);toast("สร้างทะเบียน PDF ไม่สำเร็จ",err.message||String(err),"error");}}
 
@@ -12096,6 +12542,8 @@ function examCurrentPeriod(){
   return {academicYear:Number(state.examAcademicYear||p.academicYear),semester:Number(state.examSemester||p.semester)};
 }
 function examSetById(id=state.selectedExamSetId){return (state.examSets||[]).find(x=>x.id===id)||null;}
+function examVisibleSets(){return (state.examSets||[]).filter(x=>Boolean(x.archived_at)===Boolean(state.examShowArchived));}
+function examIsArchived(id=state.selectedExamSetId){return Boolean(examSetById(id)?.archived_at);}
 function examItemsForSet(id=state.selectedExamSetId){return (state.examItems||[]).filter(x=>x.exam_set_id===id).sort((a,b)=>Number(a.item_no||0)-Number(b.item_no||0)||String(a.created_at||"").localeCompare(String(b.created_at||"")));}
 function examClassById(id){return (state.examClasses||[]).find(x=>x.id===id)||null;}
 function examSubjectById(id){return (state.examSubjects||[]).find(x=>x.id===id)||null;}
@@ -12193,7 +12641,7 @@ async function loadExamWorkspace(){
   let assignmentQuery=supabase.from("teaching_assignments").select("*").eq("is_active",true).order("created_at");
   if(!examCanReviewAll())assignmentQuery=assignmentQuery.eq("teacher_id",state.user.id);
   const [setsRes,classesRes,subjectsRes,assignmentsRes]=await Promise.all([
-    supabase.from("academic_exam_sets").select("id,academic_year,semester,exam_period,exam_name,teaching_assignment_id,class_id,subject_id,teacher_id,subject_code_snapshot,subject_name_snapshot,class_label_snapshot,teacher_name_snapshot,duration_minutes,full_score,objective_count,subjective_count,number_style,default_choice_style,default_choice_count,instructions,general_instructions,sections,learning_outcomes,created_by,updated_by,created_at,updated_at").eq("academic_year",String(p.academicYear)).eq("semester",p.semester).order("updated_at",{ascending:false}),
+    supabase.from("academic_exam_sets").select("id,academic_year,semester,exam_period,exam_name,teaching_assignment_id,class_id,subject_id,teacher_id,subject_code_snapshot,subject_name_snapshot,class_label_snapshot,teacher_name_snapshot,duration_minutes,full_score,objective_count,subjective_count,number_style,default_choice_style,default_choice_count,instructions,general_instructions,sections,learning_outcomes,archived_at,archived_by,created_by,updated_by,created_at,updated_at").eq("academic_year",String(p.academicYear)).eq("semester",p.semester).order("updated_at",{ascending:false}),
     supabase.from("school_classes").select("id,academic_year,semester,stage_code,level_name,room_name,sort_order,is_active").eq("academic_year",String(p.academicYear)).eq("semester",p.semester).eq("is_active",true).order("sort_order"),
     supabase.from("academic_subjects").select("id,subject_code,subject_name,is_active").eq("is_active",true).order("subject_name"),
     assignmentQuery,
@@ -12204,7 +12652,8 @@ async function loadExamWorkspace(){
   state.examTeachingAssignments=assignmentsRes.error?[]:(assignmentsRes.data||[]).filter(a=>state.examClasses.some(c=>c.id===a.class_id));
   const ids=state.examSets.map(x=>x.id);
   if(ids.length){const itemsRes=await supabase.from("academic_exam_items").select("id,exam_set_id,item_no,item_type,section_no,question_text,score,choice_style,options,created_by,updated_by,created_at,updated_at").in("exam_set_id",ids).order("item_no");state.examItems=itemsRes.error?[]:(itemsRes.data||[]);if(itemsRes.error&&!state.examLoadError)state.examLoadError=itemsRes.error.message||String(itemsRes.error);}else state.examItems=[];
-  if(!state.selectedExamSetId||!state.examSets.some(x=>x.id===state.selectedExamSetId))state.selectedExamSetId=state.examSets[0]?.id||null;
+  const visibleExamSets=examVisibleSets();
+  if(!state.selectedExamSetId||!visibleExamSets.some(x=>x.id===state.selectedExamSetId))state.selectedExamSetId=visibleExamSets[0]?.id||null;
   if(state.examSection==="analysis"&&state.selectedExamSetId)await loadExamAnalysisData(state.selectedExamSetId);
   else{state.examAttempts=[];state.examResponses=[];state.examAnalysisLoadError="";}
 }
@@ -12264,14 +12713,15 @@ function examAnalysisSummaryHtml(set){
   return `<div class="exam-analysis-summary"><article><span>เข้าสอบ</span><strong>${m.n}</strong><small>คน · ขาด ${absent}</small></article><article><span>คะแนนเฉลี่ย</span><strong>${examAnalysisNum(m.mean)}</strong><small>จาก ${examAnalysisNum(set.full_score)}</small></article><article><span>ส่วนเบี่ยงเบนมาตรฐาน</span><strong>${examAnalysisNum(m.sd)}</strong><small>SD ของคะแนนรวม</small></article><article><span>KR-20</span><strong>${m.kr20===null?"—":examAnalysisNum(m.kr20,3)}</strong><small>เฉพาะข้อปรนัย</small></article></div>`;
 }
 function examAnalysisEntryCellHtml(attempt,item,set){
-  const r=examAnalysisResponse(attempt.id,item.id),disabled=attempt.attendance_status==="absent"?"disabled":"";
+  const r=examAnalysisResponse(attempt.id,item.id),disabled=(attempt.attendance_status==="absent"||!!set.archived_at)?"disabled":"";
   if(item.item_type==="objective"){const opts=Array.isArray(item.options)?item.options:[],value=r?.selected_option_index;return `<td class="exam-analysis-answer-cell ${r?(r.is_correct===true?"correct":"wrong"):""}"><select class="select exam-analysis-answer-select" data-exam-analysis-answer data-attempt-id="${attempt.id}" data-item-id="${item.id}" ${disabled}><option value="">—</option>${opts.map((o,i)=>`<option value="${i}" ${Number(value)===i?"selected":""}>${escapeHtml(examChoiceMarker(i,item.choice_style||set.default_choice_style))}</option>`).join("")}</select></td>`;}
   const score=r?Number(r.awarded_score||0):"";return `<td class="exam-analysis-answer-cell subjective"><input class="input exam-analysis-score-input" data-exam-analysis-score data-attempt-id="${attempt.id}" data-item-id="${item.id}" type="number" min="0" max="${Number(item.score||0)}" step="0.5" value="${score}" ${disabled}></td>`;
 }
 function examAnalysisEntryHtml(set){
   const attempts=examAnalysisAttempts(),items=examItemsForSet(set.id),ready=examSetReadiness(set);
+  if(set.archived_at&&!attempts.length)return `<section class="panel"><div class="empty"><strong>ไม่มีข้อมูลผลสอบที่บันทึกไว้</strong><span>ชุดข้อสอบนี้ถูกยกเลิกการใช้งานแล้ว</span></div></section>`;
   if(!attempts.length)return `<section class="panel exam-analysis-empty"><div class="empty"><strong>ยังไม่มีรายชื่อนักเรียนสำหรับบันทึกผลสอบ</strong><span>ระบบจะดึงนักเรียนสถานะกำลังเรียนจากห้อง ${escapeHtml(set.class_label_snapshot||"")} โดยใช้ชุดข้อสอบและเฉลยเดิมทันที</span><button class="btn btn-primary" id="exam-analysis-init-roster" ${ready.ready?"":"disabled"}>ดึงรายชื่อนักเรียนและเริ่มบันทึกผลสอบ</button>${ready.ready?"":`<small>ต้องจัดทำข้อสอบให้ครบก่อน · ${escapeHtml(ready.issues.slice(0,4).join(" · "))}</small>`}</div></section>`;
-  return `<section class="panel exam-analysis-entry"><div class="panel-head"><div class="panel-title-wrap"><h3>บันทึกผลสอบรายคน</h3><p>บันทึกอัตโนมัติทุกช่อง · ปรนัยตรวจตามเฉลยในชุดข้อสอบ · อัตนัยกรอกคะแนนที่ได้</p></div><div class="panel-actions"><span class="helper" id="exam-analysis-autosave">พร้อมบันทึก</span><button class="btn btn-ghost danger" id="exam-analysis-clear">ล้างผลสอบทั้งหมด</button></div></div><div class="exam-analysis-grid-wrap"><table class="exam-analysis-grid"><thead><tr><th class="sticky-no">เลขที่</th><th class="sticky-name">ชื่อ-สกุล</th><th class="sticky-status">สถานะ</th>${items.map((item,i)=>`<th title="${escapeHtml(item.question_text||"")}"><b>${examNumber(i+1,set.number_style)}</b><small>${item.item_type==="objective"?"ปรนัย":"อัตนัย"} · ${examAnalysisNum(item.score,1)}</small></th>`).join("")}<th class="sticky-score">รวม</th></tr></thead><tbody>${attempts.map(a=>{const sc=examAnalysisAttemptScores(a.id);return `<tr data-exam-attempt-row="${a.id}" class="${a.attendance_status==="absent"?"absent":""}"><td class="sticky-no">${a.student_number_snapshot??"—"}</td><td class="sticky-name"><strong>${escapeHtml(a.student_name_snapshot||"")}</strong><small>${escapeHtml(a.student_code_snapshot||"")}</small></td><td class="sticky-status"><select class="select exam-analysis-status" data-exam-analysis-status data-attempt-id="${a.id}"><option value="present" ${a.attendance_status!=="absent"?"selected":""}>เข้าสอบ</option><option value="absent" ${a.attendance_status==="absent"?"selected":""}>ขาดสอบ</option></select></td>${items.map(item=>examAnalysisEntryCellHtml(a,item,set)).join("")}<td class="sticky-score"><strong data-exam-attempt-score="${a.id}">${examAnalysisNum(sc.total)}</strong><small>/ ${examAnalysisNum(set.full_score)}</small></td></tr>`;}).join("")}</tbody></table></div><div class="exam-analysis-entry-note"><strong>การคิดคะแนน</strong><span>ปรนัย: ระบบให้คะแนนเต็มของข้อนั้นเมื่อคำตอบตรงเฉลย และ 0 เมื่อผิด/เว้นว่าง · อัตนัย: ครูกรอกคะแนนตั้งแต่ 0 ถึงคะแนนเต็มของข้อ</span></div></section>`;
+  return `<section class="panel exam-analysis-entry"><div class="panel-head"><div class="panel-title-wrap"><h3>บันทึกผลสอบรายคน</h3><p>บันทึกอัตโนมัติทุกช่อง · ปรนัยตรวจตามเฉลยในชุดข้อสอบ · อัตนัยกรอกคะแนนที่ได้</p></div><div class="panel-actions">${set.archived_at?`<span class="pill neutral">โหมดอ่านอย่างเดียว</span>`:`<span class="helper" id="exam-analysis-autosave">พร้อมบันทึก</span><button class="btn btn-ghost danger" id="exam-analysis-clear">ล้างผลสอบทั้งหมด</button>`}</div></div><div class="exam-analysis-grid-wrap"><table class="exam-analysis-grid"><thead><tr><th class="sticky-no">เลขที่</th><th class="sticky-name">ชื่อ-สกุล</th><th class="sticky-status">สถานะ</th>${items.map((item,i)=>`<th title="${escapeHtml(item.question_text||"")}"><b>${examNumber(i+1,set.number_style)}</b><small>${item.item_type==="objective"?"ปรนัย":"อัตนัย"} · ${examAnalysisNum(item.score,1)}</small></th>`).join("")}<th class="sticky-score">รวม</th></tr></thead><tbody>${attempts.map(a=>{const sc=examAnalysisAttemptScores(a.id);return `<tr data-exam-attempt-row="${a.id}" class="${a.attendance_status==="absent"?"absent":""}"><td class="sticky-no">${a.student_number_snapshot??"—"}</td><td class="sticky-name"><strong>${escapeHtml(a.student_name_snapshot||"")}</strong><small>${escapeHtml(a.student_code_snapshot||"")}</small></td><td class="sticky-status"><select class="select exam-analysis-status" data-exam-analysis-status data-attempt-id="${a.id}" ${set.archived_at?"disabled":""}><option value="present" ${a.attendance_status!=="absent"?"selected":""}>เข้าสอบ</option><option value="absent" ${a.attendance_status==="absent"?"selected":""}>ขาดสอบ</option></select></td>${items.map(item=>examAnalysisEntryCellHtml(a,item,set)).join("")}<td class="sticky-score"><strong data-exam-attempt-score="${a.id}">${examAnalysisNum(sc.total)}</strong><small>/ ${examAnalysisNum(set.full_score)}</small></td></tr>`;}).join("")}</tbody></table></div><div class="exam-analysis-entry-note"><strong>การคิดคะแนน</strong><span>ปรนัย: ระบบให้คะแนนเต็มของข้อนั้นเมื่อคำตอบตรงเฉลย และ 0 เมื่อผิด/เว้นว่าง · อัตนัย: ครูกรอกคะแนนตั้งแต่ 0 ถึงคะแนนเต็มของข้อ</span></div></section>`;
 }
 function examAnalysisReportHtml(set){
   const m=examAnalysisMetrics(set);if(!examAnalysisAttempts().length)return examAnalysisEntryHtml(set);
@@ -12281,11 +12731,11 @@ function examAnalysisReportHtml(set){
 function examAnalysisWorkspaceHtml(){
   const set=examSetById();if(!set)return `<section class="panel"><div class="empty"><strong>ยังไม่มีชุดข้อสอบ</strong><span>สร้างชุดข้อสอบในหน้าที่ 1 ก่อน</span></div></section>`;
   if(state.examAnalysisLoadError&&examAnalysisTablesMissing())return `<section class="panel"><div class="empty"><strong>ฐานข้อมูลระบบที่ 4 ยังไม่พร้อม</strong><span>${escapeHtml(state.examAnalysisLoadError)}</span><code>supabase-v5.3.0-academic-exam-item-analysis.sql</code></div></section>`;
-  const r=examSetReadiness(set);
-  return `<section class="panel exam-analysis-head"><div class="panel-head"><div class="panel-title-wrap"><h3>ระบบที่ 4 · วิเคราะห์คุณภาพข้อสอบ</h3><p>${escapeHtml(set.subject_code_snapshot||"")} ${escapeHtml(set.subject_name_snapshot||"")} · ${escapeHtml(set.class_label_snapshot||"")} · ${escapeHtml(set.exam_name||"")}</p></div><div class="field exam-set-picker"><label>ชุดข้อสอบ</label>${examSetSelectHtml()}</div></div><div class="exam-analysis-subtabs"><button class="btn ${state.examAnalysisView!=="report"?"btn-primary":"btn-ghost"}" data-exam-analysis-view="entry">1 · บันทึกผลสอบ</button><button class="btn ${state.examAnalysisView==="report"?"btn-primary":"btn-ghost"}" data-exam-analysis-view="report" ${r.ready?"":"disabled"}>2 · วิเคราะห์คุณภาพ</button></div>${state.examAnalysisLoadError?`<div class="exam-readiness warning"><strong>โหลดข้อมูลวิเคราะห์ไม่ครบ</strong><span>${escapeHtml(state.examAnalysisLoadError)}</span></div>`:""}</section>${state.examAnalysisView==="report"?examAnalysisReportHtml(set):examAnalysisEntryHtml(set)}`;
+  const r=examSetReadiness(set),archived=!!set.archived_at;
+  return `<section class="panel exam-analysis-head"><div class="panel-head"><div class="panel-title-wrap"><h3>ระบบที่ 4 · วิเคราะห์คุณภาพข้อสอบ</h3><p>${escapeHtml(set.subject_code_snapshot||"")} ${escapeHtml(set.subject_name_snapshot||"")} · ${escapeHtml(set.class_label_snapshot||"")} · ${escapeHtml(set.exam_name||"")}</p></div><div class="field exam-set-picker"><label>ชุดข้อสอบ</label>${examSetSelectHtml()}</div></div><div class="exam-analysis-subtabs"><button class="btn ${!archived&&state.examAnalysisView!=="report"?"btn-primary":"btn-ghost"}" data-exam-analysis-view="entry" ${archived?"disabled":""}>1 · บันทึกผลสอบ</button><button class="btn ${archived||state.examAnalysisView==="report"?"btn-primary":"btn-ghost"}" data-exam-analysis-view="report" ${r.ready?"":"disabled"}>2 · วิเคราะห์คุณภาพ</button></div>${state.examAnalysisLoadError?`<div class="exam-readiness warning"><strong>โหลดข้อมูลวิเคราะห์ไม่ครบ</strong><span>${escapeHtml(state.examAnalysisLoadError)}</span></div>`:""}</section>${(archived||state.examAnalysisView==="report")?examAnalysisReportHtml(set):examAnalysisEntryHtml(set)}`;
 }
-async function examAnalysisInitialize(){const set=examSetById();if(!set)return;const ready=examSetReadiness(set);if(!ready.ready)return toast("ข้อสอบยังไม่พร้อม",ready.issues.slice(0,5).join(" · "),"error");const btn=document.querySelector("#exam-analysis-init-roster");buttonLoading(btn,true,"กำลังดึงรายชื่อ...");const {data,error}=await supabase.rpc("initialize_academic_exam_attempts",{p_exam_set_id:set.id});buttonLoading(btn,false);if(error)return toast("ดึงรายชื่อนักเรียนไม่สำเร็จ",error.message,"error");toast("เตรียมรายชื่อผลสอบแล้ว",`เพิ่ม ${Number(data||0)} คน · ถ้ามีรายชื่อเดิมระบบจะไม่สร้างซ้ำ`,"success");await loadExamAnalysisData(set.id);renderDashboard();}
-async function examAnalysisClear(){const set=examSetById();if(!set||!state.examAttempts.length)return;if(!confirm(`ล้างผลสอบของ ${set.subject_name_snapshot||set.exam_name} ทั้งหมดหรือไม่?\n\nคำตอบ คะแนน และผลวิเคราะห์จะถูกลบ แต่ชุดข้อสอบจะยังอยู่ครบ`))return;const btn=document.querySelector("#exam-analysis-clear");buttonLoading(btn,true,"กำลังล้าง...");const {error}=await supabase.from("academic_exam_attempts").delete().eq("exam_set_id",set.id);buttonLoading(btn,false);if(error)return toast("ล้างผลสอบไม่สำเร็จ",error.message,"error");state.examAttempts=[];state.examResponses=[];toast("ล้างผลสอบแล้ว","สามารถกลับไปแก้โครงสร้างข้อสอบ/เฉลยได้ตามปกติ","success");renderDashboard();}
+async function examAnalysisInitialize(){const set=examSetById();if(!set)return;if(set.archived_at)return toast("รายการที่ยกเลิกเป็นโหมดอ่านอย่างเดียว","กรุณาคืนชุดข้อสอบก่อน","error");const ready=examSetReadiness(set);if(!ready.ready)return toast("ข้อสอบยังไม่พร้อม",ready.issues.slice(0,5).join(" · "),"error");const btn=document.querySelector("#exam-analysis-init-roster");buttonLoading(btn,true,"กำลังดึงรายชื่อ...");const {data,error}=await supabase.rpc("initialize_academic_exam_attempts",{p_exam_set_id:set.id});buttonLoading(btn,false);if(error)return toast("ดึงรายชื่อนักเรียนไม่สำเร็จ",error.message,"error");toast("เตรียมรายชื่อผลสอบแล้ว",`เพิ่ม ${Number(data||0)} คน · ถ้ามีรายชื่อเดิมระบบจะไม่สร้างซ้ำ`,"success");await loadExamAnalysisData(set.id);renderDashboard();}
+async function examAnalysisClear(){const set=examSetById();if(!set||!state.examAttempts.length)return;if(set.archived_at)return toast("รายการที่ยกเลิกเป็นโหมดอ่านอย่างเดียว","กรุณาคืนชุดข้อสอบก่อน","error");if(!confirm(`ล้างผลสอบของ ${set.subject_name_snapshot||set.exam_name} ทั้งหมดหรือไม่?\n\nคำตอบ คะแนน และผลวิเคราะห์จะถูกลบ แต่ชุดข้อสอบจะยังอยู่ครบ`))return;const btn=document.querySelector("#exam-analysis-clear");buttonLoading(btn,true,"กำลังล้าง...");const {error}=await supabase.from("academic_exam_attempts").delete().eq("exam_set_id",set.id);buttonLoading(btn,false);if(error)return toast("ล้างผลสอบไม่สำเร็จ",error.message,"error");state.examAttempts=[];state.examResponses=[];toast("ล้างผลสอบแล้ว","สามารถกลับไปแก้โครงสร้างข้อสอบ/เฉลยได้ตามปกติ","success");renderDashboard();}
 function examAnalysisSyncLocalScore(attemptId){const a=(state.examAttempts||[]).find(x=>x.id===attemptId);if(!a)return;const sc=examAnalysisAttemptScores(attemptId);a.objective_score=sc.objective;a.subjective_score=sc.subjective;a.total_score=sc.total;const el=document.querySelector(`[data-exam-attempt-score="${attemptId}"]`);if(el)el.textContent=examAnalysisNum(sc.total);}
 function examAnalysisSetSaveText(text){const el=document.querySelector("#exam-analysis-autosave");if(el)el.textContent=text;}
 async function examAnalysisSaveResponse(el,type){
@@ -12321,12 +12771,17 @@ function examPeriodFiltersHtml(){
   const years=[...new Set([...(state.academicTerms||[]).map(t=>Number(t.academic_year)).filter(Boolean),Number(currentAcademicPeriod().academicYear),Number(state.examAcademicYear)].filter(Boolean))].sort((a,b)=>b-a);
   return `<div class="exam-toolbar"><div class="field"><label>ปีการศึกษา</label><select class="select" id="exam-year">${years.map(y=>`<option value="${y}" ${y===Number(state.examAcademicYear)?"selected":""}>${y}</option>`).join("")}</select></div><div class="field"><label>ภาคเรียน</label><select class="select" id="exam-semester">${[1,2,3].map(s=>`<option value="${s}" ${s===Number(state.examSemester)?"selected":""}>${s}</option>`).join("")}</select></div><div class="field exam-search-field"><label>ค้นหา</label><input class="input" id="exam-search" placeholder="ชื่อวิชา ชั้น หรือชื่อชุดข้อสอบ" value="${escapeHtml(state.examSearch||"")}"></div></div>`;
 }
+function examArchiveFilterHtml(){
+  const active=(state.examSets||[]).filter(x=>!x.archived_at).length;
+  const archived=(state.examSets||[]).filter(x=>!!x.archived_at).length;
+  return `<div class="exam-archive-switch"><span>แสดงรายการ:</span><button type="button" class="btn btn-sm ${state.examShowArchived?"btn-ghost":"btn-primary"}" data-exam-archive-view="active">ใช้งานอยู่ (${active})</button><button type="button" class="btn btn-sm ${state.examShowArchived?"btn-primary":"btn-ghost"}" data-exam-archive-view="archived">ชุดข้อสอบที่ยกเลิก (${archived})</button></div>`;
+}
 function examSectionChipsHtml(set){
   return examSections(set).map(section=>`<span class="exam-section-chip"><b>ตอนที่ ${examNumber(section.no,set.number_style)}</b> ${escapeHtml(section.title)} · ${examNumber(section.count,set.number_style)} ข้อ</span>`).join("");
 }
 function examSetCardHtml(set){
-  const c=examSetCounts(set),ready=examSetReadiness(set);
-  return `<article class="exam-set-card"><div class="exam-set-card-main"><div><div class="exam-set-meta"><span class="pill ${ready.ready?"active":"pending"}">${ready.ready?"พร้อม Export":"กำลังจัดทำ"}</span><span>${escapeHtml(examPeriodLabel(set.exam_period))}</span></div><h3>${escapeHtml(set.subject_code_snapshot?`${set.subject_code_snapshot} ${set.subject_name_snapshot}`:set.subject_name_snapshot||set.exam_name)}</h3><p>${escapeHtml(set.class_label_snapshot||"—")} · ${escapeHtml(set.exam_name||"")} · ${examNumber(Number(set.duration_minutes||0),set.number_style)} นาที</p><div class="exam-set-sections">${examSectionChipsHtml(set)}</div><small>บันทึกแล้ว ${examNumber(c.items.length,set.number_style)} / ${examNumber(c.plannedObjective+c.plannedSubjective,set.number_style)} ข้อ</small></div><div class="exam-set-actions"><button class="btn btn-primary btn-sm" data-exam-open="${set.id}">เปิดชุดข้อสอบ</button><button class="btn btn-secondary btn-sm" data-exam-cover="${set.id}">ปกข้อสอบ</button><button class="btn btn-secondary btn-sm" data-exam-documents="${set.id}">PDF</button>${ready.ready?`<button class="btn btn-secondary btn-sm" data-exam-analysis="${set.id}">วิเคราะห์</button>`:""}<button class="btn btn-ghost btn-sm danger" data-exam-delete-set="${set.id}">ลบ</button></div></div><div class="exam-progress"><i style="width:${Math.min(100,c.items.length/Math.max(1,c.plannedObjective+c.plannedSubjective)*100)}%"></i></div></article>`;
+  const c=examSetCounts(set),ready=examSetReadiness(set),archived=!!set.archived_at;
+  return `<article class="exam-set-card ${archived?"archived":""}"><div class="exam-set-card-main"><div><div class="exam-set-meta"><span class="pill ${archived?"neutral":ready.ready?"active":"pending"}">${archived?"ยกเลิกการใช้งานแล้ว":ready.ready?"พร้อม Export":"กำลังจัดทำ"}</span><span>${escapeHtml(examPeriodLabel(set.exam_period))}</span></div><h3>${escapeHtml(set.subject_code_snapshot?`${set.subject_code_snapshot} ${set.subject_name_snapshot}`:set.subject_name_snapshot||set.exam_name)}</h3><p>${escapeHtml(set.class_label_snapshot||"—")} · ${escapeHtml(set.exam_name||"")} · ${examNumber(Number(set.duration_minutes||0),set.number_style)} นาที</p><div class="exam-set-sections">${examSectionChipsHtml(set)}</div><small>บันทึกแล้ว ${examNumber(c.items.length,set.number_style)} / ${examNumber(c.plannedObjective+c.plannedSubjective,set.number_style)} ข้อ</small></div><div class="exam-set-actions">${archived?`<button class="btn btn-secondary btn-sm" data-exam-documents="${set.id}">PDF</button><button class="btn btn-secondary btn-sm" data-exam-analysis="${set.id}">ดูผลสอบ/วิเคราะห์</button><button class="btn btn-primary btn-sm" data-exam-restore-set="${set.id}">คืนชุดข้อสอบ</button>`:`<button class="btn btn-primary btn-sm" data-exam-open="${set.id}">เปิดชุดข้อสอบ</button><button class="btn btn-secondary btn-sm" data-exam-cover="${set.id}">ปกข้อสอบ</button><button class="btn btn-secondary btn-sm" data-exam-documents="${set.id}">PDF</button>${ready.ready?`<button class="btn btn-secondary btn-sm" data-exam-analysis="${set.id}">วิเคราะห์</button>`:""}<button class="btn btn-ghost btn-sm danger" data-exam-delete-set="${set.id}">ลบ / ยกเลิก</button>`}</div></div><div class="exam-progress"><i style="width:${Math.min(100,c.items.length/Math.max(1,c.plannedObjective+c.plannedSubjective)*100)}%"></i></div></article>`;
 }
 function examQuestionCardHtml(item,index,set){
   const opts=Array.isArray(item.options)?item.options:[],section=examSections(set).find(x=>x.no===Number(item.section_no||examSectionForType(set,item.item_type)?.no||1));
@@ -12345,11 +12800,11 @@ function examFullEditorHtml(set){
 function examSetsWorkspaceHtml(){
   if(state.examEditorOpen)return examFullEditorHtml(examSetById());
   const q=String(state.examSearch||"").trim().toLowerCase();
-  const rows=(state.examSets||[]).filter(x=>!q||[x.exam_name,x.subject_name_snapshot,x.subject_code_snapshot,x.class_label_snapshot,x.teacher_name_snapshot].some(v=>String(v||"").toLowerCase().includes(q)));
-  return `${examPeriodFiltersHtml()}<section class="exam-set-list">${rows.length?rows.map(examSetCardHtml).join(""):`<div class="panel"><div class="empty"><strong>ยังไม่มีชุดข้อสอบในภาคเรียนนี้</strong><span>กด “เพิ่มชุดข้อสอบ” แล้วเลือกรายวิชาจากตารางสอนของคุณ</span></div></div>`}</section>`;
+  const rows=examVisibleSets().filter(x=>!q||[x.exam_name,x.subject_name_snapshot,x.subject_code_snapshot,x.class_label_snapshot,x.teacher_name_snapshot].some(v=>String(v||"").toLowerCase().includes(q)));
+  return `${examPeriodFiltersHtml()}${examArchiveFilterHtml()}<section class="exam-set-list">${rows.length?rows.map(examSetCardHtml).join(""):`<div class="panel"><div class="empty"><strong>${state.examShowArchived?"ไม่มีชุดข้อสอบที่ยกเลิก":"ยังไม่มีชุดข้อสอบในภาคเรียนนี้"}</strong><span>${state.examShowArchived?"รายการที่ยกเลิกจะเก็บผลสอบและข้อสอบไว้ สามารถคืนการใช้งานจากหน้านี้":"กด “เพิ่มชุดข้อสอบ” แล้วเลือกรายวิชาจากตารางสอนของคุณ"}</span></div></div>`}</section>`;
 }
 function examSetSelectHtml(id="exam-selected-set"){
-  return `<select class="select" id="${id}">${(state.examSets||[]).map(x=>`<option value="${x.id}" ${x.id===state.selectedExamSetId?"selected":""}>${escapeHtml(`${x.subject_name_snapshot||x.exam_name} · ${x.class_label_snapshot||""}`)}</option>`).join("")}</select>`;
+  return `<select class="select" id="${id}">${examVisibleSets().map(x=>`<option value="${x.id}" ${x.id===state.selectedExamSetId?"selected":""}>${escapeHtml(`${x.subject_name_snapshot||x.exam_name} · ${x.class_label_snapshot||""}`)}</option>`).join("")}</select>`;
 }
 function examOutcomeRowHtml(row,set,index){
   const sections=examSections(set),sectionNo=Number(row?.section_no||sections[0]?.no||1),type=row?.outcome_type==="indicator"?"indicator":"learning_outcome";
@@ -12366,12 +12821,14 @@ function examDocumentsWorkspaceHtml(){
   return `<section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ข้อสอบ · กระดาษคำตอบ · Export PDF</h3><p>PDF ใช้ฟอนต์ ${escapeHtml(OFFICIAL_PDF_FONT)} ตามมาตรฐาน BNK School OS และคง A4 ทุกอุปกรณ์</p></div><div class="field exam-set-picker"><label>ชุดข้อสอบ</label>${examSetSelectHtml()}</div></div><div class="exam-document-summary"><article><span>ปรนัย</span><strong>${examNumber(c.objective.length,set.number_style)}/${examNumber(c.plannedObjective,set.number_style)}</strong><small>ข้อ</small></article><article><span>อัตนัย</span><strong>${examNumber(c.subjective.length,set.number_style)}/${examNumber(c.plannedSubjective,set.number_style)}</strong><small>ข้อ</small></article><article><span>เวลา</span><strong>${examNumber(set.duration_minutes,set.number_style)}</strong><small>นาที</small></article><article><span>สถานะ</span><strong>${r.ready?"พร้อม":"ยังไม่ครบ"}</strong><small>${r.ready?"Export ได้":"กลับไปเติมข้อสอบ"}</small></article></div>${r.ready?`<div class="exam-export-grid"><button class="btn btn-secondary" data-exam-export="cover">PDF ปก / ใบปะหน้า</button><button class="btn btn-secondary" data-exam-export="questions">PDF ตัวข้อสอบ</button><button class="btn btn-secondary" data-exam-export="answers">PDF กระดาษคำตอบ</button><button class="btn btn-primary" data-exam-export="full">PDF ชุดข้อสอบฉบับสมบูรณ์</button></div>`:`<div class="exam-readiness warning"><strong>ยัง Export ชุดสมบูรณ์ไม่ได้</strong><span>${escapeHtml(r.issues.slice(0,8).join(" · "))}</span><button class="btn btn-secondary" id="exam-back-builder">กลับไปจัดทำข้อสอบ</button></div>`}<div class="exam-document-note"><strong>รูปแบบกระดาษคำตอบ</strong><span>ปรนัยใช้กล่องสี่เหลี่ยม □ ตามจำนวนตัวเลือกจริง และจัดสองฝั่งเมื่อจำนวนข้อมาก · อัตนัยแยกหน้า 2 ข้อต่อ A4 พร้อมเส้นบรรทัดจุด</span></div></section>`;
 }
 function examWorkspaceHtml(){
+  if(state.examLoadError&&/archived_at|archived_by/i.test(state.examLoadError))return `<section class="panel"><div class="empty"><strong>ต้องติดตั้ง SQL ของ v5.12.9.6 ก่อน</strong><span>เพิ่มฟิลด์เก็บประวัติชุดข้อสอบเพื่อไม่ให้ลบผลสอบเดิม · ${escapeHtml(state.examLoadError)}</span><code>supabase-v5.12.9.6-academic-exam-safe-archive.sql</code></div></section>`;
   if(state.examLoadError&&/academic_exam_sets|academic_exam_items|relation .* does not exist|Could not find/i.test(state.examLoadError))return examSetupRequiredHtml();
   if(state.examSection==="sets"&&state.examEditorOpen)return `<section class="exam-page exam-editor-mode">${examFullEditorHtml(examSetById())}</section>`;
   return `<section class="exam-page">${examHeroHtml()}${examTabsHtml()}${state.examSection==="cover"?examCoverWorkspaceHtml():state.examSection==="documents"?examDocumentsWorkspaceHtml():state.examSection==="analysis"?examAnalysisWorkspaceHtml():examSetsWorkspaceHtml()}</section>`;
 }
 function examSetModal(set=null){
   const editing=!!set,p=examCurrentPeriod(),assignments=state.examTeachingAssignments||[];
+  if(editing&&set.archived_at)return toast("ชุดข้อสอบนี้ยกเลิกการใช้งานแล้ว","กรุณาคืนชุดข้อสอบก่อนแก้ไขโครงสร้าง","error");
   if(!editing&&!assignments.length)return toast("ไม่พบรายวิชาจากตารางสอน","ต้องมีการกำหนดรายวิชา/ครูในระบบจัดตารางสอนก่อนสร้างข้อสอบ","error");
   const d=set||{academic_year:String(p.academicYear),semester:p.semester,exam_period:"final",duration_minutes:60,full_score:30,objective_count:30,subjective_count:0,number_style:"arabic",default_choice_style:"thai_letters",default_choice_count:4};
   const ds=examSections(d),objectiveSection=ds.find(x=>x.item_type==="objective")||{title:"ข้อสอบปรนัย",instruction:examDefaultSectionInstruction("objective")},subjectiveSection=ds.find(x=>x.item_type==="subjective")||{title:"ข้อสอบอัตนัย",instruction:examDefaultSectionInstruction("subjective")};
@@ -12406,7 +12863,7 @@ async function examNormalizeItemNumbers(examSetId){
   const results=await Promise.all(updates),bad=results.find(x=>x?.error);if(bad?.error)throw bad.error;
 }
 function examItemModal(type,item=null){
-  const set=examSetById();if(!set)return;const editing=!!item,section=examSectionForType(set,type);if(!section)return toast("ไม่พบตอนสำหรับข้อสอบประเภทนี้","กรุณาแก้โครงสร้างชุดข้อสอบก่อน","error");
+  const set=examSetById();if(!set)return;if(set.archived_at)return toast("ชุดข้อสอบนี้ยกเลิกการใช้งานแล้ว","กรุณาคืนชุดข้อสอบก่อนแก้ไข","error");const editing=!!item,section=examSectionForType(set,type);if(!section)return toast("ไม่พบตอนสำหรับข้อสอบประเภทนี้","กรุณาแก้โครงสร้างชุดข้อสอบก่อน","error");
   const style=item?.choice_style||set.default_choice_style||"thai_letters",existing=Array.isArray(item?.options)?item.options:[],defaultCount=Math.max(1,Number(set.default_choice_count||4)),initialOptions=existing.length?existing:Array.from({length:defaultCount},()=>({text:"",correct:false}));
   const m=document.createElement("div");m.className="modal-backdrop";m.innerHTML=`<div class="modal modal-wide exam-item-modal"><div class="modal-head"><div><span class="eyebrow dark">ตอนที่ ${examNumber(section.no,set.number_style)} · ${escapeHtml(section.title)}</span><h3>${editing?"แก้ไข":"เพิ่ม"}ข้อ${type==="objective"?"ปรนัย":"อัตนัย"}</h3><p>${escapeHtml(set.subject_name_snapshot||"")} · ${escapeHtml(set.class_label_snapshot||"")}</p></div><button class="modal-close">×</button></div><form id="exam-item-form" class="form-grid"><div class="field form-wide"><label>โจทย์ / คำถาม</label><textarea class="input textarea exam-question-input" name="question_text" required>${escapeHtml(item?.question_text||"")}</textarea></div><div class="form-row"><div class="field"><label>คะแนนข้อนี้</label><input class="input" name="score" type="number" min="0" step="0.5" value="${Number(item?.score??1)}"></div>${type==="objective"?`<div class="field"><label>รูปแบบตัวเลือก</label><select class="select" name="choice_style">${[["thai_letters","ก ข ค ง"],["arabic_numbers","1 2 3 4"],["thai_numbers","๑ ๒ ๓ ๔"]].map(([v,t])=>`<option value="${v}" ${style===v?"selected":""}>${t}</option>`).join("")}</select></div>`:""}</div>${type==="objective"?`<div class="exam-options-editor"><div class="panel-head compact"><div><strong>ตัวเลือกและเฉลย</strong><small>เพิ่ม/ลดตัวเลือกได้ และเลือกคำตอบที่ถูกต้อง 1 ตัวเลือก</small></div><button type="button" class="btn btn-secondary btn-sm" id="exam-add-option">＋ เพิ่มตัวเลือก</button></div><div id="exam-option-rows"></div></div>`:""}<div class="modal-actions"><button type="button" class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" type="submit">บันทึกข้อสอบ</button></div></form></div>`;document.body.appendChild(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;
   let options=initialOptions.map(x=>({text:String(x?.text||""),correct:!!x?.correct}));if(type==="objective"&&!options.some(x=>x.correct)&&options.length)options[0].correct=true;
@@ -12414,13 +12871,46 @@ function examItemModal(type,item=null){
   if(type==="objective"){renderOptions();m.querySelector("#exam-add-option").onclick=()=>{options.push({text:"",correct:false});renderOptions();};m.querySelector('[name="choice_style"]').onchange=renderOptions;}
   m.querySelector("form").onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),question=String(fd.get("question_text")||"").trim();if(!question)return toast("กรุณากรอกโจทย์","","error");if(type==="objective"){if(!options.length)return toast("ต้องมีตัวเลือกอย่างน้อย 1 ตัวเลือก","","error");if(options.some(o=>!String(o.text||"").trim()))return toast("กรอกตัวเลือกให้ครบ","หากไม่ใช้ตัวเลือกใดให้ลบแถวนั้นออก","error");if(!options.some(o=>o.correct))return toast("กรุณาเลือกเฉลยที่ถูกต้อง","","error");}const btn=e.submitter;buttonLoading(btn,true,"กำลังบันทึก...");const existingItems=examItemsForSet(set.id),payload={exam_set_id:set.id,item_type:type,section_no:section.no,item_no:item?.item_no||existingItems.length+1,question_text:question,score:Number(fd.get("score")||0),choice_style:type==="objective"?String(fd.get("choice_style")||set.default_choice_style):null,options:type==="objective"?options:[],updated_by:state.user.id};const res=editing?await supabase.from("academic_exam_items").update(payload).eq("id",item.id).select().single():await supabase.from("academic_exam_items").insert({...payload,created_by:state.user.id}).select().single();buttonLoading(btn,false);if(res.error)return toast("บันทึกข้อสอบไม่สำเร็จ",res.error.message,"error");close();await loadExamWorkspace();try{await examNormalizeItemNumbers(set.id);}catch(err){console.warn("Normalize exam item numbers failed",err);}await loadExamWorkspace();renderDashboard();};
 }
-async function examDeleteSet(id){const set=examSetById(id);if(!set)return;if(!confirm(`ลบชุดข้อสอบ “${set.subject_name_snapshot||set.exam_name}” หรือไม่?\n\nข้อสอบและข้อมูลปกในชุดนี้จะถูกลบทั้งหมด`))return;const {error}=await supabase.from("academic_exam_sets").delete().eq("id",id);if(error)return toast("ลบชุดข้อสอบไม่สำเร็จ",error.message,"error");if(state.selectedExamSetId===id)state.selectedExamSetId=null;state.examEditorOpen=false;toast("ลบชุดข้อสอบแล้ว","","success");await loadExamWorkspace();renderDashboard();}
-async function examDeleteItem(id){const item=(state.examItems||[]).find(x=>x.id===id);if(!item)return;if(!confirm("ลบข้อสอบข้อนี้หรือไม่? ระบบจะจัดเลขข้อใหม่ให้อัตโนมัติ"))return;const {error}=await supabase.from("academic_exam_items").delete().eq("id",id);if(error)return toast("ลบข้อสอบไม่สำเร็จ",error.message,"error");await loadExamWorkspace();try{await examNormalizeItemNumbers(item.exam_set_id);}catch(err){console.warn(err);}await loadExamWorkspace();renderDashboard();}
+async function examDeleteSet(id){
+  const set=examSetById(id);if(!set||set.archived_at)return;
+  // Query only existence, not individual student scores. Never delete a set with recorded attempts.
+  const {count,error:readError}=await supabase.from("academic_exam_attempts").select("id",{count:"exact",head:true}).eq("exam_set_id",id);
+  if(readError)return toast("ตรวจสอบผลสอบไม่สำเร็จ",readError.message,"error");
+  if(count===null||count===undefined)return toast("ยังตรวจสอบจำนวนผลสอบไม่ได้","ไม่ดำเนินการลบเพื่อป้องกันข้อมูลสูญหาย","error");
+  const label=set.subject_name_snapshot||set.exam_name;
+  if(count>0){
+    if(!confirm(`ชุดข้อสอบ “${label}” มีผลสอบอยู่ ${count} รายการ\n\nต้องการยกเลิกการใช้งานแทนการลบถาวรหรือไม่?\nข้อสอบ เฉลย คะแนนนักเรียน และรายงานวิเคราะห์จะเก็บไว้ครบ สามารถคืนชุดข้อสอบได้`))return;
+    const {data,error}=await supabase.from("academic_exam_sets").update({archived_at:new Date().toISOString(),archived_by:state.user.id,updated_by:state.user.id}).eq("id",id).is("archived_at",null).select("id");
+    if(error)return toast("ยกเลิกชุดข้อสอบไม่สำเร็จ",error.message,"error");
+    if(!data?.length)return toast("ยกเลิกชุดข้อสอบไม่สำเร็จ","ไม่พบรายการที่มีสิทธิ์แก้ไข กรุณาตรวจสอบสิทธิ์บัญชี","error");
+    state.selectedExamSetId=null;state.examEditorOpen=false;state.examShowArchived=false;
+    toast("ยกเลิกการใช้งานชุดข้อสอบแล้ว",`เก็บผลสอบ ${count} รายการไว้ครบ · เปิดแท็บชุดข้อสอบที่ยกเลิกเพื่อคืนค่า`,"success");
+  }else{
+    if(!confirm(`ลบชุดข้อสอบ “${label}” ถาวรหรือไม่?\n\nตรวจสอบแล้ว ยังไม่มีผลสอบนักเรียน\nข้อสอบและข้อมูลปกชุดนี้จะถูกลบถาวร`))return;
+    const {data,error}=await supabase.from("academic_exam_sets").delete().eq("id",id).select("id");
+    if(error)return toast("ลบชุดข้อสอบไม่สำเร็จ",/exam results already exist/i.test(error.message||"")?"มีการเพิ่มผลสอบระหว่างทำรายการ กรุณาลองใหม่โดยเลือกยกเลิกการใช้งาน":error.message,"error");
+    if(!data?.length)return toast("ลบชุดข้อสอบไม่สำเร็จ","ไม่พบรายการที่มีสิทธิ์ลบ กรุณาตรวจสอบสิทธิ์บัญชี","error");
+    if(state.selectedExamSetId===id)state.selectedExamSetId=null;
+    state.examEditorOpen=false;toast("ลบชุดข้อสอบที่ไม่มีผลสอบแล้ว","ข้อมูลชุดข้อสอบถูกลบถาวร","success");
+  }
+  await loadExamWorkspace();renderDashboard();
+}
+async function examRestoreSet(id){
+  const set=examSetById(id);if(!set?.archived_at)return;
+  if(!confirm(`คืนการใช้งานชุดข้อสอบ “${set.subject_name_snapshot||set.exam_name}” หรือไม่?\n\nข้อสอบและผลสอบเดิมจะยังอยู่ครบ`))return;
+  const {data,error}=await supabase.from("academic_exam_sets").update({archived_at:null,archived_by:null,updated_by:state.user.id}).eq("id",id).not("archived_at","is",null).select("id");
+  if(error)return toast("คืนชุดข้อสอบไม่สำเร็จ",error.message,"error");
+  if(!data?.length)return toast("คืนชุดข้อสอบไม่สำเร็จ","ไม่พบรายการที่มีสิทธิ์แก้ไข","error");
+  state.examShowArchived=false;state.examEditorOpen=false;state.selectedExamSetId=id;
+  toast("คืนชุดข้อสอบแล้ว","ข้อสอบและผลสอบเดิมยังอยู่ครบ","success");
+  await loadExamWorkspace();renderDashboard();
+}
+async function examDeleteItem(id){if(examIsArchived())return toast("ชุดข้อสอบนี้ถูกยกเลิกแล้ว","กรุณาคืนชุดข้อสอบก่อนแก้ไข","error");const item=(state.examItems||[]).find(x=>x.id===id);if(!item)return;if(!confirm("ลบข้อสอบข้อนี้หรือไม่? ระบบจะจัดเลขข้อใหม่ให้อัตโนมัติ"))return;const {error}=await supabase.from("academic_exam_items").delete().eq("id",id);if(error)return toast("ลบข้อสอบไม่สำเร็จ",error.message,"error");await loadExamWorkspace();try{await examNormalizeItemNumbers(item.exam_set_id);}catch(err){console.warn(err);}await loadExamWorkspace();renderDashboard();}
 function examOutcomeRowsFromDom(){
   return [...document.querySelectorAll("[data-exam-outcome-row]")].map((row,index)=>({id:`outcome-${index+1}`,outcome_type:row.querySelector("[data-exam-outcome-type]")?.value||"learning_outcome",section_no:Number(row.querySelector("[data-exam-outcome-section]")?.value||1),item_range:String(row.querySelector("[data-exam-outcome-range]")?.value||"").trim(),text:String(row.querySelector("[data-exam-outcome-text]")?.value||"").trim()})).filter(x=>x.text||x.item_range);
 }
 async function examSaveCover(){
-  const set=examSetById();if(!set)return;const instructions=String(document.querySelector("#exam-cover-instructions")?.value||"").trim(),general=String(document.querySelector("#exam-cover-general")?.value||"").trim(),learning_outcomes=examOutcomeRowsFromDom();const btn=document.querySelector("#exam-save-cover");buttonLoading(btn,true,"กำลังบันทึก...");const {error}=await supabase.from("academic_exam_sets").update({instructions,general_instructions:general,learning_outcomes,updated_by:state.user.id}).eq("id",set.id);buttonLoading(btn,false);if(error)return toast("บันทึกปกไม่สำเร็จ",error.message,"error");toast("บันทึกปกข้อสอบแล้ว",learning_outcomes.length?`บันทึกตัวชี้วัด/ผลลัพธ์ ${learning_outcomes.length} รายการ`:"ไม่ได้บังคับตัวชี้วัด/ผลลัพธ์การเรียนรู้","success");await loadExamWorkspace();renderDashboard();
+  const set=examSetById();if(!set)return;if(set.archived_at)return toast("ชุดข้อสอบนี้ถูกยกเลิกแล้ว","กรุณาคืนชุดข้อสอบก่อนแก้ไข","error");const instructions=String(document.querySelector("#exam-cover-instructions")?.value||"").trim(),general=String(document.querySelector("#exam-cover-general")?.value||"").trim(),learning_outcomes=examOutcomeRowsFromDom();const btn=document.querySelector("#exam-save-cover");buttonLoading(btn,true,"กำลังบันทึก...");const {error}=await supabase.from("academic_exam_sets").update({instructions,general_instructions:general,learning_outcomes,updated_by:state.user.id}).eq("id",set.id);buttonLoading(btn,false);if(error)return toast("บันทึกปกไม่สำเร็จ",error.message,"error");toast("บันทึกปกข้อสอบแล้ว",learning_outcomes.length?`บันทึกตัวชี้วัด/ผลลัพธ์ ${learning_outcomes.length} รายการ`:"ไม่ได้บังคับตัวชี้วัด/ผลลัพธ์การเรียนรู้","success");await loadExamWorkspace();renderDashboard();
 }
 function examPdfGeneralList(set){return String(set.general_instructions||EXAM_DEFAULT_GENERAL_INSTRUCTIONS).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);}
 function examPdfPageShell(inner,extra=""){return `<article class="exam-pdf-page exam-pdf-standard ${extra}">${inner}</article>`;}
@@ -12575,11 +13065,13 @@ function bindExamEvents(){
   document.querySelectorAll("[data-exam-open]").forEach(b=>b.addEventListener("click",()=>{state.selectedExamSetId=b.dataset.examOpen;state.examSection="sets";state.examEditorOpen=true;renderDashboard();}));
   document.querySelectorAll("[data-exam-cover]").forEach(b=>b.addEventListener("click",()=>{state.selectedExamSetId=b.dataset.examCover;state.examSection="cover";state.examEditorOpen=false;renderDashboard();}));
   document.querySelectorAll("[data-exam-documents]").forEach(b=>b.addEventListener("click",()=>{state.selectedExamSetId=b.dataset.examDocuments;state.examSection="documents";state.examEditorOpen=false;renderDashboard();}));
-  document.querySelectorAll("[data-exam-analysis]").forEach(b=>b.addEventListener("click",()=>{state.selectedExamSetId=b.dataset.examAnalysis;state.examSection="analysis";state.examAnalysisView="entry";state.examEditorOpen=false;renderDashboard();}));
+  document.querySelectorAll("[data-exam-analysis]").forEach(b=>b.addEventListener("click",()=>{state.selectedExamSetId=b.dataset.examAnalysis;state.examSection="analysis";state.examAnalysisView=examIsArchived()?"report":"entry";state.examEditorOpen=false;renderDashboard();}));
   document.querySelector("[data-exam-editor-cover]")?.addEventListener("click",()=>{state.examSection="cover";state.examEditorOpen=false;renderDashboard();});
   document.querySelector("[data-exam-editor-analysis]")?.addEventListener("click",()=>{state.examSection="analysis";state.examAnalysisView="entry";state.examEditorOpen=false;renderDashboard();});
   document.querySelector("[data-exam-editor-documents]")?.addEventListener("click",()=>{state.examSection="documents";state.examEditorOpen=false;renderDashboard();});
   document.querySelectorAll("[data-exam-delete-set]").forEach(b=>b.addEventListener("click",()=>examDeleteSet(b.dataset.examDeleteSet)));
+  document.querySelectorAll("[data-exam-restore-set]").forEach(b=>b.addEventListener("click",()=>examRestoreSet(b.dataset.examRestoreSet)));
+  document.querySelectorAll("[data-exam-archive-view]").forEach(b=>b.addEventListener("click",async()=>{state.examShowArchived=b.dataset.examArchiveView==="archived";state.selectedExamSetId=null;state.examEditorOpen=false;await loadExamWorkspace();renderDashboard();}));
   document.querySelectorAll("[data-exam-add-type]").forEach(b=>b.addEventListener("click",()=>examItemModal(b.dataset.examAddType)));
   document.querySelectorAll("[data-exam-edit-item]").forEach(b=>b.addEventListener("click",()=>{const item=(state.examItems||[]).find(x=>x.id===b.dataset.examEditItem);if(item)examItemModal(item.item_type,item);}));
   document.querySelectorAll("[data-exam-delete-item]").forEach(b=>b.addEventListener("click",()=>examDeleteItem(b.dataset.examDeleteItem)));
@@ -12590,7 +13082,7 @@ function bindExamEvents(){
   document.querySelector("#exam-preview-cover")?.addEventListener("click",()=>examOpenPdf("cover"));
   document.querySelectorAll("[data-exam-export]").forEach(b=>b.addEventListener("click",()=>examOpenPdf(b.dataset.examExport)));
   document.querySelector("#exam-back-builder")?.addEventListener("click",()=>{state.examSection="sets";state.examEditorOpen=true;renderDashboard();});
-  document.querySelectorAll("[data-exam-analysis-view]").forEach(b=>b.addEventListener("click",()=>{state.examAnalysisView=b.dataset.examAnalysisView||"entry";renderDashboard();}));
+  document.querySelectorAll("[data-exam-analysis-view]").forEach(b=>b.addEventListener("click",()=>{if(examIsArchived()&&b.dataset.examAnalysisView==="entry")return;state.examAnalysisView=b.dataset.examAnalysisView||"entry";renderDashboard();}));
   document.querySelector("#exam-analysis-init-roster")?.addEventListener("click",examAnalysisInitialize);
   document.querySelector("#exam-analysis-clear")?.addEventListener("click",examAnalysisClear);
   document.querySelectorAll("[data-exam-analysis-answer]").forEach(el=>el.addEventListener("change",()=>examAnalysisSaveResponse(el,"objective")));
@@ -12599,9 +13091,333 @@ function bindExamEvents(){
   document.querySelector("#exam-analysis-export")?.addEventListener("click",examOpenAnalysisPdf);
 }
 
+// ===== Plan & Budget / School Lunch Document Builder (v5.12.6) =====
+// Source-of-truth: legacy Excel packet "สัปดาห์ที่ 17 14-18 กันยายน 2569.xls".
+// One round stores shared data once, then feeds all 12 official documents.
+const SCHOOL_LUNCH_DOCUMENTS = Object.freeze([
+  {code:"disbursement_memo",name:"บันทึกขออนุมัติเบิกจ่ายเงิน",group:"เบิกจ่าย"},
+  {code:"menu_plan",name:"แผนรายการอาหารกลางวัน",group:"เมนูอาหาร"},
+  {code:"request_attachment",name:"รายละเอียดแนบท้ายบันทึกข้อความ",group:"จัดหา"},
+  {code:"scope_appointment",name:"แต่งตั้งผู้ร่างขอบข่ายงาน",group:"TOR"},
+  {code:"tor",name:"ขอบเขตของงาน TOR",group:"TOR"},
+  {code:"inspection_appointment",name:"แต่งตั้งผู้ควบคุมและคณะกรรมการตรวจรับ",group:"แต่งตั้ง"},
+  {code:"quotation",name:"ใบเสนอราคา",group:"ผู้รับจ้าง"},
+  {code:"order_attachment",name:"รายละเอียดแนบชุดการจ้าง",group:"จัดหา"},
+  {code:"controller_report",name:"บันทึกรายงานผู้ควบคุม",group:"ส่งมอบ/ตรวจรับ"},
+  {code:"delivery_note",name:"ใบส่งมอบงาน",group:"ส่งมอบ/ตรวจรับ"},
+  {code:"inspection",name:"ใบตรวจรับพัสดุ",group:"ส่งมอบ/ตรวจรับ"},
+  {code:"payment_voucher",name:"ใบสำคัญรับเงิน",group:"การเงิน"},
+]);
+const SCHOOL_LUNCH_STATUS_LABEL = Object.freeze({draft:"ฉบับร่าง",prepared:"จัดทำเอกสารแล้ว",inspected:"ตรวจรับแล้ว",paid:"เบิกจ่ายแล้ว",cancelled:"ยกเลิก / คืนเลขแล้ว"});
+const SCHOOL_LUNCH_STATUS_CLASS = Object.freeze({draft:"neutral",prepared:"info",inspected:"success",paid:"success",cancelled:"danger"});
+const SCHOOL_LUNCH_WEEKDAY = ["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"];
+
+function schoolLunchCurrentFiscalYear(){return procurementCurrentFiscalYear();}
+function schoolLunchSetting(){return state.schoolLunchSettings||null;}
+function schoolLunchRoundById(id){return (state.schoolLunchRounds||[]).find(x=>x.id===id)||null;}
+function schoolLunchVendorById(id){return (state.schoolLunchVendors||[]).find(x=>x.id===id)||null;}
+function schoolLunchDaysFor(roundId){return (state.schoolLunchDays||[]).filter(x=>x.round_id===roundId).sort((a,b)=>Number(a.day_order||0)-Number(b.day_order||0)||String(a.service_date||"").localeCompare(String(b.service_date||"")));}
+function schoolLunchStatusPill(status){return `<span class="pill ${SCHOOL_LUNCH_STATUS_CLASS[status]||"neutral"}">${escapeHtml(SCHOOL_LUNCH_STATUS_LABEL[status]||status||"—")}</span>`;}
+function schoolLunchRoles(c){const r=c?.role_snapshots;return r&&typeof r==="object"&&!Array.isArray(r)&&Object.keys(r).length?r:(schoolLunchSetting()?.roles||{});}
+function schoolLunchPersonName(p){return String(p?.name||p?.full_name||"").trim();}
+function schoolLunchPersonPosition(p){return String(p?.position||p?.position_title||"").trim();}
+function schoolLunchPersonDisplay(p){const n=schoolLunchPersonName(p),pos=schoolLunchPersonPosition(p);return n?`${n}${pos?` · ${pos}`:""}`:"—";}
+function schoolLunchRoundTitle(c){return String(c?.round_label||((c?.round_no)?`รอบที่ ${c.round_no}`:"รอบอาหารกลางวัน")).trim();}
+function schoolLunchRoundDateRange(c){if(!c)return "—";return `${thaiDateOnly(c.start_date)} – ${thaiDateOnly(c.end_date)}`;}
+function schoolLunchDayLabel(date){if(!date)return "—";const d=new Date(`${date}T00:00:00`);return `วัน${SCHOOL_LUNCH_WEEKDAY[d.getDay()]}`;}
+function schoolLunchNetAmount(c){return Math.max(0,Number(c?.total_amount||0)-Number(c?.withholding_tax_amount||0)-Number(c?.fine_amount||0));}
+function schoolLunchNormalizeControlNumber(v){const map={"๐":"0","๑":"1","๒":"2","๓":"3","๔":"4","๕":"5","๖":"6","๗":"7","๘":"8","๙":"9"};return String(v||"").trim().replace(/[๐-๙]/g,ch=>map[ch]||ch).replace(/\s+/g,"");}
+function schoolLunchControlNumberValid(v,year){const s=schoolLunchNormalizeControlNumber(v);return !s||new RegExp(`^[0-9]+/${year}$`).test(s);}
+function schoolLunchRolesCount(roles){return [roles?.scope_writer,roles?.procurement_officer,roles?.head_officer,roles?.finance_officer,roles?.director,...(roles?.meal_supervisors||[]),...(roles?.inspection_committee||[])].filter(x=>schoolLunchPersonName(x)).length;}
+function schoolLunchSafeFileName(v){return String(v||"เอกสารอาหารกลางวัน").replace(/[\\/:*?"<>|]+/g,"_").replace(/\s+/g,"_").slice(0,90);}
+function schoolLunchCanEdit(c){if(!c||c.status==="cancelled")return false;const role=state.profile?.role;return c.created_by===state.user?.id||c.owner_user_id===state.user?.id||["super_admin","director","department_head"].includes(role);}
+function schoolLunchSettingDefaults(){const y=state.schoolLunchFiscalYear||schoolLunchCurrentFiscalYear();return {fiscal_year:y,plan_name:"พื้นฐานด้านการพัฒนาและเสริมสร้างศักยภาพคน",project_name:"อาหารกลางวันนักเรียน",funding_source:"เงินอุดหนุนอาหารกลางวัน",municipality_name:"เทศบาลตำบลเมืองนะ",default_rate_per_student:22,default_penalty_rate:.20,roles:{},default_vendor_id:null};}
+function schoolLunchFiscalYears(){
+  // Keep the year list centered on the selected fiscal year instead of capping it at current + 2.
+  const focus=Number(state.schoolLunchFiscalYear||schoolLunchCurrentFiscalYear());
+  const current=schoolLunchCurrentFiscalYear();
+  const years=new Set([
+    ...Array.from({length:15},(_,i)=>focus+i-7),current,
+    ...(state.schoolLunchRounds||[]).map(x=>Number(x.fiscal_year)),
+    ...(state.schoolLunchSettings?[Number(state.schoolLunchSettings.fiscal_year)]:[])
+  ]);
+  return [...years].filter(y=>Number.isSafeInteger(y)&&y>=1&&y<=9999).sort((a,b)=>b-a);
+}
+function schoolLunchFiscalYearOptions(selected){return schoolLunchFiscalYears().map(y=>`<option value="${y}" ${Number(selected)===y?"selected":""}>ปีงบประมาณ พ.ศ. ${y}</option>`).join("");}
+function schoolLunchCentralControls(){return state.schoolLunchProcurementControls||[];}
+function schoolLunchCentralControlById(id){return schoolLunchCentralControls().find(x=>x.id===id)||null;}
+function schoolLunchCentralControlAvailable(n,c=null){return !!n&&(!n.used_by_lunch_round_id||n.used_by_lunch_round_id===c?.id);}
+function schoolLunchCentralControlLabel(n){if(!n)return "—";const nums=n.series==="request_approval"?`${n.primary_number||"—"} + ${n.secondary_number||"—"}`:(n.primary_number||"—");return `${nums}${n.subject?` · ${n.subject}`:""}`;}
+function schoolLunchCentralControlOptions(series,selected,c=null,parentId=null){const rows=schoolLunchCentralControls().filter(n=>n.series===series&&schoolLunchCentralControlAvailable(n,c)&&(parentId===null||n.parent_control_id===parentId));return `<option value="">— เลือกเลขคุม —</option>${rows.map(n=>`<option value="${n.id}" ${selected===n.id?"selected":""}>${escapeHtml(schoolLunchCentralControlLabel(n))}</option>`).join("")}`;}
+
+async function loadSchoolLunchWorkspace(){
+  if(!procurementHasModuleAccess("school_lunch_documents")){state.schoolLunchLoadError="คุณไม่มีสิทธิ์ใช้งานระบบจัดทำเอกสารอาหารกลางวัน";state.schoolLunchRounds=[];state.schoolLunchDays=[];state.schoolLunchVendors=[];state.schoolLunchSettings=null;return;}
+  const year=Number(state.schoolLunchFiscalYear||schoolLunchCurrentFiscalYear());
+  state.schoolLunchFiscalYear=year;
+  const [roundsRes,daysRes,vendorsRes,settingsRes,staffRes,controlsRes]=await Promise.all([
+    supabase.from("school_lunch_rounds").select("*").eq("fiscal_year",year).order("start_date",{ascending:false}).order("created_at",{ascending:false}),
+    supabase.from("school_lunch_round_days").select("*").order("service_date").order("day_order"),
+    supabase.from("school_lunch_vendors").select("*").eq("is_active",true).order("vendor_name"),
+    supabase.from("school_lunch_settings").select("*").eq("fiscal_year",year).maybeSingle(),
+    supabase.from("personnel_public_directory").select("user_id,full_name,position_title,academic_rank,role,department_code").order("full_name"),
+    supabase.rpc("get_school_lunch_procurement_controls",{p_control_year:year}),
+  ]);
+  const err=roundsRes.error||daysRes.error||vendorsRes.error||settingsRes.error||staffRes.error||controlsRes.error;
+  state.schoolLunchLoadError=err?.message||"";
+  state.schoolLunchRounds=roundsRes.error?[]:(roundsRes.data||[]);
+  const ids=new Set(state.schoolLunchRounds.map(x=>x.id));
+  state.schoolLunchDays=daysRes.error?[]:(daysRes.data||[]).filter(x=>ids.has(x.round_id));
+  state.schoolLunchVendors=vendorsRes.error?[]:(vendorsRes.data||[]);
+  state.schoolLunchSettings=settingsRes.error?null:(settingsRes.data||null);
+  state.schoolLunchStaff=staffRes.error?[]:(staffRes.data||[]);
+  state.schoolLunchProcurementControls=controlsRes.error?[]:(controlsRes.data||[]);
+  if(state.selectedSchoolLunchRoundId&&!state.schoolLunchRounds.some(x=>x.id===state.selectedSchoolLunchRoundId))state.selectedSchoolLunchRoundId=null;
+}
+
+function schoolLunchFilteredRounds(){
+  const q=String(state.schoolLunchSearch||"").trim().toLowerCase(),status=state.schoolLunchStatusFilter||"active";
+  return (state.schoolLunchRounds||[]).filter(x=>{
+    if(status==="active"&&x.status==="cancelled")return false;
+    if(status!=="all"&&status!=="active"&&x.status!==status)return false;
+    if(!q)return true;
+    const v=schoolLunchVendorById(x.vendor_id);
+    return [x.round_label,x.round_no,x.appointment_control_no,x.job_control_no,x.disbursement_control_no,x.purchase_order_control_no,x.title,v?.vendor_name].some(z=>String(z||"").toLowerCase().includes(q));
+  });
+}
+function schoolLunchRoundListHtml(){const rows=schoolLunchFilteredRounds();if(!rows.length)return `<div class="empty lunch-empty"><strong>ยังไม่มีรอบจัดทำเอกสารอาหารกลางวัน</strong><span>กด “สร้างรอบใหม่” แล้วกำหนดช่วงวันที่ เมนู และข้อมูลการจ้าง</span></div>`;return `<div class="school-lunch-round-list">${rows.map(c=>{const days=schoolLunchDaysFor(c.id),active=c.id===state.selectedSchoolLunchRoundId,v=schoolLunchVendorById(c.vendor_id);return `<button type="button" class="school-lunch-round-card ${active?"active":""}" data-school-lunch-select="${c.id}"><div class="school-lunch-round-card-top"><span>${escapeHtml(schoolLunchRoundTitle(c))}</span>${schoolLunchStatusPill(c.status)}</div><strong>${escapeHtml(schoolLunchRoundDateRange(c))}</strong><small>${escapeHtml(v?.vendor_name||"ยังไม่ระบุผู้รับจ้าง")} · ${days.length} วัน</small><div class="school-lunch-round-card-bottom"><span>${escapeHtml(c.job_control_no||"ยังไม่มีเลขการจ้าง")}</span><b>${money(c.total_amount)} บาท</b></div></button>`;}).join("")}</div>`;}
+function schoolLunchDocumentMissing(c,code){const days=schoolLunchDaysFor(c.id),v=schoolLunchVendorById(c.vendor_id),roles=schoolLunchRoles(c),miss=[];if(!days.length)miss.push("เมนู/วันจัดอาหาร");if(["quotation","controller_report","delivery_note","inspection","payment_voucher","disbursement_memo"].includes(code)&&!v)miss.push("ผู้รับจ้าง");if(["scope_appointment","tor"].includes(code)&&!schoolLunchPersonName(roles.scope_writer))miss.push("ผู้ร่างขอบข่ายงาน");if(["inspection_appointment","controller_report","inspection"].includes(code)&&!(roles.inspection_committee||[]).some(x=>schoolLunchPersonName(x)))miss.push("คณะกรรมการตรวจรับ");if(code==="disbursement_memo"&&!schoolLunchPersonName(roles.finance_officer))miss.push("เจ้าหน้าที่การเงิน");if(["scope_appointment","inspection_appointment"].includes(code)&&!c.appointment_control_no)miss.push("เลขคุมชุดที่ 2");if(code==="disbursement_memo"&&!c.disbursement_control_no)miss.push("เลขคุมชุดที่ 1 ตัวที่ 2");if(["disbursement_memo","controller_report","delivery_note","inspection"].includes(code)&&!c.purchase_order_control_no)miss.push("เลขคุมชุดที่ 3");return miss;}
+function schoolLunchDocumentGridHtml(c){return `<div class="school-lunch-document-grid">${SCHOOL_LUNCH_DOCUMENTS.map(d=>{const miss=schoolLunchDocumentMissing(c,d.code);return `<article class="school-lunch-doc-card ${miss.length?"needs-data":"ready"}"><div><span>${escapeHtml(d.group)}</span><strong>${escapeHtml(d.name)}</strong><small>${miss.length?`ยังขาด: ${escapeHtml(miss.join(" · "))}`:"พร้อมสร้างเอกสาร"}</small></div><button type="button" class="btn btn-ghost" data-school-lunch-pdf="${d.code}" data-round-id="${c.id}">ดู PDF</button></article>`;}).join("")}</div>`;}
+function schoolLunchDetailHtml(c){if(!c)return `<section class="school-lunch-detail-empty"><div class="school-lunch-detail-empty-icon">☰</div><strong>เลือกรอบเอกสารเพื่อดูรายละเอียด</strong><span>คลิกรอบจากรายการด้านซ้าย แล้วระบบจะแสดง Master Form, Timeline, ผู้รับผิดชอบ และเอกสาร PDF ของรอบที่เลือก</span><small>ปุ่มแก้ไขและ Export จะปรากฏหลังจากเลือกรอบแล้ว</small></section>`;const days=schoolLunchDaysFor(c.id),billing=schoolLunchDailyAmountMode(c),vendor=schoolLunchVendorById(c.vendor_id),roles=schoolLunchRoles(c),canEdit=schoolLunchCanEdit(c),totalDaily=days.reduce((s,x)=>s+Number(x.day_amount||0),0),studentCounts=billing.days.map(d=>Number(d.student_count||0)),minStudents=studentCounts.length?Math.min(...studentCounts):Number(c.student_count||0),maxStudents=studentCounts.length?Math.max(...studentCounts):Number(c.student_count||0),studentKpi=billing.uniformStudents?Number(minStudents||0).toLocaleString("th-TH"):"รายวัน",studentKpiNote=billing.uniformStudents?"คน":`${minStudents.toLocaleString("th-TH")}–${maxStudents.toLocaleString("th-TH")} คน`;return `<section class="school-lunch-detail"><div class="school-lunch-detail-head"><div><span class="eyebrow dark">${escapeHtml(schoolLunchRoundTitle(c))}</span><h3>${escapeHtml(schoolLunchRoundDateRange(c))}</h3><p>${escapeHtml(c.title||"จ้างเหมาประกอบอาหารกลางวันนักเรียน (ปรุงสำเร็จ)")}</p></div><div class="school-lunch-detail-actions">${schoolLunchStatusPill(c.status)}${canEdit?`<button class="btn btn-ghost" data-school-lunch-roles="${c.id}">ผู้รับผิดชอบ/ผู้ลงนาม</button><button class="btn btn-secondary" data-school-lunch-edit="${c.id}">แก้ไข Master Form</button>`:""}<button class="btn btn-primary" data-school-lunch-export-all="${c.id}">Export ทั้งชุด</button></div></div><div class="school-lunch-kpi-grid"><div><span>นักเรียน</span><strong>${studentKpi}</strong><small>${studentKpiNote}</small></div><div><span>อัตรา</span><strong>${money(c.rate_per_student)}</strong><small>บาท / คน / วัน</small></div><div><span>จำนวนวัน</span><strong>${days.length}</strong><small>วันจัดอาหาร</small></div><div class="total"><span>รวมทั้งสิ้น</span><strong>${money(totalDaily||c.total_amount)}</strong><small>บาท</small></div></div><section class="school-lunch-control-strip"><div><span>เลขแต่งตั้ง / ขอบข่ายงาน · ชุดที่ 2</span><strong>${escapeHtml(c.appointment_control_no||"—")}</strong></div><div><span>เลขการจ้าง · ชุดที่ 1 ตัวที่ 1</span><strong>${escapeHtml(c.job_control_no||"—")}</strong></div><div><span>เลขขอเบิกจ่าย · ชุดที่ 1 ตัวที่ 2</span><strong>${escapeHtml(c.disbursement_control_no||"—")}</strong></div><div><span>เลขใบสั่งซื้อ / ใบสั่งจ้าง · ชุดที่ 3</span><strong>${escapeHtml(c.purchase_order_control_no||"—")}</strong></div></section><div class="school-lunch-detail-columns"><section class="panel school-lunch-subpanel"><div class="panel-head"><div class="panel-title-wrap"><h3>Timeline เมนูอาหาร</h3><p>ข้อมูลเดียวกันจะถูกนำไปใช้ในแผนเมนู รายงานผู้ควบคุม ใบส่งมอบ และใบตรวจรับ</p></div></div>${days.length?`<div class="school-lunch-timeline">${days.map((d,i)=>`<div class="school-lunch-timeline-row"><div class="school-lunch-timeline-date"><b>${academicRegThaiDigits(i+1)}</b><span>${escapeHtml(schoolLunchDayLabel(d.service_date))}</span><strong>${escapeHtml(thaiDateOnly(d.service_date))}</strong></div><div class="school-lunch-timeline-menu">${(Array.isArray(d.menu_items)?d.menu_items:[]).filter(Boolean).map(x=>`<span>${escapeHtml(x)}</span>`).join("")||"<span>ยังไม่ระบุเมนู</span>"}</div><div class="school-lunch-timeline-money"><small>${Number(d.student_count||0).toLocaleString("th-TH")} × ${money(d.rate_per_student)}</small><strong>${money(d.day_amount)}</strong></div></div>`).join("")}</div>`:`<div class="empty"><strong>ยังไม่มี Timeline</strong></div>`}</section><section class="panel school-lunch-subpanel"><div class="panel-head"><div class="panel-title-wrap"><h3>ผู้รับจ้างและผู้เกี่ยวข้อง</h3><p>รายชื่อเป็น Snapshot ของรอบนี้ เพื่อให้ PDF เก่ายังตรงกับวันที่จัดทำ</p></div></div><div class="school-lunch-people-summary"><div><span>ผู้รับจ้าง</span><strong>${escapeHtml(vendor?.vendor_name||"—")}</strong><small>${escapeHtml(vendor?.tax_id?`เลขผู้เสียภาษี ${vendor.tax_id}`:"ยังไม่ระบุเลขผู้เสียภาษี")}</small></div><div><span>ผู้ร่างขอบข่ายงาน</span><strong>${escapeHtml(schoolLunchPersonDisplay(roles.scope_writer))}</strong></div><div><span>ผู้ควบคุม/ตรวจการประกอบอาหาร</span><strong>${escapeHtml((roles.meal_supervisors||[]).map(schoolLunchPersonName).filter(Boolean).join(" · ")||"—")}</strong></div><div><span>คณะกรรมการตรวจรับ</span><strong>${escapeHtml((roles.inspection_committee||[]).map(schoolLunchPersonName).filter(Boolean).join(" · ")||"—")}</strong></div><div><span>เจ้าหน้าที่ / หัวหน้าเจ้าหน้าที่</span><strong>${escapeHtml(`${schoolLunchPersonName(roles.procurement_officer)||"—"} / ${schoolLunchPersonName(roles.head_officer)||"—"}`)}</strong></div><div><span>การเงิน / ผู้อำนวยการ</span><strong>${escapeHtml(`${schoolLunchPersonName(roles.finance_officer)||"—"} / ${schoolLunchPersonName(roles.director)||"—"}`)}</strong></div></div></section></div><section class="panel school-lunch-documents-panel"><div class="panel-head"><div class="panel-title-wrap"><h3>เอกสารจาก Excel ต้นฉบับ · 12 แบบ</h3><p>ทุกใบใช้ข้อมูลชุดเดียวกัน และ PDF จะแบ่งหน้า A4 อัตโนมัติตามปริมาณเนื้อหา</p></div></div>${schoolLunchDocumentGridHtml(c)}</section>${canEdit&&c.status!=="cancelled"?`<div class="school-lunch-danger-actions"><button class="btn btn-danger" data-school-lunch-cancel="${c.id}">ยกเลิกรอบนี้และคืนเลขคุม</button></div>`:""}</section>`;}
+function schoolLunchWorkspaceHtml(){if(state.schoolLunchLoadError)return `<section class="panel"><div class="empty"><strong>ยังเปิดระบบจัดทำเอกสารอาหารกลางวันไม่ได้</strong><span>${escapeHtml(state.schoolLunchLoadError)}</span><small>ตรวจสอบว่า Migration v5.12.3 ถูกติดตั้งใน Supabase Production แล้ว</small></div></section>`;const visibleRounds=schoolLunchFilteredRounds(),selected=visibleRounds.some(x=>x.id===state.selectedSchoolLunchRoundId)?schoolLunchRoundById(state.selectedSchoolLunchRoundId):null,active=state.schoolLunchRounds.filter(x=>x.status!=="cancelled"),total=active.reduce((s,x)=>s+Number(x.total_amount||0),0);return `<section class="school-lunch-workspace"><section class="school-lunch-hero"><div><span class="eyebrow">Lunch Document Workflow · Plan & Budget</span><h2>ระบบจัดทำเอกสารอาหารกลางวัน</h2><p>หนึ่งรอบกรอกข้อมูลครั้งเดียว → คำนวณเงิน → Timeline เมนู → แต่งตั้งผู้เกี่ยวข้อง → เลขคุมจากระบบจัดซื้อจัดจ้างและพัสดุ → PDF ครบชุด</p></div><div class="school-lunch-hero-actions"><button class="btn school-lunch-hero-btn" id="school-lunch-settings">ตั้งค่าผู้รับผิดชอบ</button>${isSuperAdminUser()?`<button class="btn school-lunch-hero-btn" id="school-lunch-permissions">สิทธิ์ผู้ใช้งาน</button>`:""}<button class="btn school-lunch-hero-btn" id="school-lunch-vendors">ทะเบียนผู้รับจ้าง</button><button class="btn btn-primary" id="school-lunch-create">＋ สร้างรอบใหม่</button></div></section><section class="school-lunch-overview"><div><span>รอบที่ใช้งาน</span><strong>${active.length}</strong><small>ปีงบประมาณ ${state.schoolLunchFiscalYear}</small></div><div><span>ยอดรวมเอกสาร</span><strong>${money(total)}</strong><small>บาท</small></div><div><span>ผู้รับจ้างในทะเบียน</span><strong>${state.schoolLunchVendors.length}</strong><small>ราย</small></div><div><span>ชุดผู้รับผิดชอบ</span><strong>${schoolLunchRolesCount(schoolLunchSetting()?.roles||{})}</strong><small>รายชื่อที่ตั้งค่า</small></div></section><section class="school-lunch-toolbar"><div class="school-lunch-year-picker" role="group" aria-label="เลือกปีงบประมาณ"><button type="button" class="school-lunch-year-step" id="school-lunch-year-prev" title="ลดปีงบประมาณ 1 ปี" aria-label="ปีงบประมาณก่อนหน้า">−</button><select class="select" id="school-lunch-year" aria-label="ปีงบประมาณ">${schoolLunchFiscalYearOptions(state.schoolLunchFiscalYear)}</select><button type="button" class="school-lunch-year-step" id="school-lunch-year-next" title="เพิ่มปีงบประมาณ 1 ปี" aria-label="ปีงบประมาณถัดไป">＋</button></div><select class="select" id="school-lunch-status"><option value="active" ${state.schoolLunchStatusFilter==="active"?"selected":""}>กำลังใช้งาน</option>${Object.entries(SCHOOL_LUNCH_STATUS_LABEL).map(([v,l])=>`<option value="${v}" ${state.schoolLunchStatusFilter===v?"selected":""}>${escapeHtml(l)}</option>`).join("")}<option value="all" ${state.schoolLunchStatusFilter==="all"?"selected":""}>ทั้งหมด</option></select><input class="input" id="school-lunch-search" value="${escapeHtml(state.schoolLunchSearch||"")}" placeholder="ค้นหารอบ / เลขคุม / ผู้รับจ้าง"></section><section class="school-lunch-master-detail"><aside class="school-lunch-master">${schoolLunchRoundListHtml()}</aside><main class="school-lunch-detail-wrap">${schoolLunchDetailHtml(selected)}</main></section></section>`;}
+
+function schoolLunchStaffOptionHtml(selected){return `<option value="">บุคคลภายนอก / กรอกชื่อเอง</option>${(state.schoolLunchStaff||[]).map(p=>`<option value="${p.user_id}" ${selected===p.user_id?"selected":""}>${escapeHtml(p.full_name)}${p.position_title?` · ${escapeHtml(p.position_title)}`:""}</option>`).join("")}`;}
+function schoolLunchPersonPickerHtml(key,label,p={}){return `<div class="school-lunch-person-row" data-lunch-person-row="${key}"><div class="field"><label>${escapeHtml(label)}</label><select class="select" name="${key}_user_id" data-lunch-person-select="${key}">${schoolLunchStaffOptionHtml(p?.user_id||"")}</select></div><div class="field"><label>ชื่อ–นามสกุล</label><input class="input" name="${key}_name" value="${escapeHtml(schoolLunchPersonName(p))}" placeholder="เลือกบุคลากร หรือพิมพ์ชื่อบุคคลภายนอก"></div><div class="field"><label>ตำแหน่ง / บทบาท</label><input class="input" name="${key}_position" value="${escapeHtml(schoolLunchPersonPosition(p))}" placeholder="เช่น ครู / ผู้ปกครองนักเรียน"></div></div>`;}
+function schoolLunchRoleEditorHtml(roles={}){const supervisors=roles.meal_supervisors||[],committee=roles.inspection_committee||[];return `<div class="school-lunch-role-editor"><div class="school-lunch-role-memory-note"><strong>ระบบจะจดจำรายชื่อที่กรอกไว้</strong><span>ผู้ควบคุม คณะกรรมการตรวจรับ เจ้าหน้าที่ และผู้ลงนามที่บันทึก จะถูกใช้เป็นค่าเริ่มต้นของรอบถัดไปในปีงบประมาณเดียวกัน และสามารถกลับมาแก้ไขได้ทุกเมื่อ</span></div><div class="school-lunch-role-section"><h4>ผู้ร่างขอบข่ายงาน</h4>${schoolLunchPersonPickerHtml("scope_writer","ผู้ร่างขอบข่ายงาน",roles.scope_writer)}</div><div class="school-lunch-role-section"><h4>ผู้ควบคุมและตรวจการประกอบอาหาร</h4>${Array.from({length:5},(_,i)=>schoolLunchPersonPickerHtml(`meal_supervisor_${i+1}`,`คนที่ ${i+1}`,supervisors[i])).join("")}</div><div class="school-lunch-role-section"><h4>คณะกรรมการตรวจรับพัสดุ</h4>${Array.from({length:5},(_,i)=>schoolLunchPersonPickerHtml(`inspection_member_${i+1}`,i===0?"ประธานกรรมการ":`กรรมการคนที่ ${i}`,committee[i])).join("")}</div><div class="school-lunch-role-section"><h4>เจ้าหน้าที่และผู้ลงนาม</h4>${schoolLunchPersonPickerHtml("procurement_officer","เจ้าหน้าที่พัสดุ",roles.procurement_officer)}${schoolLunchPersonPickerHtml("head_officer","หัวหน้าเจ้าหน้าที่พัสดุ",roles.head_officer)}${schoolLunchPersonPickerHtml("finance_officer","เจ้าหน้าที่การเงิน",roles.finance_officer)}${schoolLunchPersonPickerHtml("director","ผู้อำนวยการสถานศึกษา",roles.director)}</div></div>`;}
+function schoolLunchBindPersonPickers(root){root.querySelectorAll("[data-lunch-person-select]").forEach(sel=>sel.addEventListener("change",()=>{const key=sel.dataset.lunchPersonSelect,row=root.querySelector(`[data-lunch-person-row="${key}"]`),p=(state.schoolLunchStaff||[]).find(x=>x.user_id===sel.value);if(!row)return;const n=row.querySelector(`[name="${key}_name"]`),pos=row.querySelector(`[name="${key}_position"]`);if(p){if(n)n.value=p.full_name||"";if(pos)pos.value=p.position_title||"";}else{if(n)n.focus();}}));}
+function schoolLunchPersonFromForm(fd,key){const name=String(fd.get(`${key}_name`)||"").trim();if(!name)return null;const userId=String(fd.get(`${key}_user_id`)||"").trim();return {source:userId?"internal":"manual",user_id:userId||null,name,position:String(fd.get(`${key}_position`)||"").trim()};}
+function schoolLunchRolesFromForm(fd){return {scope_writer:schoolLunchPersonFromForm(fd,"scope_writer"),meal_supervisors:Array.from({length:5},(_,i)=>schoolLunchPersonFromForm(fd,`meal_supervisor_${i+1}`)).filter(Boolean),inspection_committee:Array.from({length:5},(_,i)=>schoolLunchPersonFromForm(fd,`inspection_member_${i+1}`)).filter(Boolean),procurement_officer:schoolLunchPersonFromForm(fd,"procurement_officer"),head_officer:schoolLunchPersonFromForm(fd,"head_officer"),finance_officer:schoolLunchPersonFromForm(fd,"finance_officer"),director:schoolLunchPersonFromForm(fd,"director")};}
+
+function schoolLunchSettingsModal(){const current={...schoolLunchSettingDefaults(),...(schoolLunchSetting()||{})},m=document.createElement("div");m.className="modal-backdrop";m.innerHTML=`<div class="modal modal-wide school-lunch-settings-modal"><div class="modal-head"><div><span class="eyebrow dark">ปีงบประมาณ พ.ศ. ${state.schoolLunchFiscalYear}</span><h3>ตั้งค่าระบบอาหารกลางวัน</h3><p>กำหนดค่าเริ่มต้นและแต่งตั้งผู้รับผิดชอบหนึ่งครั้ง แล้วรอบใหม่จะ Snapshot ชุดนี้ไปใช้กับเอกสาร</p></div><button class="modal-close">×</button></div><form id="school-lunch-settings-form" class="form-grid"><div class="form-row"><div class="field"><label>อัตราค่าอาหาร / คน / วัน</label><input class="input" name="default_rate_per_student" type="number" min="0" step="0.01" required value="${Number(current.default_rate_per_student||22)}"></div><div class="field"><label>ค่าปรับร้อยละ / วัน</label><input class="input" name="default_penalty_rate" type="number" min="0" step="0.01" value="${Number(current.default_penalty_rate||.20)}"></div></div><div class="field"><label>แผนงาน</label><input class="input" name="plan_name" value="${escapeHtml(current.plan_name||"")}"></div><div class="field"><label>โครงการ</label><input class="input" name="project_name" value="${escapeHtml(current.project_name||"")}"></div><div class="field"><label>แหล่งเงิน</label><input class="input" name="funding_source" value="${escapeHtml(current.funding_source||"")}"></div><div class="field"><label>องค์กรปกครองส่วนท้องถิ่น / หน่วยสนับสนุน</label><input class="input" name="municipality_name" value="${escapeHtml(current.municipality_name||"")}" placeholder="เช่น เทศบาลตำบลเมืองนะ"></div><div class="field form-span-2"><label>ผู้รับจ้างเริ่มต้น</label><select class="select" name="default_vendor_id"><option value="">— ไม่กำหนด —</option>${state.schoolLunchVendors.map(v=>`<option value="${v.id}" ${current.default_vendor_id===v.id?"selected":""}>${escapeHtml(v.vendor_name)}</option>`).join("")}</select></div><div class="form-span-2">${schoolLunchRoleEditorHtml(current.roles||{})}</div></form><div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="school-lunch-settings-save">บันทึกการตั้งค่า</button></div></div>`;document.body.appendChild(m);schoolLunchBindPersonPickers(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;m.querySelector("#school-lunch-settings-save").onclick=async e=>{const form=m.querySelector("form"),fd=new FormData(form),payload={fiscal_year:Number(state.schoolLunchFiscalYear),plan_name:String(fd.get("plan_name")||"").trim(),project_name:String(fd.get("project_name")||"").trim(),funding_source:String(fd.get("funding_source")||"").trim(),municipality_name:String(fd.get("municipality_name")||"").trim()||null,default_rate_per_student:Number(fd.get("default_rate_per_student")||0),default_penalty_rate:Number(fd.get("default_penalty_rate")||0),default_vendor_id:String(fd.get("default_vendor_id")||"")||null,roles:schoolLunchRolesFromForm(fd),updated_by:state.user.id};buttonLoading(e.currentTarget,true,"กำลังบันทึก...");const {error}=await supabase.from("school_lunch_settings").upsert(payload,{onConflict:"fiscal_year"});buttonLoading(e.currentTarget,false);if(error)return toast("บันทึกการตั้งค่าไม่สำเร็จ",error.message,"error");close();toast("บันทึกชุดผู้รับผิดชอบแล้ว",`ปีงบประมาณ พ.ศ. ${state.schoolLunchFiscalYear}`,"success");await loadSchoolLunchWorkspace();renderDashboard();};}
+function schoolLunchRolesModal(c){if(!schoolLunchCanEdit(c))return;const roles=schoolLunchRoles(c),m=document.createElement("div");m.className="modal-backdrop";m.innerHTML=`<div class="modal modal-wide school-lunch-settings-modal"><div class="modal-head"><div><span class="eyebrow dark">${escapeHtml(schoolLunchRoundTitle(c))}</span><h3>ผู้รับผิดชอบและผู้ลงนามของรอบนี้</h3><p>บันทึกแล้วระบบจะจดจำรายชื่อชุดนี้เป็นค่าเริ่มต้นของปีงบประมาณ และยังแก้ไขภายหลังได้</p></div><button class="modal-close">×</button></div><form id="school-lunch-round-roles-form">${schoolLunchRoleEditorHtml(roles)}</form><div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="school-lunch-round-roles-save">บันทึกและจดจำรายชื่อ</button></div></div>`;document.body.appendChild(m);schoolLunchBindPersonPickers(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;m.querySelector("#school-lunch-round-roles-save").onclick=async e=>{const fd=new FormData(m.querySelector("form")),role_snapshots=schoolLunchRolesFromForm(fd),base={...schoolLunchSettingDefaults(),...(schoolLunchSetting()||{})};buttonLoading(e.currentTarget,true,"กำลังบันทึก...");const roundRes=await supabase.from("school_lunch_rounds").update({role_snapshots,updated_by:state.user.id}).eq("id",c.id);if(roundRes.error){buttonLoading(e.currentTarget,false);return toast("บันทึกผู้รับผิดชอบไม่สำเร็จ",roundRes.error.message,"error");}const settingPayload={fiscal_year:Number(state.schoolLunchFiscalYear),plan_name:base.plan_name,project_name:base.project_name,funding_source:base.funding_source,municipality_name:base.municipality_name||null,default_rate_per_student:Number(base.default_rate_per_student||22),default_penalty_rate:Number(base.default_penalty_rate??.20),default_vendor_id:base.default_vendor_id||null,roles:role_snapshots,updated_by:state.user.id};const settingRes=await supabase.from("school_lunch_settings").upsert(settingPayload,{onConflict:"fiscal_year"});buttonLoading(e.currentTarget,false);if(settingRes.error)return toast("บันทึกรอบแล้ว แต่จดจำค่าเริ่มต้นไม่สำเร็จ",settingRes.error.message,"error");close();toast("บันทึกและจดจำรายชื่อแล้ว","รอบนี้ใช้ Snapshot ชุดนี้ และรอบใหม่จะดึงรายชื่อชุดเดียวกันให้อัตโนมัติ","success");await loadSchoolLunchWorkspace();renderDashboard();};}
+
+function schoolLunchVendorModal(v=null){const x=v||{},m=document.createElement("div");m.className="modal-backdrop";m.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>${v?"แก้ไข":"เพิ่ม"}ผู้รับจ้างอาหารกลางวัน</h3><p>บันทึกครั้งเดียว แล้วเลือกรายเดิมในรอบถัดไปได้</p></div><button class="modal-close">×</button></div><form id="school-lunch-vendor-form" class="form-grid"><div class="field form-span-2"><label>ชื่อบุคคล / บริษัท / ร้าน</label><input class="input" name="vendor_name" required value="${escapeHtml(x.vendor_name||"")}"></div><div class="field"><label>ประเภท</label><select class="select" name="vendor_type"><option value="individual" ${x.vendor_type==="individual"?"selected":""}>บุคคลธรรมดา</option><option value="company" ${x.vendor_type==="company"?"selected":""}>บริษัท / นิติบุคคล</option><option value="shop" ${x.vendor_type==="shop"?"selected":""}>ร้านค้า</option><option value="other" ${x.vendor_type==="other"?"selected":""}>อื่น ๆ</option></select></div><div class="field"><label>เลขประจำตัวผู้เสียภาษี / บัตรประชาชน</label><input class="input" name="tax_id" value="${escapeHtml(x.tax_id||"")}"></div><div class="field form-span-2"><label>ที่อยู่บรรทัด 1</label><input class="input" name="address_line1" value="${escapeHtml(x.address_line1||"")}"></div><div class="field form-span-2"><label>ที่อยู่บรรทัด 2</label><input class="input" name="address_line2" value="${escapeHtml(x.address_line2||"")}"></div><div class="field"><label>โทรศัพท์</label><input class="input" name="phone" value="${escapeHtml(x.phone||"")}"></div><div class="field"><label>เลขที่บัญชี</label><input class="input" name="bank_account_no" value="${escapeHtml(x.bank_account_no||"")}"></div><div class="field"><label>ชื่อบัญชี</label><input class="input" name="bank_account_name" value="${escapeHtml(x.bank_account_name||"")}"></div><div class="field"><label>ธนาคาร</label><input class="input" name="bank_name" value="${escapeHtml(x.bank_name||"")}"></div><div class="field"><label>สาขา</label><input class="input" name="bank_branch" value="${escapeHtml(x.bank_branch||"")}"></div></form><div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="school-lunch-vendor-save">บันทึกผู้รับจ้าง</button></div></div>`;document.body.appendChild(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;m.querySelector("#school-lunch-vendor-save").onclick=async e=>{const fd=new FormData(m.querySelector("form")),payload={vendor_name:String(fd.get("vendor_name")||"").trim(),vendor_type:String(fd.get("vendor_type")||"individual"),tax_id:String(fd.get("tax_id")||"").trim()||null,address_line1:String(fd.get("address_line1")||"").trim()||null,address_line2:String(fd.get("address_line2")||"").trim()||null,phone:String(fd.get("phone")||"").trim()||null,bank_account_no:String(fd.get("bank_account_no")||"").trim()||null,bank_account_name:String(fd.get("bank_account_name")||"").trim()||null,bank_name:String(fd.get("bank_name")||"").trim()||null,bank_branch:String(fd.get("bank_branch")||"").trim()||null,updated_by:state.user.id};let q;if(v)q=supabase.from("school_lunch_vendors").update(payload).eq("id",v.id);else q=supabase.from("school_lunch_vendors").insert({...payload,created_by:state.user.id});buttonLoading(e.currentTarget,true,"กำลังบันทึก...");const {error}=await q;buttonLoading(e.currentTarget,false);if(error)return toast("บันทึกผู้รับจ้างไม่สำเร็จ",error.message,"error");close();toast("บันทึกผู้รับจ้างแล้ว","พร้อมเรียกใช้ใน Master Form","success");await loadSchoolLunchWorkspace();renderDashboard();};}
+function schoolLunchVendorRegistryModal(){const m=document.createElement("div");m.className="modal-backdrop";m.innerHTML=`<div class="modal modal-wide"><div class="modal-head"><div><h3>ทะเบียนผู้รับจ้างอาหารกลางวัน</h3><p>เก็บข้อมูลที่อยู่ ภาษี และบัญชี เพื่อไม่ต้องพิมพ์ซ้ำทุกครั้ง</p></div><button class="modal-close">×</button></div><div class="school-lunch-vendor-toolbar"><button class="btn btn-primary" id="school-lunch-vendor-add">＋ เพิ่มผู้รับจ้าง</button></div>${state.schoolLunchVendors.length?`<div class="table-wrap"><table class="table"><thead><tr><th>ผู้รับจ้าง</th><th>เลขผู้เสียภาษี</th><th>โทรศัพท์</th><th>ธนาคาร</th><th></th></tr></thead><tbody>${state.schoolLunchVendors.map(v=>`<tr><td><strong>${escapeHtml(v.vendor_name)}</strong><br><span class="table-muted">${escapeHtml([v.address_line1,v.address_line2].filter(Boolean).join(" ")||"—")}</span></td><td>${escapeHtml(v.tax_id||"—")}</td><td>${escapeHtml(v.phone||"—")}</td><td>${escapeHtml([v.bank_name,v.bank_branch].filter(Boolean).join(" · ")||"—")}</td><td><button class="btn btn-ghost" data-lunch-vendor-edit="${v.id}">แก้ไข</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="empty"><strong>ยังไม่มีผู้รับจ้างในทะเบียน</strong></div>`}</div>`;document.body.appendChild(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector("#school-lunch-vendor-add").onclick=()=>{close();schoolLunchVendorModal();};m.querySelectorAll("[data-lunch-vendor-edit]").forEach(b=>b.onclick=()=>{const v=schoolLunchVendorById(b.dataset.lunchVendorEdit);close();if(v)schoolLunchVendorModal(v);});}
+
+function schoolLunchWeekdaysBetween(start,end){if(!start||!end)return[];const a=new Date(`${start}T00:00:00`),b=new Date(`${end}T00:00:00`);if(!Number.isFinite(a.getTime())||!Number.isFinite(b.getTime())||a>b)return[];const out=[];for(let d=new Date(a);d<=b;d.setDate(d.getDate()+1)){if(d.getDay()!==0&&d.getDay()!==6)out.push(localDateInputValue(d));}return out;}
+function schoolLunchDayRowHtml(d={},i=0){const menus=Array.isArray(d.menu_items)?d.menu_items:[];return `<div class="school-lunch-day-edit-row" data-lunch-day-row data-day-id="${escapeHtml(d.id||"")}"><div class="field"><label>วันที่</label><input class="input" type="date" data-lunch-day-date value="${escapeHtml(d.service_date||"")}" required></div><div class="field"><label>นักเรียน (คน)</label><input class="input" type="number" min="1" data-lunch-day-students value="${Number(d.student_count||0)||""}" required></div><div class="field"><label>บาท/คน/วัน</label><input class="input" type="number" min="0" step="0.01" data-lunch-day-rate value="${Number(d.rate_per_student||0)||""}" required></div><div class="field school-lunch-day-menu-field"><label>รายการอาหาร <span class="optional">1 รายการต่อ 1 บรรทัด</span></label><textarea class="input textarea" data-lunch-day-menu rows="3" placeholder="ข้าวสวย\nผัดบวบ\nผลไม้">${escapeHtml(menus.join("\n"))}</textarea></div><div class="field"><label>ผลดำเนินงาน</label><select class="select" data-lunch-day-status><option value="pending" ${d.result_status==="pending"?"selected":""}>รอดำเนินการ</option><option value="completed" ${d.result_status==="completed"?"selected":""}>สำเร็จ</option><option value="incomplete" ${d.result_status==="incomplete"?"selected":""}>ไม่ครบ</option><option value="cancelled" ${d.result_status==="cancelled"?"selected":""}>ยกเลิกวัน</option></select></div><div class="school-lunch-day-row-total"><small>ยอดวันนี้</small><strong data-lunch-day-total>${money(Number(d.student_count||0)*Number(d.rate_per_student||0))}</strong><span>บาท</span></div><button type="button" class="mini-link danger" data-lunch-day-remove>ลบวัน</button></div>`;}
+function schoolLunchRoundDefaultDates(){const now=new Date(),day=now.getDay(),delta=(day===0?-6:1-day),monday=new Date(now);monday.setDate(now.getDate()+delta);const friday=new Date(monday);friday.setDate(monday.getDate()+4);return {start:localDateInputValue(monday),end:localDateInputValue(friday)};}
+function schoolLunchRoundFormModal(c=null){const settings={...schoolLunchSettingDefaults(),...(schoolLunchSetting()||{})},defaults=schoolLunchRoundDefaultDates(),days=c?schoolLunchDaysFor(c.id):schoolLunchWeekdaysBetween(defaults.start,defaults.end).map((date,i)=>({service_date:date,day_order:i+1,student_count:1,rate_per_student:Number(settings.default_rate_per_student||22),menu_items:[],result_status:"pending"})),x=c||{fiscal_year:state.schoolLunchFiscalYear,academic_year:new Date().getFullYear()+543,round_no:"",round_label:"",start_date:defaults.start,end_date:defaults.end,student_count:1,rate_per_student:Number(settings.default_rate_per_student||22),plan_name:settings.plan_name,project_name:settings.project_name,title:"จ้างเหมาประกอบอาหารกลางวันนักเรียน (ปรุงสำเร็จ)",reason:"เพื่อจ้างเหมาประกอบอาหารกลางวัน (ปรุงสำเร็จ) ให้แก่นักเรียน",funding_source:settings.funding_source,municipality_name:settings.municipality_name,appointment_control_no:"",job_control_no:"",disbursement_control_no:"",purchase_order_control_no:"",procurement_request_control_id:"",procurement_order_control_id:"",procurement_purchase_order_control_id:"",document_date:defaults.start,quote_date:defaults.start,order_date:defaults.start,inspection_appointment_date:defaults.start,delivery_due_date:defaults.end,delivery_date:defaults.end,inspection_date:defaults.end,payment_request_date:defaults.end,quote_valid_days:10,delivery_days:10,penalty_rate:Number(settings.default_penalty_rate||.20),vendor_id:settings.default_vendor_id||"",owner_user_id:state.user.id,vat_amount:0,withholding_tax_amount:0,fine_amount:0,status:"draft"};if(!c){days.forEach(d=>d.student_count=x.student_count);}const m=document.createElement("div");m.className="modal-backdrop";m.innerHTML=`<div class="modal modal-wide school-lunch-round-modal"><div class="modal-head"><div><span class="eyebrow dark">Master Form · ปีงบประมาณ ${state.schoolLunchFiscalYear}</span><h3>${c?"แก้ไข":"สร้าง"}รอบจัดทำเอกสารอาหารกลางวัน</h3><p>ข้อมูลหน้านี้จะไหลไปใช้กับเอกสารทั้ง 12 แบบโดยไม่ต้องกรอกซ้ำ</p></div><button class="modal-close">×</button></div><form id="school-lunch-round-form" class="form-grid"><div class="school-lunch-form-section form-span-2"><strong>1. ข้อมูลรอบและการคำนวณ</strong></div><div class="form-row"><div class="field"><label>ปีการศึกษา</label><input class="input" name="academic_year" type="number" min="2500" max="3000" required value="${Number(x.academic_year||new Date().getFullYear()+543)}"></div><div class="field"><label>รอบที่ <span class="optional">ไม่บังคับ</span></label><input class="input" name="round_no" type="number" min="1" value="${x.round_no||""}" placeholder="เช่น 17"></div></div><div class="field form-span-2"><label>ชื่อรอบ <span class="optional">ไม่บังคับ</span></label><input class="input" name="round_label" value="${escapeHtml(x.round_label||"")}" placeholder="เช่น รอบที่ 17"></div><div class="field form-span-2"><label>สถานะการดำเนินงาน</label><select class="select" name="status"><option value="draft" ${x.status==="draft"?"selected":""}>ฉบับร่าง</option><option value="prepared" ${x.status==="prepared"?"selected":""}>จัดทำเอกสารแล้ว</option><option value="inspected" ${x.status==="inspected"?"selected":""}>ตรวจรับแล้ว</option><option value="paid" ${x.status==="paid"?"selected":""}>เบิกจ่ายแล้ว</option></select></div><div class="form-row"><div class="field"><label>วันที่เริ่ม</label><input class="input" name="start_date" type="date" required value="${escapeHtml(x.start_date||"")}"></div><div class="field"><label>วันที่สิ้นสุด</label><input class="input" name="end_date" type="date" required value="${escapeHtml(x.end_date||"")}"></div></div><div class="form-row"><div class="field"><label>จำนวนนักเรียนเริ่มต้น</label><input class="input" name="student_count" type="number" min="1" required value="${Number(x.student_count||1)}"></div><div class="field"><label>อัตรา / คน / วัน</label><input class="input" name="rate_per_student" type="number" min="0" step="0.01" required value="${Number(x.rate_per_student||settings.default_rate_per_student||22)}"></div></div><div class="school-lunch-count-mode form-span-2"><strong>รูปแบบจำนวนผู้เบิก</strong><label><input type="radio" name="student_count_mode" value="uniform"> ใช้จำนวนนักเรียนเท่ากันทุกวัน</label><label><input type="radio" name="student_count_mode" value="daily"> กำหนดจำนวนนักเรียนรายวัน</label><span>หากแต่ละวันไม่เท่ากัน ระบบจะใช้ยอดจริงรายวันและสร้างตารางรายละเอียดการคำนวณแนบท้ายให้อัตโนมัติ</span></div><div class="school-lunch-live-total form-span-2"><span>ยอดรวมจาก Timeline</span><strong id="school-lunch-live-total">${money(c?.total_amount||0)} บาท</strong><small>ระบบจะคำนวณจาก นักเรียน × อัตรา ของแต่ละวันที่จัดอาหาร</small></div><div class="school-lunch-form-section form-span-2"><strong>2. ข้อมูลงบประมาณและการจ้าง</strong></div><div class="field"><label>แผนงาน</label><input class="input" name="plan_name" value="${escapeHtml(x.plan_name||settings.plan_name||"")}"></div><div class="field"><label>โครงการ</label><input class="input" name="project_name" value="${escapeHtml(x.project_name||settings.project_name||"")}"></div><div class="field form-span-2"><label>รายการจ้าง</label><input class="input" name="title" required value="${escapeHtml(x.title||"")}"></div><div class="field form-span-2"><label>เหตุผลและความจำเป็น</label><textarea class="input textarea" name="reason">${escapeHtml(x.reason||"")}</textarea></div><div class="field"><label>แหล่งเงิน</label><input class="input" name="funding_source" value="${escapeHtml(x.funding_source||"")}"></div><div class="field"><label>หน่วยสนับสนุน / อปท.</label><input class="input" name="municipality_name" value="${escapeHtml(x.municipality_name||"")}"></div><div class="field form-span-2"><label>ผู้รับจ้าง</label><select class="select" name="vendor_id"><option value="">— เลือกผู้รับจ้าง —</option>${state.schoolLunchVendors.map(v=>`<option value="${v.id}" ${x.vendor_id===v.id?"selected":""}>${escapeHtml(v.vendor_name)}${v.tax_id?` · ${escapeHtml(v.tax_id)}`:""}</option>`).join("")}</select><span class="helper">เพิ่ม/แก้ผู้รับจ้างได้จาก “ทะเบียนผู้รับจ้าง” หน้าแรก</span></div><div class="field form-span-2"><label>ผู้รับผิดชอบหลักของรอบ</label><select class="select" name="owner_user_id">${state.schoolLunchStaff.map(p=>`<option value="${p.user_id}" ${(x.owner_user_id||state.user.id)===p.user_id?"selected":""}>${escapeHtml(p.full_name)}${p.position_title?` · ${escapeHtml(p.position_title)}`:""}</option>`).join("")}</select></div><div class="school-lunch-form-section form-span-2"><strong>3. เลขคุมจากระบบจัดซื้อจัดจ้างและพัสดุ</strong><span>เลือกเลขที่ออกไว้ในระบบเลขคุมกลาง ระบบจะนำเลขแต่ละชุดไปใช้ในเอกสารให้อัตโนมัติ</span></div><div class="field form-span-2"><label>ชุดที่ 1 · รายงานขอซื้อ/ขอจ้าง + อนุมัติ</label><select class="select" name="procurement_request_control_id" id="school-lunch-control-request">${schoolLunchCentralControlOptions("request_approval",x.procurement_request_control_id||"",c)}</select><span class="helper" id="school-lunch-control-request-preview">เลขการจ้าง = ${escapeHtml(x.job_control_no||"—")} · เลขขอเบิกจ่าย = ${escapeHtml(x.disbursement_control_no||"—")}</span></div><div class="field"><label>ชุดที่ 2 · คำสั่ง TOR / แต่งตั้งตรวจรับ</label><select class="select" name="procurement_order_control_id" id="school-lunch-control-order">${schoolLunchCentralControlOptions("order",x.procurement_order_control_id||"",c,x.procurement_request_control_id||null)}</select><span class="helper" id="school-lunch-control-order-preview">เลขแต่งตั้ง / ขอบข่ายงาน = ${escapeHtml(x.appointment_control_no||"—")}</span></div><div class="field"><label>ชุดที่ 3 · ใบสั่งซื้อ / ใบสั่งจ้าง</label><select class="select" name="procurement_purchase_order_control_id" id="school-lunch-control-purchase">${schoolLunchCentralControlOptions("purchase_order",x.procurement_purchase_order_control_id||"",c,x.procurement_request_control_id||null)}</select><span class="helper" id="school-lunch-control-purchase-preview">เลขใบสั่งซื้อ / ใบสั่งจ้าง = ${escapeHtml(x.purchase_order_control_no||"—")}</span></div><div class="school-lunch-form-section form-span-2"><strong>4. วันที่เอกสาร</strong></div><div class="school-lunch-date-grid form-span-2">${[["document_date","วันที่เอกสาร/แต่งตั้ง"],["quote_date","วันที่เสนอราคา"],["order_date","วันที่จ้าง"],["inspection_appointment_date","วันที่แต่งตั้งตรวจรับ"],["delivery_due_date","วันครบกำหนด"],["delivery_date","วันส่งมอบ"],["inspection_date","วันที่ตรวจรับ"],["payment_request_date","วันที่ขออนุมัติจ่าย"]].map(([k,l])=>`<div class="field"><label>${l}</label><input class="input" name="${k}" type="date" value="${escapeHtml(x[k]||"")}"></div>`).join("")}</div><div class="form-row"><div class="field"><label>ยืนราคา (วัน)</label><input class="input" name="quote_valid_days" type="number" min="1" value="${Number(x.quote_valid_days||10)}"></div><div class="field"><label>กำหนดส่งมอบ (วัน)</label><input class="input" name="delivery_days" type="number" min="1" value="${Number(x.delivery_days||10)}"></div></div><div class="form-row"><div class="field"><label>ค่าปรับร้อยละ / วัน</label><input class="input" name="penalty_rate" type="number" min="0" step="0.01" value="${Number(x.penalty_rate??settings.default_penalty_rate??.20)}"></div><div class="field"><label>VAT (บาท)</label><input class="input" name="vat_amount" type="number" min="0" step="0.01" value="${Number(x.vat_amount||0)}"></div></div><div class="form-row"><div class="field"><label>ภาษีหัก ณ ที่จ่าย (บาท)</label><input class="input" name="withholding_tax_amount" type="number" min="0" step="0.01" value="${Number(x.withholding_tax_amount||0)}"></div><div class="field"><label>ค่าปรับ (บาท)</label><input class="input" name="fine_amount" type="number" min="0" step="0.01" value="${Number(x.fine_amount||0)}"></div></div><div class="school-lunch-form-section form-span-2 school-lunch-timeline-form-head"><div><strong>5. Timeline วันจัดอาหารและเมนู</strong><span>เลือกใช้จำนวนเท่ากันทุกวัน หรือกำหนดจำนวนรายวันได้ ยอดรวมจะคำนวณจากแต่ละวันอัตโนมัติ</span></div><div><button type="button" class="btn btn-ghost" id="school-lunch-generate-days">สร้างวันจันทร์–ศุกร์จากช่วงวันที่</button><button type="button" class="btn btn-ghost" id="school-lunch-add-day">＋ เพิ่มวัน</button></div></div><div class="school-lunch-days-editor form-span-2" id="school-lunch-days-editor">${days.map(schoolLunchDayRowHtml).join("")}</div></form><div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="school-lunch-round-save">บันทึก Master Form</button></div></div>`;document.body.appendChild(m);const close=()=>m.remove(),form=m.querySelector("form"),editor=m.querySelector("#school-lunch-days-editor");m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;
+  const requestControl=form.elements.procurement_request_control_id,orderControl=form.elements.procurement_order_control_id,purchaseControl=form.elements.procurement_purchase_order_control_id;
+  const availableChildren=(series,parentId)=>schoolLunchCentralControls().filter(n=>n.series===series&&n.parent_control_id===parentId&&schoolLunchCentralControlAvailable(n,c));
+  const updateControlPreview=()=>{const req=schoolLunchCentralControlById(requestControl?.value),ord=schoolLunchCentralControlById(orderControl?.value),po=schoolLunchCentralControlById(purchaseControl?.value),rp=m.querySelector("#school-lunch-control-request-preview"),op=m.querySelector("#school-lunch-control-order-preview"),pp=m.querySelector("#school-lunch-control-purchase-preview");if(rp)rp.textContent=`เลขการจ้าง = ${req?.primary_number||"—"} · เลขขอเบิกจ่าย = ${req?.secondary_number||"—"}`;if(op)op.textContent=`เลขแต่งตั้ง / ขอบข่ายงาน = ${ord?.primary_number||"—"}`;if(pp)pp.textContent=`เลขใบสั่งซื้อ / ใบสั่งจ้าง = ${po?.primary_number||"—"}`;};
+  const refillControlChild=(select,series,parentId,preferred="")=>{if(!select)return;const rows=availableChildren(series,parentId);select.innerHTML=`<option value="">— เลือกเลขคุม —</option>${rows.map(n=>`<option value="${n.id}">${escapeHtml(schoolLunchCentralControlLabel(n))}</option>`).join("")}`;if(preferred&&rows.some(n=>n.id===preferred))select.value=preferred;else if(rows.length===1)select.value=rows[0].id;};
+  requestControl?.addEventListener("change",()=>{const parentId=requestControl.value;refillControlChild(orderControl,"order",parentId,"");refillControlChild(purchaseControl,"purchase_order",parentId,"");updateControlPreview();});orderControl?.addEventListener("change",updateControlPreview);purchaseControl?.addEventListener("change",updateControlPreview);updateControlPreview();
+  const modeInputs=[...form.querySelectorAll('[name="student_count_mode"]')];
+  const initialMode=(()=>{const activeDays=days.filter(d=>d.result_status!=="cancelled");return activeDays.length&&new Set(activeDays.map(d=>Number(d.student_count||0))).size>1?"daily":"uniform";})();
+  const currentCountMode=()=>form.querySelector('[name="student_count_mode"]:checked')?.value||"uniform";
+  const applyCountMode=()=>{const uniform=currentCountMode()==="uniform",base=Number(form.elements.student_count.value||1);editor.querySelectorAll("[data-lunch-day-students]").forEach(el=>{if(uniform)el.value=base;el.readOnly=uniform;el.classList.toggle("is-locked",uniform);});recalc();};
+  modeInputs.forEach(el=>{el.checked=el.value===initialMode;el.addEventListener("change",applyCountMode);});
+  const bindDayRows=()=>{editor.querySelectorAll("[data-lunch-day-row]").forEach(row=>{row.querySelector("[data-lunch-day-remove]").onclick=()=>{row.remove();recalc();};row.querySelectorAll("input,textarea,select").forEach(el=>el.addEventListener("input",recalc));});applyCountMode();};
+  const recalc=()=>{let sum=0;editor.querySelectorAll("[data-lunch-day-row]").forEach(row=>{const st=Number(row.querySelector("[data-lunch-day-students]")?.value||0),rate=Number(row.querySelector("[data-lunch-day-rate]")?.value||0),cancel=row.querySelector("[data-lunch-day-status]")?.value==="cancelled",amt=cancel?0:st*rate;sum+=amt;const out=row.querySelector("[data-lunch-day-total]");if(out)out.textContent=money(amt);});m.querySelector("#school-lunch-live-total").textContent=`${money(sum)} บาท`;};
+  const seedDefaults=()=>{const sc=Number(form.elements.student_count.value||0),rate=Number(form.elements.rate_per_student.value||0);editor.querySelectorAll("[data-lunch-day-row]").forEach(row=>{const s=row.querySelector("[data-lunch-day-students]"),r=row.querySelector("[data-lunch-day-rate]");if(s&&!s.value)s.value=sc||1;if(r&&!r.value)r.value=rate||0;});applyCountMode();};
+  form.elements.student_count.addEventListener("change",()=>{if(currentCountMode()==="uniform")editor.querySelectorAll("[data-lunch-day-students]").forEach(el=>{el.value=form.elements.student_count.value;});recalc();});form.elements.rate_per_student.addEventListener("change",()=>{editor.querySelectorAll("[data-lunch-day-rate]").forEach(el=>{el.value=form.elements.rate_per_student.value;});recalc();});
+  m.querySelector("#school-lunch-add-day").onclick=()=>{editor.insertAdjacentHTML("beforeend",schoolLunchDayRowHtml({student_count:Number(form.elements.student_count.value||1),rate_per_student:Number(form.elements.rate_per_student.value||0),result_status:"pending"},editor.children.length));bindDayRows();};
+  m.querySelector("#school-lunch-generate-days").onclick=()=>{const ds=schoolLunchWeekdaysBetween(form.elements.start_date.value,form.elements.end_date.value);if(!ds.length)return toast("สร้าง Timeline ไม่ได้","ตรวจสอบวันที่เริ่มและสิ้นสุด","error");if(editor.children.length&&!confirm("แทนที่ Timeline ปัจจุบันด้วยวันจันทร์–ศุกร์จากช่วงวันที่หรือไม่?"))return;editor.innerHTML=ds.map((date,i)=>schoolLunchDayRowHtml({service_date:date,day_order:i+1,student_count:Number(form.elements.student_count.value||1),rate_per_student:Number(form.elements.rate_per_student.value||0),menu_items:[],result_status:"pending"},i)).join("");bindDayRows();};bindDayRows();seedDefaults();
+  m.querySelector("#school-lunch-round-save").onclick=async e=>{const fd=new FormData(form),fy=Number(state.schoolLunchFiscalYear),requestControlId=String(fd.get("procurement_request_control_id")||"")||null,orderControlId=String(fd.get("procurement_order_control_id")||"")||null,purchaseControlId=String(fd.get("procurement_purchase_order_control_id")||"")||null;if((orderControlId||purchaseControlId)&&!requestControlId)return toast("เลขคุมยังไม่ครบ","กรุณาเลือกเลขคุมชุดที่ 1 ก่อนชุดที่ 2 และชุดที่ 3","error");const dayRows=[...editor.querySelectorAll("[data-lunch-day-row]")].map((row,i)=>({service_date:row.querySelector("[data-lunch-day-date]")?.value,day_order:i+1,student_count:Number(row.querySelector("[data-lunch-day-students]")?.value||0),rate_per_student:Number(row.querySelector("[data-lunch-day-rate]")?.value||0),menu_items:String(row.querySelector("[data-lunch-day-menu]")?.value||"").split(/\r?\n/).map(v=>v.trim()).filter(Boolean),result_status:row.querySelector("[data-lunch-day-status]")?.value||"pending",note:""})).filter(x=>x.service_date);if(!dayRows.length)return toast("ยังบันทึกไม่ได้","ต้องมีวันจัดอาหารอย่างน้อย 1 วัน","error");if(dayRows.some(x=>x.student_count<=0||x.rate_per_student<0))return toast("ข้อมูล Timeline ไม่ถูกต้อง","ตรวจสอบจำนวนนักเรียนและอัตราค่าอาหาร","error");const payload={fiscal_year:fy,academic_year:Number(fd.get("academic_year")),round_no:Number(fd.get("round_no"))||null,round_label:String(fd.get("round_label")||"").trim()||null,status:String(fd.get("status")||"draft"),start_date:String(fd.get("start_date")||""),end_date:String(fd.get("end_date")||""),student_count:Number(fd.get("student_count")||1),rate_per_student:Number(fd.get("rate_per_student")||0),plan_name:String(fd.get("plan_name")||"").trim(),project_name:String(fd.get("project_name")||"").trim(),title:String(fd.get("title")||"").trim(),reason:String(fd.get("reason")||"").trim(),funding_source:String(fd.get("funding_source")||"").trim(),municipality_name:String(fd.get("municipality_name")||"").trim()||null,procurement_request_control_id:requestControlId,procurement_order_control_id:orderControlId,procurement_purchase_order_control_id:purchaseControlId,document_date:String(fd.get("document_date")||"")||null,quote_date:String(fd.get("quote_date")||"")||null,order_date:String(fd.get("order_date")||"")||null,inspection_appointment_date:String(fd.get("inspection_appointment_date")||"")||null,delivery_due_date:String(fd.get("delivery_due_date")||"")||null,delivery_date:String(fd.get("delivery_date")||"")||null,inspection_date:String(fd.get("inspection_date")||"")||null,payment_request_date:String(fd.get("payment_request_date")||"")||null,quote_valid_days:Number(fd.get("quote_valid_days")||10),delivery_days:Number(fd.get("delivery_days")||10),penalty_rate:Number(fd.get("penalty_rate")||0),vendor_id:String(fd.get("vendor_id")||"")||null,owner_user_id:String(fd.get("owner_user_id")||"")||state.user.id,vat_amount:Number(fd.get("vat_amount")||0),withholding_tax_amount:Number(fd.get("withholding_tax_amount")||0),fine_amount:Number(fd.get("fine_amount")||0),updated_by:state.user.id};if(!c){payload.created_by=state.user.id;payload.role_snapshots=schoolLunchSetting()?.roles||{};}buttonLoading(e.currentTarget,true,"กำลังบันทึก...");let saved;if(c){const res=await supabase.from("school_lunch_rounds").update(payload).eq("id",c.id).select("id").single();if(res.error){buttonLoading(e.currentTarget,false);return toast("บันทึก Master Form ไม่สำเร็จ",res.error.message,"error");}saved=res.data;}else{const res=await supabase.from("school_lunch_rounds").insert(payload).select("id").single();if(res.error){buttonLoading(e.currentTarget,false);return toast("สร้างรอบไม่สำเร็จ",res.error.message,"error");}saved=res.data;}const roundId=saved.id;const timeline=await supabase.rpc("replace_school_lunch_round_days",{p_round_id:roundId,p_days:dayRows});buttonLoading(e.currentTarget,false);if(timeline.error)return toast("บันทึก Timeline ไม่สำเร็จ",timeline.error.message,"error");state.selectedSchoolLunchRoundId=roundId;close();toast("บันทึก Master Form แล้ว",`${dayRows.length} วัน · ระบบคำนวณยอดและพร้อมสร้างเอกสาร`,"success");await loadSchoolLunchWorkspace();renderDashboard();};}
+
+async function schoolLunchCancelRound(c){if(!schoolLunchCanEdit(c))return;if(!confirm(`ยืนยันยกเลิก ${schoolLunchRoundTitle(c)} ?\n\nระบบจะปลดการใช้งานเลขคุมชุดที่ 1–3 ออกจากรอบนี้ ทำให้เลขชุดเดิมสามารถเลือกใช้กับรอบอื่นได้ โดยประวัติรอบนี้ยังคงอยู่`))return;const {error}=await supabase.from("school_lunch_rounds").update({status:"cancelled",cancelled_by:state.user.id,cancelled_at:new Date().toISOString(),updated_by:state.user.id}).eq("id",c.id);if(error)return toast("ยกเลิกรอบไม่สำเร็จ",error.message,"error");toast("ยกเลิกรอบและคืนเลขแล้ว","เลขคุมกลางสามารถเลือกใช้กับรอบอื่นได้ และประวัติเดิมยังตรวจสอบย้อนหลังได้","success");await loadSchoolLunchWorkspace();renderDashboard();}
+
+function schoolLunchPdfText(v,fallback="........................................................"){const s=String(v??"").trim();return escapeHtml(s||fallback);}
+function schoolLunchPdfMoney(v){return money(Number(v||0));}
+function schoolLunchPdfBaht(c){return procurementThaiBahtText(Number(c?.total_amount||0));}
+function schoolLunchPdfPerson(p,label="",opts={}){const position=opts.position!==undefined?String(opts.position||"").trim():schoolLunchPersonPosition(p),date=opts.date||"";return `<div class="school-lunch-pdf-sign"><div class="school-lunch-pdf-sign-line"><span>ลงชื่อ</span><span class="school-lunch-pdf-sign-blank"></span>${label?`<span class="school-lunch-pdf-sign-label">${escapeHtml(label)}</span>`:""}</div><strong>( ${schoolLunchPdfText(schoolLunchPersonName(p),"........................................................")} )</strong>${position?`<span>${escapeHtml(position)}</span>`:""}${date?`<small class="school-lunch-pdf-sign-date">วันที่ ${escapeHtml(thaiDateOnly(date))}</small>`:""}</div>`;}
+function schoolLunchPdfOfficerHeadDirector(roles,{officerLabel="เจ้าหน้าที่",headLabel="หัวหน้าเจ้าหน้าที่",directorLabel=`ผู้อำนวยการ${schoolName()}`,date="",replacePositionWithDate=false,directorPosition=undefined,directorDate=undefined}={}){const dated=replacePositionWithDate&&date?{position:"",date}:date?{date}:{};const directorOpts=replacePositionWithDate&&date?{position:"",date}:{};if(directorPosition!==undefined)directorOpts.position=directorPosition;if(directorDate!==undefined)directorOpts.date=directorDate;return `<div class="school-lunch-signature-hierarchy"><div class="school-lunch-signature-top-two">${schoolLunchPdfPerson(roles.procurement_officer,officerLabel,dated)}${schoolLunchPdfPerson(roles.head_officer,headLabel,dated)}</div><div class="school-lunch-signature-director">${schoolLunchPdfPerson(roles.director,directorLabel,directorOpts)}</div></div>`;}
+function schoolLunchPdfCommitteeRole(index,total){return index===0?"ประธานกรรมการ":index===total-1&&total>2?"กรรมการและเลขานุการ":"กรรมการ";}
+function schoolLunchPdfAppointmentList(people){const list=(people||[]).length?people:[null];return `<div class="school-lunch-appointment-list">${list.map((p,i)=>`<div class="school-lunch-appointment-row"><b>${academicRegThaiDigits(i+1)}.</b><span class="name">${schoolLunchPdfText(schoolLunchPersonName(p))}</span><span class="position">${schoolLunchPdfText(schoolLunchPersonPosition(p),"—")}</span><strong>${escapeHtml(schoolLunchPdfCommitteeRole(i,list.length))}</strong></div>`).join("")}</div>`;}
+function schoolLunchPdfPage(inner,extra=""){return `<article class="school-lunch-pdf-page ${extra}"><div class="school-lunch-pdf-inner">${inner}</div></article>`;}
+function schoolLunchPdfGaruda(){return `<div class="school-lunch-pdf-garuda"><img src="${ACADEMIC_REG_GARUDA_DATA_URL}" alt="ตราครุฑ"></div>`;}
+function schoolLunchPdfMemoHeader(c,{no="",date="",subject=""}={}){return `${schoolLunchPdfGaruda()}<h1 class="school-lunch-memo-title">บันทึกข้อความ</h1><div class="school-lunch-memo-line"><b>ส่วนราชการ</b><span>${escapeHtml(schoolName())}</span></div><div class="school-lunch-memo-two"><div class="school-lunch-memo-line"><b>ที่</b><span>${schoolLunchPdfText(no)}</span></div><div class="school-lunch-memo-line"><b>วันที่</b><span>${escapeHtml(thaiDateOnly(date))}</span></div></div><div class="school-lunch-memo-line"><b>เรื่อง</b><span>${escapeHtml(subject)}</span></div><div class="school-lunch-memo-line"><b>เรียน</b><span>ผู้อำนวยการ${escapeHtml(schoolName())}</span></div>`;}
+function schoolLunchPdfDayRows(c,{status=false,sign=false,note=false}={}){const days=schoolLunchDaysFor(c.id);return days.flatMap((d,di)=>{const menus=(Array.isArray(d.menu_items)?d.menu_items:[]);return (menus.length?menus:["—"]).map((menu,mi)=>{let signCell="";if(sign==="committee")signCell=`<td class="school-lunch-sign-cell"><div class="school-lunch-sign-three-inline"><span>1) ................................</span><span>2) ................................</span><span>3) ................................</span></div></td>`;else if(sign==="single")signCell=`<td class="school-lunch-sign-cell single"><span class="school-lunch-sign-one-line">........................................................</span></td>`;else if(sign===true)signCell=`<td class="school-lunch-sign-cell"><div class="school-lunch-sign-three-inline"><span>1) ................................</span><span>2) ................................</span><span>3) ................................</span></div></td>`;const noteCell=note?`<td class="school-lunch-sign-cell school-lunch-inspection-note-cell"><div class="school-lunch-sign-three-inline school-lunch-inspection-note-sign"><span>1) <i></i></span><span>2) <i></i></span><span>3) <i></i></span></div>${mi===0&&String(d.note||"").trim()?`<div class="school-lunch-inspection-free-note">${escapeHtml(d.note)}</div>`:""}</td>`:"";return `<tr><td>${mi===0?escapeHtml(thaiDateOnly(d.service_date)):""}</td><td>${escapeHtml(menu)}</td>${status?`<td>${d.result_status==="incomplete"?"ไม่ครบ":"สำเร็จ"}</td>`:""}${signCell}${noteCell}</tr>`;});}).join("");}
+function schoolLunchPdfMenuSummary(c){return schoolLunchDaysFor(c.id).flatMap(d=>Array.isArray(d.menu_items)?d.menu_items:[]).filter(x=>x&&x!=="-").slice(0,10).join(" ");}
+function schoolLunchBillableDays(c){return schoolLunchDaysFor(c.id).filter(d=>d.result_status!=="cancelled");}
+function schoolLunchDailyAmountMode(c){const days=schoolLunchBillableDays(c),studentValues=[...new Set(days.map(d=>Number(d.student_count||0)))],rateValues=[...new Set(days.map(d=>Number(d.rate_per_student||0)))];return {days,uniformStudents:studentValues.length<=1,uniformRates:rateValues.length<=1,variable:studentValues.length>1||rateValues.length>1,studentValues,rateValues};}
+function schoolLunchPdfContext(c){const days=schoolLunchDaysFor(c.id),billing=schoolLunchDailyAmountMode(c),billableDays=billing.days,vendor=schoolLunchVendorById(c.vendor_id)||{},roles=schoolLunchRoles(c),amount=Number(c.total_amount||billableDays.reduce((s,d)=>s+Number(d.day_amount||0),0)),baht=procurementThaiBahtText(amount),range=schoolLunchRoundDateRange(c),baseStudents=billableDays.length?Number(billableDays[0].student_count||0):Number(c.student_count||0),baseRate=billableDays.length?Number(billableDays[0].rate_per_student||0):Number(c.rate_per_student||0),studentText=billing.variable?(billing.uniformRates?`ตามจำนวนนักเรียนที่ได้รับบริการจริงในแต่ละวัน อัตราคนละ ${money(baseRate)} บาท/คน/วัน`:`ตามจำนวนนักเรียนและอัตราค่าอาหารที่ได้รับบริการจริงในแต่ละวัน`):`จำนวนนักเรียน ${baseStudents.toLocaleString("th-TH")} คน ๆ ละ ${money(baseRate)} บาท × ${billableDays.length} วัน`,studentDetailNote=billing.variable?"(รายละเอียดการคำนวณตามเอกสารแนบท้าย)":"";return {c,days,billableDays,billing,vendor,roles,amount,baht,range,studentText,studentDetailNote,baseStudents,baseRate,net:schoolLunchNetAmount(c),committee:(roles.inspection_committee||[]).filter(x=>schoolLunchPersonName(x)),supervisors:(roles.meal_supervisors||[]).filter(x=>schoolLunchPersonName(x))};}
+function schoolLunchPdfAttachmentTable(ctx){const billableCount=ctx.billableDays.length,unitPrice=ctx.billing.variable?(ctx.billing.uniformRates?`${schoolLunchPdfMoney(ctx.baseRate)} บาท/คน/วัน`:"ตามรายละเอียดแนบท้าย"):schoolLunchPdfMoney(ctx.baseStudents*ctx.baseRate),detailNote=ctx.studentDetailNote?`<br><strong>${escapeHtml(ctx.studentDetailNote)}</strong>`:"";return `<table class="school-lunch-pdf-table"><thead><tr><th style="width:9%">ลำดับ</th><th>รายละเอียดของพัสดุที่จะจ้าง</th><th style="width:13%">จำนวน / หน่วย</th><th style="width:18%">ราคา/หน่วย</th><th style="width:20%">จำนวนเงิน</th></tr></thead><tbody><tr><td>1</td><td>${escapeHtml(ctx.c.title)}<br>${escapeHtml(ctx.studentText)}${detailNote}<br>${escapeHtml(ctx.range)}<div class="school-lunch-price-source">☐ ราคามาตรฐาน &nbsp;&nbsp; ☑ ราคาที่ได้มาจากการสืบจากท้องตลาด</div></td><td>${billableCount} วัน</td><td>${unitPrice}</td><td>${schoolLunchPdfMoney(ctx.amount)}</td></tr></tbody><tfoot><tr><td colspan="3" rowspan="3" class="school-lunch-pdf-baht">(${escapeHtml(ctx.baht)})</td><td>ราคาสินค้า/บริการ</td><td>${schoolLunchPdfMoney(ctx.amount-Number(ctx.c.vat_amount||0))}</td></tr><tr><td>ภาษีมูลค่าเพิ่ม</td><td>${schoolLunchPdfMoney(ctx.c.vat_amount)}</td></tr><tr><td><strong>รวมราคาทั้งสิ้น</strong></td><td><strong>${schoolLunchPdfMoney(ctx.amount)}</strong></td></tr></tfoot></table>`;}
+function schoolLunchPdfDailyAmountBreakdown(ctx){if(!ctx.billing.variable)return "";const rows=ctx.billableDays.map((d,i)=>`<tr><td>${academicRegThaiDigits(i+1)}</td><td>${escapeHtml(thaiDateOnly(d.service_date))}</td><td>${Number(d.student_count||0).toLocaleString("th-TH")}</td><td>${schoolLunchPdfMoney(d.rate_per_student)}</td><td>${schoolLunchPdfMoney(d.day_amount||Number(d.student_count||0)*Number(d.rate_per_student||0))}</td></tr>`).join("");return `<section class="school-lunch-daily-breakdown"><h3>รายละเอียดการคำนวณค่าอาหารกลางวันรายวัน</h3><p>คำนวณตามจำนวนนักเรียนที่ได้รับบริการจริงในแต่ละวัน</p><table class="school-lunch-pdf-table compact"><thead><tr><th style="width:9%">ลำดับ</th><th style="width:27%">วันที่</th><th style="width:18%">นักเรียน (คน)</th><th style="width:20%">อัตรา/คน/วัน</th><th>จำนวนเงิน</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="4"><strong>รวมทั้งสิ้น</strong></td><td><strong>${schoolLunchPdfMoney(ctx.amount)}</strong></td></tr></tfoot></table></section>`;}
+function schoolLunchDocumentPages(code,c){const x=schoolLunchPdfContext(c),d=x.days.length,docDate=c.document_date||c.start_date,orderDate=c.order_date||docDate,deliveryDate=c.delivery_date||c.end_date,inspectionDate=c.inspection_date||deliveryDate,paymentDate=c.payment_request_date||inspectionDate,muni=c.municipality_name||"องค์กรปกครองส่วนท้องถิ่น";switch(code){
+  case "disbursement_memo":return [schoolLunchPdfPage(`${schoolLunchPdfMemoHeader(c,{no:c.disbursement_control_no,date:paymentDate,subject:"บันทึกขออนุมัติจ่ายเงินค่าจ้างเหมาอาหารกลางวัน (ปรุงสำเร็จ)"})}<div class="school-lunch-pdf-body"><p class="indent">ตามที่โรงเรียนได้จัดจ้างเหมาประกอบอาหารกลางวัน (ปรุงสำเร็จ) จำนวน 1 ราย จาก <strong>${schoolLunchPdfText(x.vendor.vendor_name)}</strong> จำนวนเงิน <strong>${schoolLunchPdfMoney(x.amount)}</strong> บาท (${escapeHtml(x.baht)}) ตามใบสั่งจ้างเลขที่ <strong>${schoolLunchPdfText(c.purchase_order_control_no)}</strong> ลงวันที่ ${escapeHtml(thaiDateOnly(orderDate))} จากเงินนอกงบประมาณประเภท ${escapeHtml(c.funding_source||"เงินอุดหนุนอาหารกลางวัน")} ที่ได้รับจาก ${escapeHtml(muni)} นั้น</p><p class="indent">บัดนี้ ผู้รับจ้างได้ส่งมอบอาหารตามรายการอาหาร ถูกต้องครบถ้วนแล้ว และคณะกรรมการได้ตรวจสอบเรียบร้อย ครบถ้วนถูกต้องแล้ว ตามระเบียบกระทรวงการคลังว่าด้วยการจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ พ.ศ. 2560 ตามนัยข้อ 175</p><p class="indent">เห็นควรเบิกจ่ายให้แก่ผู้รับจ้าง ตามใบสั่งจ้าง โดยมีรายละเอียด ดังนี้</p><table class="school-lunch-pdf-money-table"><tr><td>จำนวนเงินที่ขอเบิก</td><td>${schoolLunchPdfMoney(x.amount)}</td><td>บาท</td></tr><tr><td>ภาษีมูลค่าเพิ่ม (ถ้ามี)</td><td>${schoolLunchPdfMoney(c.vat_amount)}</td><td>บาท</td></tr><tr><td>มูลค่าสินค้า/บริการ</td><td>${schoolLunchPdfMoney(x.amount-Number(c.vat_amount||0))}</td><td>บาท</td></tr><tr><td>หัก ภาษี ณ ที่จ่าย</td><td>${schoolLunchPdfMoney(c.withholding_tax_amount)}</td><td>บาท</td></tr><tr><td>ค่าปรับ (ถ้ามี)</td><td>${schoolLunchPdfMoney(c.fine_amount)}</td><td>บาท</td></tr><tr class="total"><td>คงเหลือจ่ายจริง</td><td>${schoolLunchPdfMoney(x.net)}</td><td>บาท</td></tr></table><p class="indent">จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติเบิกจ่าย${escapeHtml(c.funding_source||"เงินอุดหนุนอาหารกลางวัน")} ให้แก่ผู้รับจ้าง จำนวน ${schoolLunchPdfMoney(x.net)} บาท (${escapeHtml(procurementThaiBahtText(x.net))})</p><div class="school-lunch-pdf-sign-grid two">${schoolLunchPdfPerson(x.roles.finance_officer,"เจ้าหน้าที่การเงิน",{position:"",date:paymentDate})}<div class="school-lunch-director-opinion"><b>ความเห็นของผู้อำนวยการสถานศึกษา</b><div>☐ ทราบ &nbsp;&nbsp; ☐ อนุมัติ</div>${schoolLunchPdfPerson(x.roles.director,"ผู้อำนวยการสถานศึกษา",{position:"",date:paymentDate})}</div></div></div>`,`lunch-disbursement-memo`)];
+  case "menu_plan":return [schoolLunchPdfPage(`<div class="school-lunch-centered-title"><h1>แผนรายการอาหารกลางวันโรงเรียน</h1><h2>${escapeHtml(schoolName())}</h2><p>${escapeHtml(schoolLunchRoundTitle(c))} · ${escapeHtml(x.studentText)} · ${escapeHtml(x.range)}</p></div><table class="school-lunch-pdf-table menu"><thead><tr><th style="width:32%">วัน เดือน ปี</th><th>รายการอาหาร</th><th style="width:16%">หมายเหตุ</th></tr></thead><tbody>${x.days.flatMap(day=>{const menus=(day.menu_items||[]).length?day.menu_items:["—"];return menus.map((m,i)=>`<tr><td class="school-lunch-menu-date-cell">${i===0?`${escapeHtml(schoolLunchDayLabel(day.service_date))} ${escapeHtml(thaiDateOnly(day.service_date))}`:""}</td><td>${escapeHtml(m)}</td><td>${i===0?escapeHtml(day.note||"-"):""}</td></tr>`)}).join("")}</tbody></table>`,'lunch-menu-plan')];
+  case "request_attachment":return [schoolLunchPdfPage(`<div class="school-lunch-centered-title"><h2>รายละเอียดแนบท้ายบันทึกข้อความ ลงวันที่ ${escapeHtml(thaiDateOnly(docDate))}</h2><p>งานจัดจ้าง จำนวน 1 รายการ · ${escapeHtml(schoolName())}</p></div>${schoolLunchPdfAttachmentTable(x)}${schoolLunchPdfDailyAmountBreakdown(x)}<div class="school-lunch-pdf-sign-grid two">${schoolLunchPdfPerson(x.roles.procurement_officer,"เจ้าหน้าที่",{position:"",date:orderDate})}${schoolLunchPdfPerson(x.roles.head_officer,"หัวหน้าเจ้าหน้าที่",{position:"",date:orderDate})}</div>`,'lunch-attachment')];
+  case "scope_appointment":return [schoolLunchPdfPage(`${schoolLunchPdfMemoHeader(c,{no:c.appointment_control_no,date:docDate,subject:"ขออนุมัติจัดหาพัสดุ และขออนุมัติแต่งตั้งผู้ร่างขอบข่ายงาน"})}<div class="school-lunch-pdf-body"><p class="indent">ด้วย ${escapeHtml(schoolName())} จะดำเนินงานโครงการ/กิจกรรม <strong>${escapeHtml(c.project_name)}</strong> จึงมีความประสงค์ต้องการให้งานพัสดุดำเนินการจัดหาพัสดุซึ่งมีรายละเอียดตามเอกสารแนบท้าย ดังนั้นเพื่อให้การกำหนดรายละเอียดร่างขอบเขตของงานหรือรายละเอียดคุณลักษณะเฉพาะของพัสดุที่จะต้องซื้อหรือจ้าง รวมทั้งกำหนดหลักเกณฑ์การพิจารณาคัดเลือกข้อเสนอ เป็นไปตามระเบียบกระทรวงการคลังว่าด้วยการจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ พ.ศ. 2560 ข้อ 21 จึงขออนุมัติใช้บันทึกนี้แทนคำสั่งแต่งตั้งผู้ร่างขอบข่ายงาน</p><p class="indent">การดำเนินการซื้อ/จ้างดังกล่าว ประกอบด้วยผู้ร่างขอบข่ายงาน ดังนี้</p><div class="school-lunch-appointed-line"><b>1.</b><span class="name">${schoolLunchPdfText(schoolLunchPersonName(x.roles.scope_writer))}</span><span class="position">${schoolLunchPdfText(schoolLunchPersonPosition(x.roles.scope_writer),"—")}</span><strong>ผู้ร่างขอบข่ายงาน</strong></div><p class="indent">โดยให้มีหน้าที่จัดทำรายละเอียดร่างขอบเขตของงาน/คุณลักษณะเฉพาะ และกำหนดหลักเกณฑ์การพิจารณาคัดเลือกข้อเสนอ โดยให้มีรายละเอียดเป็นไปตามกฎหมาย ระเบียบ และคำสั่งที่เกี่ยวข้อง</p><p class="indent">วงเงินที่จะให้จัดหาในครั้งนี้ ภายในวงเงิน <strong>${schoolLunchPdfMoney(x.amount)}</strong> บาท (${escapeHtml(x.baht)}) เบิกจ่ายจากงบประมาณ ${escapeHtml(c.project_name)}</p><p class="indent">จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ</p>${schoolLunchPdfOfficerHeadDirector(x.roles,{officerLabel:"เจ้าหน้าที่",headLabel:"หัวหน้าเจ้าหน้าที่",directorLabel:`ผู้อำนวยการ${schoolName()}`,date:orderDate,replacePositionWithDate:true,directorPosition:"ผู้อำนวยการสถานศึกษา",directorDate:orderDate})}</div>`,'lunch-scope-appointment')];
+  case "tor":return [schoolLunchPdfPage(`<div class="school-lunch-centered-title"><h1>ขอบเขตของงาน TOR</h1><h2>การจ้างเหมาประกอบอาหารกลางวัน (ปรุงสำเร็จ)</h2><p>${escapeHtml(schoolName())} · ประจำปีการศึกษา ${c.academic_year}</p></div><div class="school-lunch-tor"><h3>1. ความเป็นมา</h3><p>ด้วย ${escapeHtml(schoolName())} มีความประสงค์จะดำเนินการจัดจ้างประกอบอาหารกลางวัน (ปรุงสำเร็จ) สำหรับเด็กนักเรียน เพื่อให้เด็กมีอาหารกลางวันที่เพียงพอ และเพื่อส่งเสริมสุขภาพอนามัยที่สมบูรณ์แข็งแรง เด็กได้รับประทานอาหารที่มีสารอาหารเพียงพอและถูกหลักโภชนาการ</p><h3>2. วัตถุประสงค์</h3><p>เพื่อให้นักเรียนทุกคนได้รับประทานอาหารกลางวันที่สะอาด ถูกอนามัย มีคุณค่าทางโภชนาการครบ 5 หมู่ เหมาะสมต่อความต้องการของร่างกายและมีสุขภาพอนามัยที่ดี</p><h3>3. คุณสมบัติของผู้รับจ้าง</h3><p>3.1 ผู้เสนอราคาต้องเป็นบุคคลธรรมดา หรือนิติบุคคล<br>3.2 ผู้เสนอราคาต้องไม่เป็นผู้ถูกแจ้งเวียนชื่อผู้ทิ้งงานของทางราชการ<br>3.3 ผู้เสนอราคาต้องไม่เป็นผู้เป็นโรคติดต่อที่สามารถแพร่เชื้อสู่ผู้อื่นได้</p><h3>4. ขอบเขตการดำเนินงาน</h3><p>ผู้รับจ้างต้องรับผิดชอบการประกอบอาหารกลางวัน (ปรุงสำเร็จ) ให้แก่นักเรียน ${escapeHtml(schoolName())} ภายในวงเงินไม่เกิน <strong>${schoolLunchPdfMoney(x.amount)}</strong> บาท (${escapeHtml(x.baht)}) โดยจัดอาหารในทุกวันทำการตามแผนรายการอาหารกลางวันที่โรงเรียนกำหนด อาหารต้องสะอาด ถูกสุขอนามัย และมีคุณค่าทางโภชนาการครบ 5 หมู่</p><p>รายการอาหารในแต่ละวัน โรงเรียนจะเป็นผู้กำหนดและแจ้งให้ผู้รับจ้างทราบก่อนถึงวันประกอบอาหาร (ปรุงสำเร็จ) อย่างน้อย 1 วันทำการ โดยเมนูของรอบนี้ประกอบด้วย ${escapeHtml(schoolLunchPdfMenuSummary(c)||"ตามแผนรายการอาหารกลางวันแนบท้าย")}</p><p>ผู้ควบคุม/ผู้ตรวจการประกอบอาหาร: ${escapeHtml(x.supervisors.map(schoolLunchPersonName).join(" · ")||"ตามคำสั่งแต่งตั้ง")}</p><h3>5. การส่งมอบพัสดุ</h3><p>โรงเรียนกำหนดการส่งมอบงานออกเป็นจำนวน 1 งวด ผู้รับจ้างต้องสรุปรายการประกอบอาหารและส่งให้โรงเรียนเพื่อดำเนินการเบิกจ่าย โดยมีกำหนดส่งมอบภายใน <strong>${Number(c.delivery_days||10)}</strong> วัน นับจากวันลงนามในการจ้าง ทั้งนี้ โรงเรียนจะชำระเงินตามที่ได้ประกอบอาหารจริง เมื่อคณะกรรมการตรวจรับพัสดุหรือผู้ตรวจรับพัสดุได้ดำเนินการตรวจรับไว้ถูกต้องครบถ้วนแล้ว</p><h3>6. หลักเกณฑ์การพิจารณาคัดเลือกข้อเสนอ</h3><p>ใช้เกณฑ์ราคา</p><h3>7. วงเงินงบประมาณ</h3><p>ใช้งบประมาณครั้งนี้ <strong>${schoolLunchPdfMoney(x.amount)}</strong> บาท (${escapeHtml(x.baht)})</p><h3>8. เงื่อนไขการชำระเงิน</h3><p>${escapeHtml(schoolName())} กำหนดจ่ายเงินเมื่อผู้รับจ้างได้สรุปรายการประกอบอาหารถูกต้องครบถ้วนเรียบร้อยแล้ว และผ่านการตรวจรับตามระเบียบ</p><div class="school-lunch-pdf-keep-together school-lunch-tor-price-block"><h3>9. ราคากลาง</h3><p>ราคากลางเป็นเงิน <strong>${schoolLunchPdfMoney(x.amount)}</strong> บาท (${escapeHtml(x.baht)})</p></div><div class="school-lunch-pdf-keep-together school-lunch-tor-final-block"><h3>10. ค่าปรับ</h3><p>ค่าปรับ 0.20 (อ้างอิงตามหนังสือคณะกรรมการวินิจฉัยปัญหาการจัดซื้อจ้างจ้างและการบริหารพัสดุภาครัฐ ที่ กค (กวจ) 0505.2/ว 116 ลงวันที่ 12 มีนาคม 2562 เรื่อง แนวทางปฏิบัติในการจัดซื้อวัตถุดิบเพื่อใช้ในการประกอบ อาหาร การจ้างบุคคลเพื่อประกอบอาหารหรือการจ้างเหมาประกอบอาหาร (ปรุงสำเร็จ) ข้อ 4 การกำหนดค่าปรับในสัญญาหรือข้อตกลง</p><div class="school-lunch-pdf-sign-single">${schoolLunchPdfPerson(x.roles.scope_writer,"ผู้ร่างขอบข่ายงาน")}</div></div></div>`,'lunch-tor')];
+  case "inspection_appointment":return [schoolLunchPdfPage(`${schoolLunchPdfGaruda()}<div class="school-lunch-centered-title"><h1>คำสั่ง${escapeHtml(schoolName())}</h1><h2>ที่ ${schoolLunchPdfText(c.appointment_control_no)}</h2><h2>เรื่อง แต่งตั้งผู้ควบคุมและตรวจการประกอบอาหาร และคณะกรรมการผู้ตรวจรับพัสดุ</h2><p>สำหรับการจ้างเหมาประกอบอาหารกลางวัน โดยวิธีเฉพาะเจาะจง</p></div><div class="school-lunch-pdf-body"><p class="indent">ด้วย ${escapeHtml(schoolName())} มีความประสงค์จะจ้างเหมาประกอบอาหารกลางวันนักเรียน (ปรุงสำเร็จ) โดยวิธีเฉพาะเจาะจง และเพื่อให้เป็นไปตามระเบียบกระทรวงการคลังว่าด้วยการจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ พ.ศ. 2560 ประกอบหนังสือคณะกรรมการวินิจฉัยปัญหาการจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ ด่วนที่สุด ที่ กค (กวจ) 0405.2/ว 116 ลงวันที่ 12 มีนาคม 2562 จึงแต่งตั้งผู้มีรายชื่อต่อไปนี้</p><h3>ผู้ควบคุมและตรวจการประกอบอาหาร</h3>${schoolLunchPdfAppointmentList(x.supervisors)}<h3>คณะกรรมการตรวจรับพัสดุ/ผู้ตรวจรับพัสดุ</h3>${schoolLunchPdfAppointmentList(x.committee)}<p>ให้คณะกรรมการตรวจรับพัสดุที่ได้รับแต่งตั้ง ปฏิบัติหน้าที่ตามระเบียบกระทรวงการคลังว่าด้วยการจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ พ.ศ. 2560 ข้อ 175</p><p class="center">ทั้งนี้ ตั้งแต่บัดนี้เป็นต้นไป<br>สั่ง ณ วันที่ ${escapeHtml(thaiDateOnly(c.inspection_appointment_date||docDate))}</p><div class="school-lunch-pdf-sign-single">${schoolLunchPdfPerson(x.roles.director,"ผู้อำนวยการสถานศึกษา",{position:"ผู้อำนวยการสถานศึกษา",date:orderDate})}</div></div>`,'lunch-inspection-appointment')];
+  case "quotation":return [schoolLunchPdfPage(`<div class="school-lunch-centered-title"><h1>ใบเสนอราคา</h1></div><div class="school-lunch-pdf-body"><p><b>เรียน</b> ผู้อำนวยการ${escapeHtml(schoolName())}</p><p>1. ข้าพเจ้า <strong>${schoolLunchPdfText(x.vendor.vendor_name)}</strong> อยู่เลขที่ ${schoolLunchPdfText(x.vendor.address_line1,"—")} ${schoolLunchPdfText(x.vendor.address_line2,"")} โทรศัพท์ ${schoolLunchPdfText(x.vendor.phone,"—")} เลขประจำตัวผู้เสียภาษี ${schoolLunchPdfText(x.vendor.tax_id,"—")}</p><p>ข้าพเจ้าเป็นผู้มีคุณสมบัติครบถ้วนตามที่กำหนด และไม่เป็นผู้ทิ้งงานของทางราชการ</p><p>2. ข้าพเจ้าขอเสนอราคาจ้างเหมาประกอบอาหารกลางวัน (ปรุงสำเร็จ) รวมทั้งบริการและกำหนดเวลาส่งมอบ ดังต่อไปนี้</p>${schoolLunchPdfAttachmentTable(x)}<p>ซึ่งเป็นราคาที่รวมภาษีมูลค่าเพิ่ม รวมทั้งภาษีอากรอื่น และค่าใช้จ่ายทั้งปวงไว้ด้วยแล้ว</p><p>3. คำเสนอนี้จะยืนอยู่ในระยะเวลา <strong>${Number(c.quote_valid_days||10)}</strong> วัน นับแต่วันที่ได้ยื่นใบเสนอราคา</p><p>4. กำหนดส่งมอบงานตามรายละเอียดข้างต้นภายใน <strong>${Number(c.delivery_days||10)}</strong> วัน นับจากวันที่ลงนามจ้าง</p><p class="right">เสนอมา ณ วันที่ ${escapeHtml(thaiDateOnly(c.quote_date||docDate))}</p><div class="school-lunch-pdf-sign-grid two">${schoolLunchPdfPerson(x.roles.procurement_officer,"ผู้เจรจาตกลงราคา",{position:"เจ้าหน้าที่"})}${schoolLunchPdfPerson({name:x.vendor.vendor_name,position:"ผู้เสนอราคา"},"ผู้เสนอราคา")}</div></div>`,'lunch-quotation')];
+  case "order_attachment":return [schoolLunchPdfPage(`<div class="school-lunch-centered-title"><h2>รายละเอียดแนบท้ายใบสั่งจ้าง ลงวันที่ ${escapeHtml(thaiDateOnly(orderDate))}</h2><p>งานจัดจ้าง จำนวน 1 รายการ · ${escapeHtml(schoolName())}</p></div>${schoolLunchPdfAttachmentTable(x)}${schoolLunchPdfDailyAmountBreakdown(x)}<div class="school-lunch-pdf-sign-grid two school-lunch-order-signatures">${schoolLunchPdfPerson(x.roles.procurement_officer,"เจ้าหน้าที่",{position:"",date:orderDate})}${schoolLunchPdfPerson(x.roles.head_officer,"หัวหน้าเจ้าหน้าที่",{position:"",date:orderDate})}</div>`,'lunch-order-attachment')];
+  case "controller_report":return [schoolLunchPdfPage(`<div class="school-lunch-centered-title"><h1>บันทึกรายงานผู้ควบคุมและคณะกรรมการตรวจการประกอบอาหารกลางวัน</h1></div><div class="school-lunch-pdf-meta-right">เขียนที่ ${escapeHtml(schoolName())}<br>วันที่ ${escapeHtml(thaiDateOnly(inspectionDate))}</div><div class="school-lunch-pdf-body"><p>ตามที่ ${escapeHtml(schoolName())} ได้ตกลงจ้าง <strong>${schoolLunchPdfText(x.vendor.vendor_name)}</strong> ประกอบอาหารกลางวัน (ปรุงสำเร็จ) ให้นักเรียนรับประทาน ตามใบสั่งจ้างเลขที่ <strong>${schoolLunchPdfText(c.purchase_order_control_no)}</strong> ลงวันที่ ${escapeHtml(thaiDateOnly(orderDate))}</p><p>บัดนี้ ผู้รับจ้างได้ส่งมอบพัสดุทุกวันตามข้อตกลง ผู้ควบคุม/ผู้ตรวจการประกอบอาหารกลางวัน ขอรายงานผลการดำเนินงาน ดังนี้</p><table class="school-lunch-pdf-table compact school-lunch-controller-table"><thead><tr><th style="width:20%">วัน เดือน ปี</th><th style="width:30%">รายการประกอบอาหารตามขอบเขตงาน TOR</th><th style="width:12%">ผลดำเนินงาน</th><th style="width:38%">ผู้ควบคุม/ผู้ตรวจการ</th></tr></thead><tbody>${schoolLunchPdfDayRows(c,{status:true,sign:"committee"})}</tbody></table><div class="school-lunch-director-opinion"><b>ความเห็นของผู้อำนวยการสถานศึกษา</b><div>☐ ทราบผลการดำเนินการประกอบอาหารกลางวัน</div>${schoolLunchPdfPerson(x.roles.director,"ผู้อำนวยการสถานศึกษา",{position:"ผู้อำนวยการสถานศึกษา"})}</div></div>`,'lunch-controller-report')];
+  case "delivery_note":return [schoolLunchPdfPage(`<div class="school-lunch-centered-title"><h1>ใบส่งมอบงาน</h1></div><div class="school-lunch-pdf-meta-right">เขียนที่ ${escapeHtml(schoolName())}<br>วันที่ ${escapeHtml(thaiDateOnly(deliveryDate))}</div><div class="school-lunch-pdf-body"><p><b>เรื่อง</b> ส่งมอบงานและแจ้งหนี้ขอเบิกเงิน</p><p><b>เรียน</b> ผู้อำนวยการ${escapeHtml(schoolName())}</p><p class="indent">ตามที่ ${escapeHtml(schoolName())} ได้ตกลงให้ข้าพเจ้า <strong>${schoolLunchPdfText(x.vendor.vendor_name)}</strong> ทำการ ${escapeHtml(c.title)} โดยวิธีเฉพาะเจาะจง ตามใบสั่งจ้างเลขที่ <strong>${schoolLunchPdfText(c.purchase_order_control_no)}</strong> ลงวันที่ ${escapeHtml(thaiDateOnly(orderDate))} ในวงเงิน <strong>${schoolLunchPdfMoney(x.amount)}</strong> บาท (${escapeHtml(x.baht)}) นั้น</p><p class="indent">บัดนี้ ข้าพเจ้าได้ปฏิบัติตาม ☑ ใบสั่งจ้าง &nbsp;&nbsp; ☐ บันทึกตกลงจ้าง &nbsp;&nbsp; ☐ สัญญาจ้าง เสร็จเรียบร้อยแล้ว จึงขอส่งมอบงานจ้าง เพื่อตรวจรับและขอเบิกเงิน จำนวน ${schoolLunchPdfMoney(x.amount)} บาท (${escapeHtml(x.baht)}) ต่อไป</p><table class="school-lunch-pdf-table compact school-lunch-delivery-table"><thead><tr><th style="width:25%">วัน เดือน ปี</th><th>รายการอาหาร</th><th style="width:30%">ผู้ส่งมอบงาน</th></tr></thead><tbody>${schoolLunchPdfDayRows(c,{sign:"single"})}</tbody></table><p class="school-lunch-respectful-closing">ขอแสดงความนับถือ</p><div class="school-lunch-pdf-sign-single school-lunch-vendor-signature">${schoolLunchPdfPerson({name:x.vendor.vendor_name,position:"ผู้รับจ้าง"},"ผู้ส่งมอบงาน")}</div></div>`,'lunch-delivery-note')];
+  case "inspection":return [schoolLunchPdfPage(`<div class="school-lunch-centered-title"><h1>ใบตรวจรับพัสดุ</h1><h2>สำหรับการจ้างเหมาประกอบอาหารกลางวัน (ปรุงสำเร็จ)</h2></div><div class="school-lunch-pdf-meta-right">เขียนที่ ${escapeHtml(schoolName())}<br>วันที่ ${escapeHtml(thaiDateOnly(inspectionDate))}</div><div class="school-lunch-pdf-body"><p><b>เรียน</b> ผู้อำนวยการ${escapeHtml(schoolName())}</p><p>ตามที่ ${escapeHtml(schoolName())} ได้ตกลงจ้าง <strong>${schoolLunchPdfText(x.vendor.vendor_name)}</strong> ประกอบอาหารกลางวันให้นักเรียนรับประทาน ตามสัญญา/ใบสั่งซื้อ/ใบสั่งจ้างเลขที่ <strong>${schoolLunchPdfText(c.purchase_order_control_no)}</strong> ลงวันที่ ${escapeHtml(thaiDateOnly(orderDate))} ครบกำหนดส่งมอบวันที่ ${escapeHtml(thaiDateOnly(c.delivery_due_date||c.end_date))}</p><p>บัดนี้ ผู้รับจ้างได้ส่งมอบพัสดุทุกวันตามข้อตกลง คณะกรรมการตรวจรับพัสดุได้ตรวจรับไว้ถูกต้องตามบันทึกข้อตกลงแล้ว ดังนี้</p><table class="school-lunch-pdf-table compact school-lunch-inspection-table"><thead><tr><th style="width:20%">วัน เดือน ปี</th><th style="width:42%">รายการอาหาร</th><th style="width:38%">หมายเหตุ</th></tr></thead><tbody>${schoolLunchPdfDayRows(c,{note:true})}</tbody></table><p>คณะกรรมการตรวจรับพัสดุได้ตรวจรับงานเมื่อวันที่ <strong>${escapeHtml(thaiDateOnly(inspectionDate))}</strong> แล้ว ปรากฏว่างานเสร็จเรียบร้อยถูกต้องตามข้อตกลงทุกประการ เป็นเงิน <strong>${schoolLunchPdfMoney(x.amount)}</strong> บาท (${escapeHtml(x.baht)})</p>${schoolLunchPdfOfficerHeadDirector(x.roles,{officerLabel:"เจ้าหน้าที่พัสดุ",headLabel:"หัวหน้าเจ้าหน้าที่พัสดุ",directorLabel:`ผู้อำนวยการ${schoolName()}`,directorPosition:"ผู้อำนวยการสถานศึกษา",directorDate:orderDate})}</div>`,'lunch-inspection lunch-inspection-one-page')];
+  case "payment_voucher":return [schoolLunchPdfPage(`<div class="school-lunch-centered-title"><h1>ใบสำคัญรับเงิน</h1></div><div class="school-lunch-pdf-meta-right">วันที่ ${escapeHtml(thaiDateOnly(paymentDate))}</div><div class="school-lunch-pdf-body"><p>ข้าพเจ้า <strong>${schoolLunchPdfText(x.vendor.vendor_name)}</strong> อยู่บ้านเลขที่ ${schoolLunchPdfText(x.vendor.address_line1,"—")} ${schoolLunchPdfText(x.vendor.address_line2,"")}</p><p>ได้รับเงินจาก <strong>${escapeHtml(schoolName())}</strong> ดังรายการต่อไปนี้</p><table class="school-lunch-pdf-table"><thead><tr><th style="width:10%">ที่</th><th>รายการ</th><th style="width:24%">จำนวนเงิน</th></tr></thead><tbody><tr><td>1</td><td>ได้รับเงินค่าจ้าง ${escapeHtml(c.title)}<br>${escapeHtml(x.studentText)}<br>${escapeHtml(x.range)}</td><td>${schoolLunchPdfMoney(x.net)}</td></tr><tr class="total"><td colspan="2">รวมเงิน (ตัวอักษร) (${escapeHtml(procurementThaiBahtText(x.net))})</td><td>${schoolLunchPdfMoney(x.net)}</td></tr></tbody></table><div class="school-lunch-pdf-sign-grid two">${schoolLunchPdfPerson({name:x.vendor.vendor_name,position:"ผู้รับเงิน"},"ผู้รับเงิน")}${schoolLunchPdfPerson(x.roles.finance_officer,"เจ้าหน้าที่การเงิน",{position:"เจ้าหน้าที่การเงิน"})}</div></div>`,'lunch-payment-voucher')];
+  default:return [];
+}}
+function schoolLunchPdfBreakPoints(node){
+  const root=node.getBoundingClientRect(),points=[];
+  const selectors="p,h1,h2,h3,li,tr,.school-lunch-centered-title,.school-lunch-pdf-meta-right,.school-lunch-memo-line,.school-lunch-memo-two,.school-lunch-appointed-line,.school-lunch-appointment-row,.school-lunch-pdf-sign-grid,.school-lunch-pdf-sign-single,.school-lunch-signature-hierarchy,.school-lunch-director-opinion,.school-lunch-committee-signatures,.school-lunch-pdf-money-table,.school-lunch-pdf-keep-together";
+  node.querySelectorAll(selectors).forEach(el=>{if(el.closest(".school-lunch-pdf-keep-together")&&!el.classList.contains("school-lunch-pdf-keep-together"))return;const r=el.getBoundingClientRect(),y=r.bottom-root.top;if(Number.isFinite(y)&&y>0)points.push(y);});
+  points.push(node.scrollHeight);
+  return [...new Set(points.map(x=>Math.round(x*10)/10))].sort((a,b)=>a-b);
+}
+function schoolLunchPdfChooseCut(points,start,target,total,pageHeight){
+  if(target>=total-1)return total;
+  const min=start+Math.min(pageHeight*.42,120);
+  const candidates=points.filter(y=>y>min&&y<=target-4);
+  const cut=candidates.length?candidates[candidates.length-1]:target;
+  return cut>start+8?cut:target;
+}
+async function schoolLunchBuildPdf(c,codes){
+  if(!c)throw new Error("ไม่พบรอบเอกสาร");
+  await ensureOfficialPdfFont("16pt");
+  const selected=(codes||SCHOOL_LUNCH_DOCUMENTS.map(x=>x.code));
+  const sources=selected.flatMap(code=>schoolLunchDocumentPages(code,c).map(html=>({code,html})));
+  if(!sources.length)throw new Error("ไม่พบเอกสารสำหรับสร้าง PDF");
+  const host=document.createElement("div");
+  host.className="school-lunch-pdf-host";
+  host.innerHTML=sources.map((x,i)=>`<div class="school-lunch-pdf-source-wrap" data-source-index="${i}" data-doc-code="${escapeHtml(x.code)}">${x.html}</div>`).join("");
+  document.body.appendChild(host);
+  try{
+    await Promise.all([...host.querySelectorAll("img")].map(img=>img.complete?Promise.resolve():new Promise(r=>{img.onload=img.onerror=r;})));
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    const nodes=[...host.querySelectorAll(".school-lunch-pdf-page")];
+    const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4",compress:true});
+    const pageCounts={};
+    let pageCount=0;
+    for(let i=0;i<nodes.length;i++){
+      const node=nodes[i],code=sources[i]?.code||"document",forceOnePage=node.classList.contains("lunch-inspection-one-page");
+      const rect=node.getBoundingClientRect(),widthCss=Math.max(1,rect.width||node.scrollWidth),heightCss=Math.max(1,node.scrollHeight);
+      const canvas=await html2canvas(node,{scale:2.35,useCORS:true,backgroundColor:"#fff",logging:false,width:Math.ceil(widthCss),height:Math.ceil(heightCss),windowWidth:Math.ceil(widthCss),windowHeight:Math.ceil(heightCss)});
+      if(forceOnePage){
+        if(pageCount)pdf.addPage("a4","portrait");
+        const maxW=195,maxH=285,naturalH=heightCss*(maxW/widthCss),fit=Math.min(1,maxH/Math.max(1,naturalH)),drawW=maxW*fit,drawH=naturalH*fit,x=(210-drawW)/2,y=5.5;
+        pdf.addImage(canvas.toDataURL("image/jpeg",.98),"JPEG",x,y,drawW,drawH,undefined,"FAST");
+        pageCount++;pageCounts[code]=(pageCounts[code]||0)+1;
+        continue;
+      }
+      const pageHeightCss=widthCss*(275/185),breakPoints=schoolLunchPdfBreakPoints(node),scaleY=canvas.height/heightCss;
+      let start=0;
+      while(start<heightCss-1){
+        const target=Math.min(heightCss,start+pageHeightCss);
+        const cut=schoolLunchPdfChooseCut(breakPoints,start,target,heightCss,pageHeightCss);
+        const sy=Math.max(0,Math.round(start*scaleY)),ey=Math.min(canvas.height,Math.round(cut*scaleY)),sh=Math.max(1,ey-sy);
+        const slice=document.createElement("canvas");
+        slice.width=canvas.width; slice.height=sh;
+        const ctx=slice.getContext("2d");
+        ctx.fillStyle="#fff";ctx.fillRect(0,0,slice.width,slice.height);
+        ctx.drawImage(canvas,0,sy,canvas.width,sh,0,0,slice.width,sh);
+        if(pageCount)pdf.addPage("a4","portrait");
+        const heightMm=Math.min(275,(cut-start)*(185/widthCss));
+        pdf.addImage(slice.toDataURL("image/jpeg",.98),"JPEG",16,10,185,heightMm,undefined,"FAST");
+        pageCount++; pageCounts[code]=(pageCounts[code]||0)+1;
+        start=cut;
+      }
+    }
+    return {blob:pdf.output("blob"),filename:`อาหารกลางวัน_${schoolLunchSafeFileName(schoolLunchRoundTitle(c))}_${schoolLunchSafeFileName(c.start_date)}.pdf`,pageCount,documentPageCounts:pageCounts};
+  }finally{host.remove();}
+}
+async function schoolLunchOpenPdf(c,code=null){try{const doc=SCHOOL_LUNCH_DOCUMENTS.find(x=>x.code===code),built=await schoolLunchBuildPdf(c,code?[code]:null);openPdfPreviewModal({title:doc?doc.name:`ชุดเอกสารอาหารกลางวัน · ${schoolLunchRoundTitle(c)}`,subtitle:`${schoolLunchRoundDateRange(c)} · ${built.pageCount} หน้า · แบ่งหน้า A4 อัตโนมัติ · ${OFFICIAL_PDF_FONT}`,blob:built.blob,filename:doc?`${schoolLunchSafeFileName(doc.name)}_${schoolLunchSafeFileName(schoolLunchRoundTitle(c))}.pdf`:built.filename});}catch(err){console.error(err);toast("สร้าง PDF ไม่สำเร็จ",err.message||String(err),"error");}}
+
+async function schoolLunchChangeFiscalYear(value){
+  const year=Number(value);
+  if(!Number.isSafeInteger(year)||year<1||year>9999)return toast("ปีงบประมาณไม่ถูกต้อง","กรุณาเลือกปี พ.ศ. ที่เป็นจำนวนเต็ม 1–9999","error");
+  if(year===Number(state.schoolLunchFiscalYear))return;
+  state.schoolLunchFiscalYear=year;
+  state.selectedSchoolLunchRoundId=null;
+  await loadSchoolLunchWorkspace();
+  renderDashboard();
+}
+function bindSchoolLunchEvents(){
+  document.querySelector("#school-lunch-year")?.addEventListener("change",e=>schoolLunchChangeFiscalYear(e.currentTarget.value));
+  document.querySelector("#school-lunch-year-prev")?.addEventListener("click",()=>schoolLunchChangeFiscalYear(Number(state.schoolLunchFiscalYear||schoolLunchCurrentFiscalYear())-1));
+  document.querySelector("#school-lunch-year-next")?.addEventListener("click",()=>schoolLunchChangeFiscalYear(Number(state.schoolLunchFiscalYear||schoolLunchCurrentFiscalYear())+1));document.querySelector("#school-lunch-status")?.addEventListener("change",e=>{state.schoolLunchStatusFilter=e.currentTarget.value;renderDashboard();});document.querySelector("#school-lunch-search")?.addEventListener("input",e=>{state.schoolLunchSearch=e.currentTarget.value;clearTimeout(bindSchoolLunchEvents._t);bindSchoolLunchEvents._t=setTimeout(()=>renderDashboard(),180);});document.querySelector("#school-lunch-create")?.addEventListener("click",()=>schoolLunchRoundFormModal());document.querySelector("#school-lunch-settings")?.addEventListener("click",schoolLunchSettingsModal);document.querySelector("#school-lunch-permissions")?.addEventListener("click",()=>procurementSettingsModal("permissions"));document.querySelector("#school-lunch-vendors")?.addEventListener("click",schoolLunchVendorRegistryModal);document.querySelectorAll("[data-school-lunch-select]").forEach(b=>b.addEventListener("click",()=>{state.selectedSchoolLunchRoundId=b.dataset.schoolLunchSelect;renderDashboard();if(window.innerWidth<=860)requestAnimationFrame(()=>document.querySelector(".school-lunch-detail-wrap")?.scrollIntoView({behavior:"smooth",block:"start"}));}));document.querySelectorAll("[data-school-lunch-edit]").forEach(b=>b.addEventListener("click",()=>{const c=schoolLunchRoundById(b.dataset.schoolLunchEdit);if(c)schoolLunchRoundFormModal(c);}));document.querySelectorAll("[data-school-lunch-roles]").forEach(b=>b.addEventListener("click",()=>{const c=schoolLunchRoundById(b.dataset.schoolLunchRoles);if(c)schoolLunchRolesModal(c);}));document.querySelectorAll("[data-school-lunch-pdf]").forEach(b=>b.addEventListener("click",()=>{const c=schoolLunchRoundById(b.dataset.roundId);if(c)schoolLunchOpenPdf(c,b.dataset.schoolLunchPdf);}));document.querySelectorAll("[data-school-lunch-export-all]").forEach(b=>b.addEventListener("click",()=>{const c=schoolLunchRoundById(b.dataset.schoolLunchExportAll);if(c)schoolLunchOpenPdf(c);}));document.querySelectorAll("[data-school-lunch-cancel]").forEach(b=>b.addEventListener("click",()=>{const c=schoolLunchRoundById(b.dataset.schoolLunchCancel);if(c)schoolLunchCancelRound(c);}));}
+
+
+// ===== BNK School OS v5.12.9.7 · General Administration: Housing Electricity =====
+const ELECTRICITY_STATUS={reading_submitted:'รอตรวจเลขมิเตอร์',reading_rejected:'แก้ไขเลขมิเตอร์',awaiting_payment:'รอชำระเงิน',payment_submitted:'รอตรวจสลิป',payment_rejected:'แก้ไขการชำระ',paid:'ชำระแล้ว'};
+function electricityManagerUi(){return isSuperAdminUser()||state.electricitySettings?.manager_user_id===state.user?.id;}
+function electricityMonthLabel(x){if(!x)return '—';return new Intl.DateTimeFormat('th-TH',{year:'numeric',month:'long'}).format(new Date(`${x.slice(0,10)}T12:00:00`));}
+function electricityMyName(m){return m.occupant_user_id?(state.electricityStaff||[]).find(x=>x.id===m.occupant_user_id)?.full_name||m.occupant_name||'บุคลากร':m.occupant_name||'บันทึกโดยผู้รับผิดชอบ';}
+function electricityPeriod(){return (state.electricityPeriods||[]).find(x=>x.id===state.electricityPeriodId)||null;}
+function electricityReadFor(meterId,periodId=state.electricityPeriodId){return (state.electricityReadings||[]).find(r=>r.meter_id===meterId&&r.period_id===periodId)||null;}
+function electricityPrevious(meterId,periodId){const m=(state.electricityMeters||[]).find(x=>x.id===meterId),p=(state.electricityPeriods||[]).find(x=>x.id===periodId);if(!m||!p)return 0;const rows=(state.electricityReadings||[]).filter(r=>r.meter_id===meterId&&['awaiting_payment','payment_submitted','payment_rejected','paid'].includes(r.status)&&((state.electricityPeriods||[]).find(y=>y.id===r.period_id)?.billing_month||'9999')<p.billing_month).sort((a,b)=>String((state.electricityPeriods||[]).find(y=>y.id===b.period_id)?.billing_month||'').localeCompare(String((state.electricityPeriods||[]).find(y=>y.id===a.period_id)?.billing_month||'')));return Number(rows[0]?.current_reading??m.opening_reading??0);}
+async function loadElectricityWorkspace(){
+ state.electricityError='';
+ try{
+  const setting=await supabase.from('electricity_settings').select('*').eq('id',1).maybeSingle();
+  if(setting.error)throw setting.error;
+  state.electricitySettings=setting.data||null;
+  const mgr=electricityManagerUi();
+  const queries=[supabase.from('electricity_meters').select('*').order('house_label'),supabase.from('electricity_periods').select('*').order('billing_month',{ascending:false}),supabase.from('electricity_readings').select('*').order('created_at',{ascending:false})];
+  if(mgr)queries.push(supabase.from('profiles').select('id,full_name,role,account_status').eq('account_status','active').is('deleted_at',null).order('full_name'));
+  const responses=await Promise.all(queries);
+  for(const res of responses)if(res.error)throw res.error;
+  state.electricityMeters=responses[0].data||[];state.electricityPeriods=responses[1].data||[];
+  state.electricityReadings=responses[2].data||[];state.electricityStaff=mgr?(responses[3].data||[]):[];
+  if(!state.electricityPeriods.some(p=>p.id===state.electricityPeriodId))state.electricityPeriodId=state.electricityPeriods[0]?.id||null;
+ }catch(e){console.error('Electricity workspace',e);state.electricityError=e.message||String(e);}
+}
+function electricityStatusBadge(status){const cl=status==='paid'?'paid':status?.includes('rejected')?'rejected':status==='awaiting_payment'?'pay':'pending';return `<span class="el-badge ${cl}">${escapeHtml(ELECTRICITY_STATUS[status]||'ยังไม่แจ้ง')}</span>`;}
+function electricityActionButtons(r){if(!r)return '';
+ const manager=electricityManagerUi();let html='';
+ if(['reading_submitted','reading_rejected'].includes(r.status))html+=`<button class="btn btn-ghost" data-el-reading="${r.meter_id}" data-el-reading-period="${r.period_id}">${manager?'บันทึก/แก้ไข':'แก้ไขเลขมิเตอร์'}</button>`;
+ if(r.status==='reading_submitted'&&manager)html+=`<button class="btn btn-primary" data-el-review-reading="${r.id}">ตรวจเลขมิเตอร์</button>`;
+ if(['awaiting_payment','payment_rejected'].includes(r.status))html+=`<button class="btn btn-primary" data-el-slip="${r.id}">แนบสลิป</button>`;
+ if(r.status==='payment_submitted'&&manager)html+=`<button class="btn btn-primary" data-el-review-payment="${r.id}">ตรวจชำระ</button>`;
+ if(r.meter_photo_path)html+=`<button class="btn btn-ghost" data-el-evidence="${escapeHtml(r.meter_photo_path)}">รูปมิเตอร์</button>`;
+ if(r.payment_slip_path)html+=`<button class="btn btn-ghost" data-el-evidence="${escapeHtml(r.payment_slip_path)}">สลิป</button>`;
+ if(r.status==='paid')html+=`<button class="btn btn-secondary" data-el-receipt="${r.id}">ใบรับชำระ PDF</button>`;
+ return html;
+}
+function electricityWorkspaceHtml(){
+ if(state.electricityError)return `<section class="panel"><div class="empty"><strong>ยังเปิดระบบค่าไฟฟ้าบ้านพักไม่ได้</strong><span>${escapeHtml(state.electricityError)}</span><small>ตรวจสอบว่าได้ติดตั้ง supabase-v5.12.9.7-housing-electricity.sql แล้ว</small></div></section>`;
+ const mgr=electricityManagerUi(),p=electricityPeriod(),meters=state.electricityMeters||[],readings=state.electricityReadings||[],current=readings.filter(r=>r.period_id===p?.id),total=current.reduce((s,r)=>s+Number(r.amount_due||0),0),paid=current.filter(r=>r.status==='paid').reduce((s,r)=>s+Number(r.amount_due||0),0),pending=meters.filter(m=>m.is_active&&!current.some(r=>r.meter_id===m.id)).length;
+ const tabs=mgr?[['dashboard','ภาพรวม/ตรวจสอบ'],['meters','ทะเบียนมิเตอร์'],['settings','ตั้งค่า'],['history','ประวัติและรายงาน']]:[['mine','มิเตอร์ของฉัน'],['history','ประวัติและใบรับชำระ']];
+ let tab=state.electricityTab;if(!tabs.some(x=>x[0]===tab))tab=tabs[0][0];
+ const bank=state.electricitySettings||{};
+ const header=`<section class="el-hero"><div><span class="el-eyebrow">General Administration · Staff Housing</span><h2>⚡ ระบบจัดการค่าไฟฟ้าบ้านพักบุคลากร</h2><p>${mgr?'ตรวจเลขมิเตอร์ · ตรวจหลักฐานชำระ · ออกเอกสาร · ดูภาพรวมโรงเรียน':'จดมิเตอร์จากภาพจริง · ตรวจยอดชำระ · ส่งหลักฐานโอนเงิน · รับเอกสาร'}</p></div><div class="el-hero-side">${mgr?`<strong>ผู้ดูแลระบบ</strong><span>ผู้รับผิดชอบงานค่าไฟฟ้า / แอดมินหลัก</span>`:`<strong>พื้นที่ของฉัน</strong><span>แสดงข้อมูลมิเตอร์เฉพาะที่ได้รับมอบหมาย</span>`}</div></section>`;
+ const toolbar=`<div class="el-toolbar">${tabs.map(([code,label])=>`<button class="el-tab ${tab===code?'active':''}" data-el-tab="${code}">${label}</button>`).join('')}<span class="el-grow"></span><button class="btn btn-ghost" id="el-refresh">↻ รีเฟรช</button></div>`;
+ if(!mgr&&!meters.length&&!readings.length)return `<div class="el-workspace">${header}${toolbar}<section class="panel"><div class="empty"><strong>ยังไม่ได้ลงทะเบียนมิเตอร์ในบัญชีของคุณ</strong><span>กรุณาให้ผู้รับผิดชอบงานเพิ่มบ้านพักและกำหนดผู้ใช้งานมิเตอร์ก่อน</span></div></section></div>`;
+ if(mgr&&tab==='settings')return `<div class="el-workspace">${header}${toolbar}${electricitySettingsHtml()}</div>`;
+ if(mgr&&tab==='meters')return `<div class="el-workspace">${header}${toolbar}<section class="panel"><div class="el-section-head"><div><h3>ทะเบียนบ้านพักและมิเตอร์</h3><p>บุคลากรมีมิเตอร์ประจำบ้านแยกกัน · ผู้ไม่มีบัญชีให้ผู้รับผิดชอบบันทึกแทน</p></div><button class="btn btn-primary" id="el-add-meter">＋ เพิ่มมิเตอร์</button></div><div class="table-wrap"><table class="table"><thead><tr><th>รหัสมิเตอร์</th><th>บ้านพัก</th><th>ผู้รับผิดชอบ</th><th>เลขเริ่มต้น</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>${meters.map(m=>`<tr><td><strong>${escapeHtml(m.meter_code)}</strong></td><td>${escapeHtml(m.house_label)}</td><td>${escapeHtml(electricityMyName(m))}</td><td>${money(m.opening_reading)}</td><td>${m.is_active?'ใช้งาน':'ระงับ'}</td><td><button class="btn btn-ghost" data-el-edit-meter="${m.id}">แก้ไข</button></td></tr>`).join('')||'<tr><td colspan="6">ยังไม่มีมิเตอร์</td></tr>'}</tbody></table></div></section></div>`;
+ if(tab==='history')return `<div class="el-workspace">${header}${toolbar}<section class="panel"><div class="el-section-head"><div><h3>ประวัติค่าไฟฟ้าและใบรับชำระ</h3><p>ดูรายการย้อนหลัง โดยไม่มีการเปลี่ยนยอดค่าไฟย้อนหลัง</p></div>${mgr?`<div class="el-card-actions"><select class="select" id="el-period-select" aria-label="เดือนที่ออกรายงาน">${(state.electricityPeriods||[]).map(y=>`<option value="${y.id}" ${y.id===state.electricityPeriodId?"selected":""}>${electricityMonthLabel(y.billing_month)}</option>`).join("")}</select><button class="btn btn-ghost" id="el-summary-pdf">รายงานรอบเดือน PDF</button><button class="btn btn-secondary" id="el-export-csv">ส่งออก CSV</button></div>`:""}</div>${electricityRowsTable(readings,true)}</section></div>`;
+ const periodControl=`<div class="el-period-select"><label>รอบค่าไฟฟ้า</label><select class="select" id="el-period-select">${(state.electricityPeriods||[]).map(y=>`<option value="${y.id}" ${y.id===p?.id?'selected':''}>${electricityMonthLabel(y.billing_month)} · ${Number(y.unit_rate).toFixed(2)} บาท/หน่วย ${y.status==='closed'?'(ปิดรอบ)':''}</option>`).join('')}</select>${mgr?'<button class="btn btn-primary" id="el-open-period">＋ เปิดรอบเดือน</button>':''}</div>`;
+ const cards=`<section class="el-stats">${[['มิเตอร์ใช้งาน',meters.filter(m=>m.is_active).length,'หลัง'],['แจ้งมิเตอร์แล้ว',current.length,'รายการ'],['ยังไม่ส่งมิเตอร์',pending,'หลัง'],['ยอดที่เรียกเก็บ',money(total),'บาท'],['รับชำระแล้ว',money(paid),'บาท']].map(([label,value,unit])=>`<div class="el-stat"><span>${label}</span><strong>${value}</strong><small>${unit}</small></div>`).join('')}</section>`;
+ const list=mgr?meters.map(m=>({meter:m,reading:current.find(r=>r.meter_id===m.id)})):meters.map(m=>({meter:m,reading:current.find(r=>r.meter_id===m.id)}));
+ const details=p?`<section class="panel"><div class="el-section-head"><div><h3>${mgr?'ติดตามและตรวจสอบค่าไฟฟ้า':'บันทึกมิเตอร์และชำระค่าไฟ'}</h3><p>${mgr?'สถานะแจ้งเลขมิเตอร์และการชำระของบุคลากรในโรงเรียน':'เลขเริ่มต้นถูกดึงอัตโนมัติจากเดือนที่ตรวจสอบแล้ว'}</p></div></div><div class="el-list">${list.map(({meter:m,reading:r})=>`<article class="el-person-card"><div class="el-person-icon">⚡</div><div class="el-person-info"><strong>${escapeHtml(m.house_label)} · ${escapeHtml(m.meter_code)}</strong><span>${mgr?escapeHtml(electricityMyName(m))+' · ':''}ก่อนหน้า ${money(r?.previous_reading??electricityPrevious(m.id,p.id))} ${r?` → ปัจจุบัน ${money(r.current_reading)} · ${money(r.used_units)} หน่วย`:'· ยังไม่ส่งมิเตอร์'}</span>${r?.review_note?`<small class="el-note">หมายเหตุ: ${escapeHtml(r.review_note)}</small>`:''}</div><div class="el-person-amount"><strong>${r?money(r.amount_due)+' ฿':'—'}</strong>${r?electricityStatusBadge(r.status):'<span class="el-badge pending">ยังไม่แจ้ง</span>'}</div><div class="el-card-actions">${r?electricityActionButtons(r):(p.status==='open'&&m.is_active?`<button class="btn btn-primary" data-el-reading="${m.id}">＋ จดเลขมิเตอร์</button>`:'')}</div></article>`).join('')||'<div class="empty"><strong>ยังไม่มีบ้านพัก/มิเตอร์ในระบบ</strong></div>'}</div></section>`:`<section class="panel"><div class="empty"><strong>ยังไม่มีรอบค่าไฟฟ้า</strong><span>${mgr?'กรุณาเปิดรอบเดือนก่อนให้บุคลากรบันทึก':'รอผู้รับผิดชอบเปิดรอบค่าไฟฟ้า'}</span></div></section>`;
+ const bankBox=!mgr?`<section class="el-bank"><div><strong>บัญชีรับชำระค่าไฟฟ้า</strong><span>${escapeHtml(bank.bank_name||'ยังไม่ตั้งค่าธนาคาร')}</span><b>${escapeHtml(bank.bank_account_no||'—')}</b><span>${escapeHtml(bank.bank_account_name||'')}</span></div><small>กรุณารอผู้รับผิดชอบตรวจเลขมิเตอร์ก่อนโอนเงิน · แนบสลิปหลังชำระ${p?.due_date?' · กำหนดชำระ '+thaiDateCompact(p.due_date):''}</small></section>`:'';
+ return `<div class="el-workspace">${header}${toolbar}${periodControl}${cards}${bankBox}${details}</div>`;
+}
+function electricityRowsTable(rows){const mgr=electricityManagerUi(), sorted=[...rows].sort((a,b)=>String((state.electricityPeriods||[]).find(p=>p.id===b.period_id)?.billing_month||'').localeCompare(String((state.electricityPeriods||[]).find(p=>p.id===a.period_id)?.billing_month||'')));return `<div class="table-wrap"><table class="table"><thead><tr><th>รอบเดือน</th><th>บ้านพัก / ผู้จ่าย</th><th>หน่วยไฟ</th><th>ยอดเงิน</th><th>สถานะ</th><th>หลักฐาน / เอกสาร</th></tr></thead><tbody>${sorted.map(r=>`<tr><td>${electricityMonthLabel(state.electricityPeriods.find(p=>p.id===r.period_id)?.billing_month||'')}</td><td>${escapeHtml(r.house_label_snapshot)}${mgr?'<br><small>'+escapeHtml(r.payer_name_snapshot)+'</small>':''}</td><td>${money(r.used_units)}</td><td>${money(r.amount_due)} บาท</td><td>${electricityStatusBadge(r.status)}${r.receipt_no?`<br><small>${escapeHtml(r.receipt_no)}</small>`:""}</td><td><div class="el-card-actions">${electricityActionButtons(r)}</div></td></tr>`).join('')||'<tr><td colspan="6">ยังไม่มีรายการย้อนหลัง</td></tr>'}</tbody></table></div>`;}
+function electricitySettingsHtml(){const s=state.electricitySettings||{};return `<section class="panel"><div class="el-section-head"><div><h3>ตั้งค่าระบบค่าไฟฟ้า</h3><p>อัตรารอบเดือนที่เปิดแล้วจะไม่เปลี่ยนเมื่อแก้ค่าตั้งต้น</p></div></div><form id="el-settings-form" class="form-grid"><div class="form-row"><div class="field"><label>ผู้รับผิดชอบงานค่าไฟฟ้า (1 คน)</label><select class="select" name="manager_id" ${!isSuperAdminUser()?'disabled':''}><option value="">— ยังไม่แต่งตั้ง —</option>${(state.electricityStaff||[]).map(p=>`<option value="${p.id}" ${p.id===s.manager_user_id?'selected':''}>${escapeHtml(p.full_name||'ไม่ระบุชื่อ')} (${escapeHtml(p.role)})</option>`).join('')}</select></div><div class="field"><label>ราคาเริ่มต้นต่อหน่วย (บาท)</label><input class="input" type="number" name="rate" min="0" max="1000" step="0.0001" required value="${Number(s.default_rate||0)}"></div></div><div class="form-row"><div class="field"><label>ธนาคาร</label><input class="input" name="bank" value="${escapeHtml(s.bank_name||'')}"></div><div class="field"><label>ชื่อบัญชีรับเงิน</label><input class="input" name="account_name" value="${escapeHtml(s.bank_account_name||'')}"></div></div><div class="form-row"><div class="field"><label>เลขบัญชี</label><input class="input" name="account_no" value="${escapeHtml(s.bank_account_no||'')}"></div><div class="field"><label>ชื่อผู้รับเงินที่แสดงในใบรับชำระ</label><input class="input" name="signatory" value="${escapeHtml(s.receipt_signatory||'')}"></div></div><div class="field"><label>คำแนะนำการชำระเงิน</label><textarea class="input" name="instructions" rows="3">${escapeHtml(s.payment_instructions||'')}</textarea></div><div class="el-form-footer"><small>แอดมินหลักเท่านั้นที่แต่งตั้งหรือเปลี่ยนผู้รับผิดชอบได้</small><button type="submit" class="btn btn-primary">บันทึกการตั้งค่า</button></div></form></section>`;}
+function electricityOpenModal(title,body,onSubmit){const modal=document.createElement('div');modal.className='modal-backdrop';modal.innerHTML=`<div class="modal modal-wide el-modal"><div class="modal-head"><div><h3>${escapeHtml(title)}</h3></div><button type="button" class="modal-close" aria-label="ปิด">×</button></div><form class="form-grid" id="el-modal-form">${body}<div class="modal-actions"><button type="button" class="btn btn-ghost modal-cancel">ยกเลิก</button><button type="submit" class="btn btn-primary">บันทึก / ยืนยัน</button></div></form></div>`;document.body.appendChild(modal);const close=()=>modal.remove();modal.querySelector('.modal-close').onclick=close;modal.querySelector('.modal-cancel').onclick=close;modal.addEventListener('click',e=>{if(e.target===modal)close()});modal.querySelector('form').addEventListener('submit',async e=>{e.preventDefault();const btn=modal.querySelector('button[type=submit]');buttonLoading(btn,true,'กำลังบันทึก...');try{await onSubmit(modal.querySelector('form'));close();await loadElectricityWorkspace();await renderDashboard();toast('บันทึกเรียบร้อย','','success');}catch(err){toast('บันทึกไม่สำเร็จ',err.message||String(err),'error');buttonLoading(btn,false);}});return modal;}
+async function electricityRpc(name,args){const {data,error}=await supabase.rpc(name,args);if(error)throw error;return data;}
+function electricityMeterModal(id=null){if(!electricityManagerUi())return;const m=state.electricityMeters.find(x=>x.id===id)||{};electricityOpenModal(id?'แก้ไขทะเบียนมิเตอร์':'เพิ่มบ้านพักและมิเตอร์',`<div class="form-row"><div class="field"><label>รหัสมิเตอร์</label><input class="input" name="code" required maxlength="80" value="${escapeHtml(m.meter_code||'')}"></div><div class="field"><label>บ้านพัก / เลขห้อง</label><input class="input" name="house" required maxlength="160" value="${escapeHtml(m.house_label||'')}"></div></div><div class="field"><label>บุคลากรที่รับผิดชอบมิเตอร์ (หากไม่มีบัญชีให้เลือก — )</label><select class="select" name="occupant"><option value="">— บันทึกแทนโดยผู้รับผิดชอบ —</option>${(state.electricityStaff||[]).map(p=>`<option value="${p.id}" ${p.id===m.occupant_user_id?'selected':''}>${escapeHtml(p.full_name||p.id)}</option>`).join('')}</select></div><div class="form-row"><div class="field"><label>ชื่อผู้พักอาศัย / ผู้ชำระ</label><input class="input" name="name" maxlength="180" value="${escapeHtml(m.occupant_name||'')}"></div><div class="field"><label>เลขมิเตอร์ตั้งต้น (มิเตอร์ใหม่ใส่ 0)</label><input class="input" type="number" name="opening" step="0.01" min="0" required value="${Number(m.opening_reading??0)}"></div></div><label class="el-checkbox"><input type="checkbox" name="active" ${m.is_active===false?'':'checked'}> ใช้งานมิเตอร์นี้</label><p class="helper">เมื่อมีประวัติค่าไฟแล้ว ไม่อนุญาตให้เปลี่ยนเจ้าของมิเตอร์หรือเลขเริ่มต้นย้อนหลัง หากเปลี่ยนผู้พักอาศัยให้สร้างทะเบียนมิเตอร์ใหม่</p>`,async f=>electricityRpc('electricity_save_meter',{p_id:id,p_meter_code:f.code.value,p_house_label:f.house.value,p_occupant_user_id:f.occupant.value||null,p_occupant_name:f.elements.name.value,p_opening_reading:Number(f.opening.value),p_is_active:f.active.checked}));}
+function electricityOpenPeriodModal(){if(!electricityManagerUi())return;const now=new Date(),thisMonth=new Date(now.getFullYear(),now.getMonth(),1),next=new Date(thisMonth.getFullYear(),thisMonth.getMonth()+1,1),iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;electricityOpenModal('เปิดรอบเรียกเก็บค่าไฟรายเดือน',`<div class="form-row"><div class="field"><label>เดือนที่คิดค่าไฟ</label><input class="input" name="month" type="month" required value="${iso(thisMonth).slice(0,7)}"></div><div class="field"><label>อัตราค่าไฟ (บาท/หน่วย)</label><input class="input" name="rate" type="number" min="0.0001" max="1000" step="0.0001" required value="${Number(state.electricitySettings?.default_rate??0)}"></div></div><div class="field"><label>ครบกำหนดชำระ (ไม่บังคับ)</label><input class="input" name="due" type="date"></div><p class="helper">เมื่อเปิดรอบแล้ว อัตราค่าไฟจะถูกเก็บแยกตามเดือน ไม่เปลี่ยนย้อนหลัง</p>`,async f=>electricityRpc('electricity_open_period',{p_billing_month:f.month.value+'-01',p_rate:Number(f.rate.value),p_due_date:f.due.value||null}));}
+async function electricityUploadEvidence(file,kind){const accept={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};if(!file||!accept[file.type]||file.size>8*1024*1024)throw Error('กรุณาแนบรูป JPEG, PNG หรือ WEBP ขนาดไม่เกิน 8 MB');const path=`${state.user.id}/${kind}/${crypto.randomUUID()}.${accept[file.type]}`;const {error}=await supabase.storage.from('electricity-evidence').upload(path,file,{contentType:file.type,upsert:false,cacheControl:'3600'});if(error)throw error;return path;}
+function electricityReadingModal(meterId){const m=state.electricityMeters.find(x=>x.id===meterId),p=electricityPeriod();if(!m||!p||p.status!=='open')return toast('บันทึกไม่ได้','ยังไม่ได้เปิดรอบหรือปิดรอบแล้ว','error');const old=electricityReadFor(meterId,p.id),prev=old?.previous_reading??electricityPrevious(meterId,p.id);const modal=electricityOpenModal('จดมิเตอร์ · '+m.house_label,`<div class="el-reading-grid"><div><span>เลขมิเตอร์ก่อนหน้า</span><strong>${money(prev)}</strong></div><div><span>ราคาเดือนนี้</span><strong>${Number(p.unit_rate).toFixed(4)} บาท/หน่วย</strong></div></div><div class="field"><label>เลขมิเตอร์ล่าสุด</label><input class="input" type="number" id="el-current-reading" name="current" step="0.01" min="${Number(prev)}" required value="${old?.current_reading??''}" placeholder="อ่านจากหน้ามิเตอร์ปัจจุบัน"></div><div class="el-live"><span>หน่วยที่ใช้ <b id="el-units-now">—</b> หน่วย</span><strong id="el-amount-now">— บาท</strong></div><div class="field"><label>รูปภาพหน้ามิเตอร์ล่าสุด (บังคับทุกครั้ง)</label><input class="input" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required><small class="helper">แนบภาพให้เห็นเลขชัดเจนก่อนส่งตรวจสอบ · ไม่เกิน 8 MB</small></div>`,async f=>{const val=Number(f.current.value);if(!Number.isFinite(val)||val<Number(prev))throw Error('เลขมิเตอร์ต้องไม่น้อยกว่าเดือนก่อน');const path=await electricityUploadEvidence(f.photo.files[0],'meter');await electricityRpc('electricity_submit_reading',{p_meter_id:m.id,p_period_id:p.id,p_current:val,p_photo_path:path});});const input=modal.querySelector('#el-current-reading');input.addEventListener('input',()=>{const cur=Number(input.value),valid=input.value.trim()&&Number.isFinite(cur)&&cur>=Number(prev);modal.querySelector('#el-units-now').textContent=valid?money(cur-Number(prev)):'—';modal.querySelector('#el-amount-now').textContent=valid?money((cur-Number(prev))*Number(p.unit_rate))+' บาท':'— บาท';});input.dispatchEvent(new Event('input'));}
+function electricityPaymentModal(readingId){const r=state.electricityReadings.find(x=>x.id===readingId),s=state.electricitySettings||{};if(!r||!['awaiting_payment','payment_rejected'].includes(r.status))return;if(!s.bank_name?.trim()||!s.bank_account_no?.trim()||!s.bank_account_name?.trim())return toast('ยังไม่มีบัญชีรับชำระ','กรุณาให้ผู้รับผิดชอบตั้งค่าธนาคาร ชื่อบัญชี และเลขบัญชีก่อนส่งสลิป','error');electricityOpenModal('ส่งหลักฐานชำระค่าไฟฟ้า',`<section class="el-bank"><strong>ยอดที่ต้องชำระ ${money(r.amount_due)} บาท</strong><p>${escapeHtml(s.bank_name||'ยังไม่ตั้งค่าบัญชีธนาคาร')}</p><b>${escapeHtml(s.bank_account_no||'—')}</b><span>${escapeHtml(s.bank_account_name||'')}</span><small>${escapeHtml(s.payment_instructions||'')}</small></section><div class="field"><label>แนบสลิปโอนเงิน (บังคับ)</label><input class="input" type="file" name="slip" accept="image/jpeg,image/png,image/webp" required><small class="helper">การแนบสลิปยังไม่ใช่การยืนยันว่าเงินเข้าบัญชี ผู้รับผิดชอบจะต้องตรวจรับเงินอีกครั้ง</small></div>`,async f=>{const path=await electricityUploadEvidence(f.slip.files[0],'slip');await electricityRpc('electricity_submit_payment',{p_reading_id:r.id,p_slip_path:path});});}
+function electricityReviewModal(id,kind){if(!electricityManagerUi())return;const r=state.electricityReadings.find(x=>x.id===id);if(!r)return;const isPayment=kind==='payment',title=isPayment?'ตรวจหลักฐานและยืนยันรับเงิน':'ตรวจเลขมิเตอร์';const modal=electricityOpenModal(title,`<div class="el-reading-grid"><div><span>เลขมิเตอร์ก่อนหน้า</span><strong>${money(r.previous_reading)}</strong></div><div><span>เลขมิเตอร์ปัจจุบัน</span><strong>${money(r.current_reading)}</strong></div><div><span>ใช้ไฟฟ้า</span><strong>${money(r.used_units)} หน่วย</strong></div><div><span>จำนวนเงิน</span><strong>${money(r.amount_due)} บาท</strong></div></div><div class="el-form-footer"><button class="btn btn-ghost" type="button" id="el-inspect-image">เปิด${isPayment?'สลิปโอนเงิน':'ภาพหน้ามิเตอร์'}เพื่อตรวจ</button></div><div class="field"><label>ผลการตรวจสอบ</label><select class="select" name="decision"><option value="approve">${isPayment?'ยืนยันว่ารับเงินจริงแล้ว':'ยืนยันเลขมิเตอร์และยอดเงิน'}</option><option value="reject">ส่งกลับให้แก้ไข</option></select></div><div class="field"><label>หมายเหตุ / เหตุผลที่ให้แก้ไข</label><textarea class="input" name="note" rows="3" maxlength="1000"></textarea></div><p class="helper">${isPayment?'กรุณาตรวจสอบยอดเงินจริงกับบัญชีโรงเรียน ไม่ใช่ตรวจเพียงภาพสลิป':'เมื่อยืนยันแล้วระบบจะเปิดให้ครูส่งสลิปชำระเงิน'}</p>`,async f=>electricityRpc(isPayment?'electricity_review_payment':'electricity_review_reading',{p_reading_id:r.id,p_approve:f.decision.value==='approve',p_note:f.note.value.trim()}));modal.querySelector('#el-inspect-image').onclick=()=>electricityEvidencePreview(isPayment?r.payment_slip_path:r.meter_photo_path);}
+async function electricityEvidencePreview(path){if(!path)return;const {data,error}=await supabase.storage.from('electricity-evidence').createSignedUrl(path,300);if(error)return toast('เปิดรูปภาพไม่ได้',error.message,'error');window.open(data.signedUrl,'_blank','noopener,noreferrer');}
+function electricityReceiptPreview(id){const r=state.electricityReadings.find(x=>x.id===id);if(!r||r.status!=='paid'||!r.receipt_no)return toast('ยังออกใบรับชำระไม่ได้','ต้องตรวจรับเงินจริงแล้วก่อน','error');const p=state.electricityPeriods.find(x=>x.id===r.period_id),s=state.electricitySettings||{},title=`ใบรับชำระค่าไฟฟ้า ${r.receipt_no}`,body=`<article class="el-receipt-paper"><h2>${escapeHtml(schoolName())}</h2><p>${escapeHtml(schoolAddress())}</p><h1>ใบรับชำระค่าไฟฟ้าบ้านพักบุคลากร</h1><div class="el-receipt-meta"><div>เลขที่: <strong>${escapeHtml(r.receipt_no)}</strong></div><div>รับชำระวันที่: ${thaiDateCompact(r.paid_at)}</div></div><div class="el-receipt-detail"><div>ได้รับชำระจาก: ${escapeHtml(r.payer_name_snapshot)}</div><div>บ้านพัก: ${escapeHtml(r.house_label_snapshot)} · มิเตอร์ ${escapeHtml(r.meter_code_snapshot)}</div><div>ค่าไฟฟ้าประจำเดือน: ${electricityMonthLabel(p?.billing_month||'')}</div></div><table><thead><tr><th>รายการ</th><th>รายละเอียด</th></tr></thead><tbody><tr><td>เลขมิเตอร์เดือนก่อน</td><td>${money(r.previous_reading)}</td></tr><tr><td>เลขมิเตอร์เดือนปัจจุบัน</td><td>${money(r.current_reading)}</td></tr><tr><td>ใช้ไฟฟ้า</td><td>${money(r.used_units)} หน่วย</td></tr><tr><td>ราคาต่อหน่วย</td><td>${Number(r.unit_rate).toFixed(4)} บาท</td></tr><tr><th>รวมเงินที่ได้รับ</th><th>${money(r.amount_due)} บาท</th></tr></tbody></table><div class="el-receipt-sign"><span>ลงชื่อ ........................................................</span><span>(${escapeHtml(s.receipt_signatory||'........................................................')})</span><span>ผู้รับเงิน</span></div><p class="el-receipt-foot">เอกสารรับชำระจากระบบ BNK School OS · ผู้มีอำนาจตรวจสอบรูปแบบเอกสารทางการเงินก่อนนำไปใช้เป็นใบเสร็จรับเงินจริงของทางราชการ</p></article>`;const styles=`@page{size:A4 portrait;margin:18mm 17mm}body,.el-receipt-paper{font-family:"TH SarabunIT๙";font-size:16pt;color:#111;line-height:1.24}.el-receipt-paper{width:100%;max-width:176mm;margin:auto;background:#fff;padding:10mm 4mm}.el-receipt-paper h2{text-align:center;font-size:18pt;margin:0}.el-receipt-paper h1{text-align:center;font-size:20pt;margin:16px 0}.el-receipt-paper p{text-align:center;margin:5px 0}.el-receipt-meta{display:flex;justify-content:space-between;margin:16px 0}.el-receipt-detail{display:grid;gap:8px;margin-bottom:16px}.el-receipt-paper table{width:100%;border-collapse:collapse}.el-receipt-paper th,.el-receipt-paper td{padding:8px;border:1px solid #444;text-align:left;font-size:16pt}.el-receipt-sign{display:grid;gap:3px;justify-content:end;text-align:center;margin-top:45px}.el-receipt-foot{font-size:12pt!important;color:#555;margin-top:34px!important}@media print{.el-receipt-paper{max-width:none;padding:0}}`;openPrintPreview(body,styles,title);}
+function bindElectricityEvents(){document.querySelector('#el-refresh')?.addEventListener('click',()=>renderDashboard());document.querySelectorAll('[data-el-tab]').forEach(b=>b.addEventListener('click',()=>{state.electricityTab=b.dataset.elTab;renderDashboard();}));document.querySelector('#el-period-select')?.addEventListener('change',e=>{state.electricityPeriodId=e.target.value;renderDashboard();});document.querySelector('#el-add-meter')?.addEventListener('click',()=>electricityMeterModal());document.querySelectorAll('[data-el-edit-meter]').forEach(b=>b.addEventListener('click',()=>electricityMeterModal(b.dataset.elEditMeter)));document.querySelector('#el-open-period')?.addEventListener('click',electricityOpenPeriodModal);document.querySelectorAll('[data-el-reading]').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.elReadingPeriod)state.electricityPeriodId=b.dataset.elReadingPeriod;electricityReadingModal(b.dataset.elReading);}));document.querySelectorAll('[data-el-slip]').forEach(b=>b.addEventListener('click',()=>electricityPaymentModal(b.dataset.elSlip)));document.querySelectorAll('[data-el-review-reading]').forEach(b=>b.addEventListener('click',()=>electricityReviewModal(b.dataset.elReviewReading,'reading')));document.querySelectorAll('[data-el-review-payment]').forEach(b=>b.addEventListener('click',()=>electricityReviewModal(b.dataset.elReviewPayment,'payment')));document.querySelectorAll('[data-el-evidence]').forEach(b=>b.addEventListener('click',()=>electricityEvidencePreview(b.dataset.elEvidence)));document.querySelectorAll('[data-el-receipt]').forEach(b=>b.addEventListener('click',()=>electricityReceiptPreview(b.dataset.elReceipt)));
+ document.querySelector('#el-summary-pdf')?.addEventListener('click',electricityReportPdf);document.querySelector('#el-export-csv')?.addEventListener('click',electricityReportCsv);
+ document.querySelector('#el-settings-form')?.addEventListener('submit',async e=>{e.preventDefault();if(!electricityManagerUi())return;const f=e.currentTarget,b=f.querySelector('[type=submit]');buttonLoading(b,true,'กำลังบันทึก...');try{await electricityRpc('electricity_save_settings',{p_manager_user_id:isSuperAdminUser()?f.manager_id.value||null:state.electricitySettings?.manager_user_id||null,p_default_rate:Number(f.rate.value),p_bank_name:f.bank.value,p_bank_account_name:f.account_name.value,p_bank_account_no:f.account_no.value,p_payment_instructions:f.instructions.value,p_receipt_signatory:f.signatory.value});toast('บันทึกตั้งค่าแล้ว','','success');await loadElectricityWorkspace();await renderDashboard();}catch(err){buttonLoading(b,false);toast('บันทึกการตั้งค่าไม่ได้',err.message,'error');}});
+}
+
+function electricityReportPdf(){if(!electricityManagerUi())return;const p=electricityPeriod();if(!p)return toast('ยังไม่มีรอบเก็บเงิน','','error');const records=(state.electricityReadings||[]).filter(r=>r.period_id===p.id),meters=(state.electricityMeters||[]).filter(m=>m.is_active),sum=records.reduce((a,r)=>a+Number(r.amount_due||0),0),paid=records.filter(r=>r.status==='paid').reduce((a,r)=>a+Number(r.amount_due||0),0),rows=meters.map((m,i)=>{const r=records.find(x=>x.meter_id===m.id);return `<tr><td>${i+1}</td><td>${escapeHtml(m.house_label)}</td><td>${escapeHtml(r?.payer_name_snapshot||electricityMyName(m))}</td><td>${r?money(r.used_units):'—'}</td><td>${r?money(r.amount_due):'—'}</td><td>${r?escapeHtml(ELECTRICITY_STATUS[r.status]||r.status):'ยังไม่ส่งมิเตอร์'}</td></tr>`}).join('');const body=`<article class="el-report-paper"><h2>${escapeHtml(schoolName())}</h2><h1>รายงานการใช้และรับชำระค่าไฟฟ้าบ้านพักบุคลากร</h1><p>ประจำเดือน ${electricityMonthLabel(p.billing_month)} · อัตรา ${Number(p.unit_rate).toFixed(4)} บาท/หน่วย</p><p>มิเตอร์ที่ใช้งาน ${meters.length} มิเตอร์ · ส่งเลขแล้ว ${records.length} ราย · รับชำระ ${money(paid)} บาท · เรียกเก็บ ${money(sum)} บาท</p><table><thead><tr><th>ที่</th><th>บ้านพัก</th><th>ผู้รับผิดชอบ</th><th>หน่วย</th><th>ค่าไฟ (บาท)</th><th>สถานะ</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th colspan="4">ยอดเรียกเก็บรวม</th><th>${money(sum)}</th><th></th></tr><tr><th colspan="4">ยอดรับชำระแล้ว</th><th>${money(paid)}</th><th></th></tr></tfoot></table><div class="el-report-foot">ผู้จัดทำรายงาน ........................................................<br>วันที่ ........................................................</div></article>`;const styles=`@page{size:A4 portrait;margin:17mm 14mm}body,.el-report-paper{font-family:"TH SarabunIT๙";font-size:16pt;color:#111;line-height:1.27}.el-report-paper h2,.el-report-paper h1,.el-report-paper p{text-align:center;margin:5px 0}.el-report-paper h2{font-size:18pt}.el-report-paper h1{font-size:20pt;margin:10px 0}.el-report-paper table{border-collapse:collapse;width:100%;margin-top:18px}.el-report-paper th,.el-report-paper td{border:1px solid #555;padding:5px 6px;text-align:left;font-size:14pt}.el-report-paper th{font-weight:bold}.el-report-paper tr{break-inside:avoid}.el-report-paper thead{display:table-header-group}.el-report-paper .el-report-foot{text-align:right;margin-top:30px}`;openPrintPreview(body,styles,`รายงานค่าไฟฟ้า ${electricityMonthLabel(p.billing_month)}`);}
+function electricityReportCsv(){if(!electricityManagerUi())return;const data=[['รอบเดือน','บ้านพัก','มิเตอร์','ผู้ชำระ','เลขก่อน','เลขหลัง','หน่วยใช้','อัตรา','ยอดเงิน','สถานะ','เลขใบรับชำระ']];for(const r of state.electricityReadings||[]){const p=state.electricityPeriods.find(x=>x.id===r.period_id);data.push([electricityMonthLabel(p?.billing_month||''),r.house_label_snapshot,r.meter_code_snapshot,r.payer_name_snapshot,r.previous_reading,r.current_reading,r.used_units,r.unit_rate,r.amount_due,ELECTRICITY_STATUS[r.status]||r.status,r.receipt_no||'']);}const csv='\ufeff'+data.map(row=>row.map(cell=>'"'+String(cell??'').replaceAll('"','""')+'"').join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const anchor=document.createElement('a');anchor.href=url;anchor.download='รายงานค่าไฟฟ้าบ้านพัก-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}
+
 function moduleView(code) {
   if(code==="procurement_document_control"&&!procurementHasModuleAccess(code))return procurementAccessDeniedHtml("ระบบเลขคุมเอกสารจัดซื้อจัดจ้างและพัสดุ");
   if(code==="procurement_documents"&&!procurementHasModuleAccess(code))return procurementAccessDeniedHtml("ระบบจัดทำเอกสารจัดซื้อจัดจ้างและพัสดุ");
+  if(code==="school_lunch_documents"&&!procurementHasModuleAccess(code))return procurementAccessDeniedHtml("ระบบจัดทำเอกสารอาหารกลางวัน");
   const module = state.modules.find(m => m.code === code);
   if (!module) return `<div class="empty"><strong>ไม่พบระบบย่อย</strong></div>`;
   if (code === "academic_calendar") return academicCalendarWorkspaceHtml(module);
@@ -12612,6 +13428,8 @@ function moduleView(code) {
   if (code === "student_followup") return studentFollowupWorkspaceHtml(module);
   if (code === "procurement_document_control") return procurementControlWorkspaceHtml(module);
   if (code === "procurement_documents") return procurementWorkspaceHtml(module);
+  if (code === "school_lunch_documents") return schoolLunchWorkspaceHtml(module);
+  if (code === "housing_electricity") return electricityWorkspaceHtml(module);
   if (code === "lesson_plans") return lessonWorkspaceHtml(module);
   if (code === "personnel_records") return personnelWorkspaceHtml(module);
   if (code === "personnel_pa") return personnelPaWorkspaceHtml(module);
@@ -13582,7 +14400,151 @@ document.addEventListener("click", event => {
   openOfficialAttendanceFromSidebar();
 }, true);
 
+
+// Phase 2: Data Center overview is read-only; only two backend-enforced, audited scopes may be reset.
+async function loadDataCenterWorkspace() {
+  if(state.profile?.role!=="super_admin") return;
+  const {data,error}=await supabase.rpc("admin_data_center_overview");
+  state.dataCenterOverview=error?null:data;
+  state.dataCenterError=error?(error.message||String(error)):"";
+  state.dataCenterLastLoaded=!error?new Date().toLocaleString("th-TH"):"";
+}
+async function loadDataCenterResetHistory(){
+  if(state.profile?.role!=="super_admin")return;
+  const {data,error}=await supabase.rpc("admin_data_center_reset_history");
+  state.dataCenterResetHistory=error?null:(Array.isArray(data)?data:[]);
+  state.dataCenterResetError=error?(error.message||String(error)):"";
+}
+const DATA_CENTER_RESET_SCOPES=[
+  {value:"preschool_units",label:"หน่วยการเรียนรู้ปฐมวัย",explanation:"ล้างรายการหน่วยกลางและรายการหน่วยรายห้องเฉพาะปี/ภาคเรียนที่เลือก ไม่ลบห้องเรียน ครู หรือนักเรียน"},
+  {value:"preschool_roster",label:"บัญชีครูเพิ่มเติมในทีมปฐมวัย",explanation:"ล้างเฉพาะรายชื่อครูที่เพิ่มในทีมปฐมวัย ไม่ลบบัญชีครูหรือคำขอลาเดิม"}
+];
+function dataCenterResetScopeLabel(code){return DATA_CENTER_RESET_SCOPES.find(s=>s.value===code)?.label||code;}
+function dataCenterSystems(){return Array.isArray(state.dataCenterOverview?.systems)?state.dataCenterOverview.systems:[];}
+function dataCenterNum(value){return Number(value||0).toLocaleString("th-TH");}
+function dataCenterRisk(risk){return ({protected:"ป้องกันถาวร",critical:"เสี่ยงสูงมาก",high:"เสี่ยงสูง",review:"ต้องตรวจสอบ"})[risk]||"รอตรวจ";}
+function dataCenterView(){
+  if(state.profile?.role!=="super_admin")return `<div class="empty">ไม่มีสิทธิ์เข้าถึงศูนย์จัดการข้อมูล</div>`;
+  const sys=dataCenterSystems(),ready=!!state.dataCenterOverview&&!state.dataCenterError,
+    protectedCount=sys.filter(x=>x.protected).length,
+    withRows=sys.filter(x=>!x.protected&&Number(x.total_records)>0).length,
+    activeCount=sys.filter(x=>!x.protected).length,
+    allRows=sys.filter(x=>!x.protected).reduce((n,x)=>n+Number(x.total_records||0),0),
+    selected=sys.find(x=>x.code===state.dataCenterSelectedCode&&!x.protected)||sys.find(x=>!x.protected),
+    tab=state.dataCenterTab||"overview";
+  const nav= [ ["overview","ภาพรวมระบบ"],["reset","รีเซตข้อมูลแบบจำกัด"],["impact","ความสัมพันธ์ข้อมูล"],["backup","สำรองและกู้คืน"],["history","ประวัติการดำเนินการ"] ];
+  return `<div class="data-center-page">
+    <section class="data-center-hero"><div><span class="data-center-hero-tag">SYSTEM DATA MANAGEMENT · SUPER ADMIN ONLY</span><h2>ศูนย์จัดการข้อมูลระบบ</h2><p>ตรวจสอบข้อมูลและรีเซตเฉพาะหมวดที่อนุญาต พร้อมประวัติและการยืนยันทุกขั้น โดยไม่แตะทะเบียนนักเรียน</p></div><div class="data-center-hero-shield"><span>🛡</span><strong>SAFE RESET</strong><small>ระยะที่ 2 · จำกัดหมวดที่อนุญาต</small></div></section>
+    <div class="data-center-protected-banner"><strong>🔒 ระบบบัญชีรายชื่อนักเรียนได้รับการป้องกันถาวร</strong><span>ไม่เลือกรีเซต ไม่ลบตารางนักเรียน ไม่เปลี่ยนข้อมูลนักเรียนหรือความสัมพันธ์ที่จำเป็นต่อทะเบียนนักเรียน คำสั่งรีเซตใช้เฉพาะตารางในรายการอนุญาตฝั่งเซิร์ฟเวอร์</span></div>
+    ${state.dataCenterError?`<div class="data-center-error"><strong>ยังเปิดข้อมูลตรวจสอบไม่ได้</strong><p>${escapeHtml(state.dataCenterError)}</p><small>ต้องติดตั้ง SQL ของ v5.12.9.8 ก่อน หน้าศูนย์นี้จึงจะแสดงจำนวนข้อมูลจริงได้</small></div>`:""}
+    <div class="data-center-toolbar"><span>ข้อมูลตรวจสอบล่าสุด: ${escapeHtml(state.dataCenterLastLoaded||"ยังไม่โหลดข้อมูล")}</span><button class="btn btn-secondary" id="data-center-refresh" type="button">↻ ตรวจสอบข้อมูลอีกครั้ง</button></div>
+    <div class="data-center-stats"><article><span>ระบบที่สำรวจได้</span><strong>${ready?dataCenterNum(activeCount):"—"}</strong><small>รายการหมวดข้อมูลที่กำหนด</small></article><article><span>ระบบที่มีข้อมูล</span><strong>${ready?dataCenterNum(withRows):"—"}</strong><small>ต้องตรวจสอบก่อนรีเซต</small></article><article><span>จำนวนรายการในตารางที่สำรวจ</span><strong>${ready?dataCenterNum(allRows):"—"}</strong><small>อาจนับซ้ำในหมวดที่เชื่อมกัน</small></article><article><span>หมวดที่ป้องกัน</span><strong>${ready?dataCenterNum(protectedCount):"—"}</strong><small>ไม่มีคำสั่งรีเซต</small></article></div>
+    <nav class="data-center-tabs">${nav.map(([key,name])=>`<button type="button" data-dc-tab="${key}" class="${tab===key?"selected":""}">${name}</button>`).join("")}</nav>
+    ${tab==="overview"?`<section class="data-center-layout"><div class="panel data-center-list-panel"><h3>ข้อมูลแยกรายระบบ</h3><p>เลือกหมวดเพื่อตรวจรายละเอียด</p><div class="data-center-modules">${sys.map(item=>`<button type="button" class="data-center-module ${selected?.code===item.code?"selected":""} ${item.protected?"protected":""}" ${item.protected?"disabled":`data-dc-code="${escapeHtml(item.code)}"`}><span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(dataCenterRisk(item.risk))}</small></span><span class="data-center-row-count">${item.protected?"🔒":dataCenterNum(item.total_records)}</span></button>`).join("")||`<div class="empty">ยังไม่มีผลตรวจสอบ กด “ตรวจสอบข้อมูลอีกครั้ง”</div>`}</div></div>
+      <div class="panel data-center-detail"><h3>${escapeHtml(selected?.label||"รายละเอียดระบบ")}</h3>${selected?`<p>${escapeHtml(selected.note||"")}</p><div class="data-center-risk-note">สถานะ: ${escapeHtml(dataCenterRisk(selected.risk))} · ลบได้เฉพาะหมวดในหน้ารีเซตที่ผ่านการตรวจสอบ</div><div class="data-center-table-scroll"><table class="table"><thead><tr><th>ตารางฐานข้อมูล</th><th>จำนวนรายการ</th><th>FK เชื่อมเข้า</th></tr></thead><tbody>${(selected.tables||[]).map(t=>`<tr><td><code>${escapeHtml(t.table)}</code>${t.student_link?'<small class="data-center-link-warning">เชื่อมทะเบียนนักเรียน</small>':''}</td><td>${t.exists?dataCenterNum(t.row_count):"ไม่พบ"}</td><td>${t.exists?dataCenterNum(t.incoming_foreign_keys):"—"}</td></tr>`).join("")}</tbody></table></div><div class="data-center-footer-note">จำนวนรายการรวม ${dataCenterNum(selected.total_records)} · ผลตรวจสอบนี้ไม่ยืนยันว่าเป็นข้อมูลทดลอง ต้องตรวจจริงก่อนอนุญาตรีเซต</div>`:"<p>กรุณาตรวจสอบ SQL ก่อนใช้งาน</p>"}<button class="btn btn-secondary" id="data-center-show-impact">ดูความสัมพันธ์และข้อควรระวัง →</button></div></section>`:
+    tab==="reset"?dataCenterResetPanel():
+    tab==="impact"?`<section class="panel data-center-info"><h3>ผลกระทบก่อนล้างข้อมูล</h3><p>การลบข้อมูลไม่เหมือนการเริ่มรอบใหม่ เพราะตารางหลายระบบมี Foreign Key, Trigger, PDF และ Storage ที่เชื่อมถึงกัน</p><div class="data-center-info-grid"><div><strong>กลุ่มที่ห้ามแตะ</strong><p>ระบบบัญชีรายชื่อนักเรียน บัญชีผู้ใช้ และประวัติระบบสำคัญ</p></div><div><strong>กลุ่มที่ต้องระวังเป็นพิเศษ</strong><p>ข้อสอบ/ผลสอบ จัดซื้อจัดจ้าง อาหารกลางวัน ค่าไฟฟ้า และ PA</p></div><div><strong>ระบบที่มีความสัมพันธ์</strong><p>ตัวเลข FK ในตารางเป็นเพียงการชี้เบื้องต้น ไม่ใช่การรับรองว่าการลบปลอดภัย</p></div></div><div class="data-center-risk-note">⚠ ห้ามใช้ TRUNCATE CASCADE หรือปิด Trigger/RLS เพื่อรีเซตข้อมูล</div></section>`:
+    tab==="backup"?`<section class="panel data-center-info"><h3>สำรองและกู้คืนข้อมูล</h3><p>ศูนย์นี้ยังไม่สร้างหรือตรวจพิสูจน์ไฟล์สำรองให้อัตโนมัติ ก่อนใช้รีเซต ต้องสำรองฐานข้อมูล Supabase และไฟล์ใน Private Storage พร้อมทดสอบกู้คืนภายนอกระบบ</p><ol><li>สร้างไฟล์สำรองฐานข้อมูลเต็มชุด</li><li>สำรองไฟล์แนบและ Storage ที่เกี่ยวข้อง</li><li>ทดสอบกู้คืนในโครงการแยก ไม่ใช้ฐานข้อมูลจริง</li><li>จึงอนุญาตให้พัฒนาคำสั่งรีเซตที่จำกัดตามระบบ</li></ol><div class="data-center-risk-note">ฟอร์มยืนยันสำรองเป็นการรับรองโดยแอดมินหลักเท่านั้น ไม่ใช่หลักฐานว่าระบบได้ตรวจไฟล์สำรองจริง</div></section>`:
+    dataCenterResetHistoryPanel()}
+
+    <section class="data-center-bottom"><strong>ระยะที่ 2 — รีเซตจำกัด 2 หมวด</strong><span>เฉพาะ Super Admin · ทุกคำสั่งตรวจสิทธิ์และจำนวนข้อมูลที่เซิร์ฟเวอร์ · ไม่มี TRUNCATE หรือ CASCADE · ระบบนักเรียนและหมวดเสี่ยงสูงยังล็อก</span></section>
+  </div>`;
+}
+function dataCenterResetPanel(){
+  const scopes=DATA_CENTER_RESET_SCOPES, preview=state.dataCenterResetPreview,
+    year=state.dataCenterResetYear,sem=state.dataCenterResetSemester,
+    textToType=`รีเซต ${year}/${sem}`,
+    canExecute=!!(preview&&!preview.empty&&preview.preview_id&&!state.dataCenterResetBusy&&
+      state.dataCenterBackupConfirmed&&state.dataCenterBackupReference.trim().length>=8&&
+      state.dataCenterConfirmation.trim()===textToType);
+  return `<section class="panel data-center-info data-center-reset-panel">
+    <h3>รีเซตข้อมูลแบบจำกัด · เฉพาะแอดมินหลัก</h3>
+    <p>ใช้ได้เฉพาะรายการที่กำหนดด้านล่าง ไม่มีคำสั่งล้างทั้งฐานข้อมูล ระบบไม่สามารถยืนยันว่าแถวที่เลือกเป็นข้อมูลทดลองหรือมีไฟล์สำรองอยู่จริง</p>
+    <div class="data-center-protected-banner"><strong>🔒 Protected Student Registry</strong><span>ข้อมูลนักเรียน นักเรียนเข้าห้อง บัญชีผู้ใช้งาน ผลสอบ เอกสารเงิน และเลขคุมไม่อยู่ในรายการรีเซต</span></div>
+    <div class="data-center-reset-form">
+      <label>หมวดข้อมูลที่อนุญาต<select id="dc-reset-scope" class="input"><option value="preschool_units" ${state.dataCenterResetScope==="preschool_units"?"selected":""}>หน่วยการเรียนรู้ปฐมวัย</option><option value="preschool_roster" ${state.dataCenterResetScope==="preschool_roster"?"selected":""}>บัญชีครูเพิ่มเติมในทีมปฐมวัย</option></select></label>
+      <label>ปีการศึกษา<input id="dc-reset-year" class="input" type="number" min="2500" max="2700" value="${escapeHtml(year)}" /></label>
+      <label>ภาคเรียน<select id="dc-reset-semester" class="input">${[1,2,3].map(x=>`<option value="${x}" ${String(x)===String(sem)?"selected":""}>ภาคเรียนที่ ${x}</option>`).join("")}</select></label>
+    </div>
+    <div class="data-center-risk-note">${escapeHtml(scopes.find(x=>x.value===state.dataCenterResetScope)?.explanation||"")}</div>
+    <button type="button" class="btn btn-primary" id="dc-reset-preview" ${state.dataCenterResetBusy?"disabled":""}>ขั้นที่ 1 · ตรวจสอบจำนวนและผลกระทบ</button>
+    ${state.dataCenterResetError?`<div class="data-center-error" role="alert">${escapeHtml(state.dataCenterResetError)}</div>`:""}
+    ${preview?`<div class="data-center-reset-preview"><h4>ผลตรวจสอบก่อนดำเนินการ</h4>
+       <p>ปีการศึกษา ${escapeHtml(String(preview.academic_year||year))} · ภาคเรียนที่ ${escapeHtml(String(preview.semester||sem))} · จำนวน ${dataCenterNum(preview.count)} รายการ</p>
+       <ul>${Object.entries(preview.breakdown||{}).map(([table,count])=>`<li><code>${escapeHtml(table)}</code> : ${dataCenterNum(count)} รายการ</li>`).join("")}</ul>
+       ${preview.empty?`<p>ไม่มีข้อมูลให้ล้างในรอบนี้</p>`:`<p><strong>คำเตือน:</strong> การลบไม่สามารถย้อนกลับได้จากหน้าเว็บ กรุณาสำรองและทดสอบกู้คืนก่อนดำเนินการ ผลตรวจนี้หมดอายุใน 10 นาที หากข้อมูลเปลี่ยน ระบบจะปฏิเสธคำสั่งลบ</p>
+       <label class="dc-reset-confirm"><input type="checkbox" id="dc-reset-backup-check" ${state.dataCenterBackupConfirmed?"checked":""}/> ยืนยันว่าได้สำรองฐานข้อมูลและไฟล์ที่เกี่ยวข้อง และทดสอบแนวทางกู้คืนแล้วด้วยตนเอง</label>
+       <label>รหัสอ้างอิงไฟล์สำรอง (อย่างน้อย 8 ตัวอักษร)<input id="dc-reset-backup-ref" class="input" autocomplete="off" maxlength="180" value="${escapeHtml(state.dataCenterBackupReference)}" placeholder="เช่น backup-2569-10-09" /></label>
+       <label>พิมพ์ข้อความ <strong>${escapeHtml(textToType)}</strong> เพื่อยืนยัน<input id="dc-reset-confirm-text" class="input" autocomplete="off" value="${escapeHtml(state.dataCenterConfirmation)}" placeholder="${escapeHtml(textToType)}" /></label>
+       <button type="button" class="btn btn-danger" id="dc-reset-execute" ${canExecute?"":"disabled"}>ขั้นที่ 2 · ยืนยันลบ ${dataCenterNum(preview.count)} รายการ</button>`}
+       <small>ระบบไม่ได้ทำสำรองให้อัตโนมัติ และไม่ได้ตรวจสอบไฟล์สำรองที่กรอก</small>
+    </div>`:""}
+    <div class="data-center-risk-note">🔒 ระบบ PA, การเงิน, จัดซื้อจัดจ้าง, ข้อสอบ/ผลสอบ, ทะเบียนนักเรียน, ข้อมูลครูหลักและบัญชีผู้ใช้ ไม่สามารถรีเซตจากเมนูนี้ได้</div>
+  </section>`;
+}
+function dataCenterResetHistoryPanel(){
+ const rows=Array.isArray(state.dataCenterResetHistory)?state.dataCenterResetHistory:[];
+ return `<section class="panel data-center-info"><h3>ประวัติการรีเซต</h3><p>รายการสำเร็จที่บันทึกฝั่งฐานข้อมูล สามารถตรวจสอบชื่อหมวด ปีการศึกษา จำนวนที่ลบ เวลา และรหัสอ้างอิงสำรอง</p><button class="btn btn-secondary" id="dc-reset-history-refresh" type="button">↻ โหลดประวัติใหม่</button>
+  ${rows.length?`<div class="data-center-table-scroll"><table class="table"><thead><tr><th>เวลา</th><th>รายการ</th><th>ปี/เทอม</th><th>จำนวน</th><th>หลักฐานสำรอง</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${escapeHtml(new Date(r.executed_at).toLocaleString("th-TH"))}</td><td>${escapeHtml(dataCenterResetScopeLabel(r.scope))}</td><td>${escapeHtml(String(r.academic_year))}/${escapeHtml(String(r.semester))}</td><td>${dataCenterNum(r.deleted)}</td><td>${escapeHtml(r.backup_reference||"")}</td></tr>`).join("")}</tbody></table></div>`:'<p class="empty">ยังไม่มีประวัติรีเซตในศูนย์นี้</p>'}
+  <div class="data-center-risk-note">รายการนี้ไม่ใช่รายงานยืนยันว่ามีการสำรองข้อมูลสำเร็จ แสดงเฉพาะข้อมูลที่แอดมินหลักรับรองไว้</div></section>`;
+}
+function dataCenterClearResetPreview(){
+ state.dataCenterResetPreview=null;
+ state.dataCenterBackupReference="";
+ state.dataCenterBackupConfirmed=false;
+ state.dataCenterConfirmation="";
+ state.dataCenterResetError="";
+}
+function bindDataCenterEvents(){
+  document.querySelector("#data-center-refresh")?.addEventListener("click",async()=>{const btn=document.querySelector("#data-center-refresh");if(btn)buttonLoading(btn,true,"กำลังตรวจสอบ...");await loadDataCenterWorkspace();await renderDashboard();});
+  document.querySelectorAll("[data-dc-tab]").forEach(b=>b.addEventListener("click",()=>{state.dataCenterTab=b.dataset.dcTab;if(state.dataCenterTab==="history")loadDataCenterResetHistory().then(()=>renderDashboard());else renderDashboard();}));
+  document.querySelectorAll("[data-dc-code]").forEach(b=>b.addEventListener("click",()=>{state.dataCenterSelectedCode=b.dataset.dcCode;renderDashboard();}));
+  document.querySelector("#data-center-show-impact")?.addEventListener("click",()=>{state.dataCenterTab="impact";renderDashboard();});
+  const dcScope=document.querySelector("#dc-reset-scope");
+  dcScope?.addEventListener("change",()=>{state.dataCenterResetScope=dcScope.value;dataCenterClearResetPreview();renderDashboard();});
+  document.querySelector("#dc-reset-year")?.addEventListener("change",e=>{state.dataCenterResetYear=e.target.value;dataCenterClearResetPreview();renderDashboard();});
+  document.querySelector("#dc-reset-semester")?.addEventListener("change",e=>{state.dataCenterResetSemester=e.target.value;dataCenterClearResetPreview();renderDashboard();});
+  document.querySelector("#dc-reset-backup-check")?.addEventListener("change",e=>{state.dataCenterBackupConfirmed=e.target.checked;renderDashboard();});
+  document.querySelector("#dc-reset-backup-ref")?.addEventListener("change",e=>{state.dataCenterBackupReference=e.target.value;renderDashboard();});
+  document.querySelector("#dc-reset-confirm-text")?.addEventListener("change",e=>{state.dataCenterConfirmation=e.target.value;renderDashboard();});
+  document.querySelector("#dc-reset-preview")?.addEventListener("click",async()=>{
+    if(state.dataCenterResetBusy)return;
+    dataCenterClearResetPreview();state.dataCenterResetBusy=true;renderDashboard();
+    try{
+      const {data,error}=await supabase.rpc("admin_data_center_reset_preview",{
+        p_scope:state.dataCenterResetScope,p_academic_year:Number(state.dataCenterResetYear),p_semester:Number(state.dataCenterResetSemester)});
+      if(error)throw error;
+      state.dataCenterResetPreview=data;
+    }catch(error){state.dataCenterResetError=error.message||String(error);toast("ตรวจสอบรายการรีเซตไม่สำเร็จ",state.dataCenterResetError,"error");}
+    finally{state.dataCenterResetBusy=false;renderDashboard();}
+  });
+  document.querySelector("#dc-reset-execute")?.addEventListener("click",async()=>{
+    if(state.dataCenterResetBusy||!state.dataCenterResetPreview?.preview_id)return;
+    const phrase=`รีเซต ${state.dataCenterResetYear}/${state.dataCenterResetSemester}`;
+    if(!state.dataCenterBackupConfirmed||state.dataCenterBackupReference.trim().length<8||state.dataCenterConfirmation.trim()!==phrase)return;
+    if(!window.confirm(`ยืนยันลบ ${state.dataCenterResetPreview.count} รายการใน ${dataCenterResetScopeLabel(state.dataCenterResetScope)} ปี ${state.dataCenterResetYear} ภาคเรียน ${state.dataCenterResetSemester}? การลบย้อนกลับจากหน้าเว็บไม่ได้`))return;
+    state.dataCenterResetBusy=true;renderDashboard();
+    try{
+      const {data,error}=await supabase.rpc("admin_data_center_execute_reset",{
+        p_preview_id:state.dataCenterResetPreview.preview_id,
+        p_backup_reference:state.dataCenterBackupReference.trim(),
+        p_backup_confirmed:state.dataCenterBackupConfirmed,
+        p_confirmation:phrase
+      });
+      if(error)throw error;
+      if(!data?.ok)throw new Error("ระบบยังไม่ยืนยันการรีเซต");
+      dataCenterClearResetPreview();toast("รีเซตสำเร็จ",`ลบ ${dataCenterNum(data.deleted)} รายการ · มีประวัติตรวจสอบ`,"success");
+      await loadDataCenterWorkspace();await loadDataCenterResetHistory();
+      state.dataCenterTab="history";
+    }catch(error){state.dataCenterResetError=error.message||String(error);toast("รีเซตไม่สำเร็จ",state.dataCenterResetError,"error");}
+    finally{state.dataCenterResetBusy=false;renderDashboard();}
+  });
+  document.querySelector("#dc-reset-history-refresh")?.addEventListener("click",async()=>{await loadDataCenterResetHistory();renderDashboard();});
+
+}
+
 function bindDashboardEvents() {
+  if(state.currentView === "data_center" && state.profile?.role === "super_admin") bindDataCenterEvents();
   // Bind primary navigation first so a module-specific binding error can never disable the sidebar.
   document.querySelectorAll("[data-view]").forEach(el => {
     if (el.dataset.view === "module:official_attendance") return;
@@ -13639,6 +14601,12 @@ function bindDashboardEvents() {
         state.procurementSearch="";
         state.procurementStatusFilter="all";
         state.selectedProcurementCaseId=null;
+      }
+      if (nextView === "module:school_lunch_documents" && state.currentView !== "module:school_lunch_documents") {
+        state.schoolLunchFiscalYear=schoolLunchCurrentFiscalYear();
+        state.schoolLunchSearch="";
+        state.schoolLunchStatusFilter="active";
+        state.selectedSchoolLunchRoundId=null;
       }
       if (nextView === "module:lesson_plans" && state.currentView !== "module:lesson_plans") {
         state.lessonPlanMode = null;
@@ -13727,6 +14695,8 @@ function bindDashboardEvents() {
   if (state.currentView === "module:personnel_pa") bindPersonnelPaEvents();
   if (state.currentView === "module:procurement_document_control") bindProcurementControlEvents();
   if (state.currentView === "module:procurement_documents") bindProcurementEvents();
+  if (state.currentView === "module:school_lunch_documents") bindSchoolLunchEvents();
+  if (state.currentView === "module:housing_electricity") bindElectricityEvents();
   if (state.currentView === "approval_center") bindApprovalCenterEvents();
   if (state.currentView === "signature_settings") bindSignatureSettingsEvents();
 
@@ -13917,21 +14887,29 @@ function bindDashboardEvents() {
     await renderDashboard();
   }));
 
+  document.querySelectorAll("[data-preschool-cover-open]").forEach(btn=>btn.addEventListener("click",()=>{
+    state.selectedPreschoolCoverId=btn.dataset.preschoolCoverOpen;renderDashboard();
+  }));
+  document.querySelector("#preschool-cover-back")?.addEventListener("click",()=>{state.selectedPreschoolCoverId=null;renderDashboard();});
+  document.querySelector("#preschool-cover-export")?.addEventListener("click",()=>preschoolCoverPdfPreview(state.selectedPreschoolCoverId));
+  document.querySelectorAll("[data-preschool-ack]").forEach(btn=>btn.addEventListener("click",()=>acknowledgePreschoolCover(btn.dataset.preschoolAck,btn.dataset.ackValue==="true",btn)));
+  document.querySelector("#sync-preschool-covers")?.addEventListener("click",()=>syncPreschoolCovers());
   document.querySelectorAll("[data-substitute-view]").forEach(btn=>btn.addEventListener("click",()=>{
     state.substituteView=btn.dataset.substituteView;
     state.selectedSubstituteLessonId=null;
     state.selectedSubstituteLeaveId=null;
     state.selectedSubstituteDate=null;
     state.substituteCandidateMap={};
+    state.selectedPreschoolCoverId=null;
     renderDashboard();
   }));
   document.querySelector("#substitute-year")?.addEventListener("change",e=>{
     state.substituteAcademicYear=Number(e.currentTarget.value);
-    state.selectedSubstituteLessonId=null; state.selectedSubstituteLeaveId=null; state.selectedSubstituteDate=null; state.substituteCandidateMap={}; renderDashboard();
+    state.selectedSubstituteLessonId=null; state.selectedSubstituteLeaveId=null; state.selectedSubstituteDate=null; state.selectedPreschoolCoverId=null; state.substituteCandidateMap={}; renderDashboard();
   });
   document.querySelector("#substitute-semester")?.addEventListener("change",e=>{
     state.substituteSemester=Number(e.currentTarget.value);
-    state.selectedSubstituteLessonId=null; state.selectedSubstituteLeaveId=null; state.selectedSubstituteDate=null; state.substituteCandidateMap={}; renderDashboard();
+    state.selectedSubstituteLessonId=null; state.selectedSubstituteLeaveId=null; state.selectedSubstituteDate=null; state.selectedPreschoolCoverId=null; state.substituteCandidateMap={}; renderDashboard();
   });
   document.querySelector("#refresh-substitute")?.addEventListener("click",()=>renderDashboard());
   document.querySelector("#sync-substitute-lessons")?.addEventListener("click",()=>syncSubstituteTeaching());
@@ -13958,7 +14936,7 @@ function bindDashboardEvents() {
   document.querySelector("#delete-substitute-record")?.addEventListener("click",()=>deleteSelectedSubstituteRecord());
   document.querySelectorAll("[data-open-leave-substitute]").forEach(btn=>btn.addEventListener("click",async()=>{
     const leaveId=btn.dataset.openLeaveSubstitute;
-    state.currentView="module:substitute_teaching"; state.substituteView="absent"; state.selectedSubstituteLeaveId=leaveId; state.selectedSubstituteLessonId=null; state.selectedSubstituteDate=null; state.substituteCandidateMap={};
+    state.currentView="module:substitute_teaching"; state.substituteView="absent"; state.targetPreschoolLeaveId=leaveId; state.selectedSubstituteLeaveId=leaveId; state.selectedSubstituteLessonId=null; state.selectedSubstituteDate=null; state.substituteCandidateMap={};
     await renderDashboard();
     const dates=substituteBatchDates(leaveId);
     if(dates.length)await openSubstituteDayPlanner(leaveId,dates[0]);
@@ -14174,15 +15152,25 @@ function bindDashboardEvents() {
     if(user) timetableTeacherCapabilityModal(user);
   }));
 
+  document.querySelector("#preschool-staff-roster")?.addEventListener("click",()=>preschoolRosterModal());
+  document.querySelector("#add-preschool-unit")?.addEventListener("click",()=>preschoolUnitModal());
+  document.querySelectorAll("[data-edit-preschool-unit]").forEach(btn=>btn.addEventListener("click",()=>preschoolUnitModal(btn.dataset.editPreschoolUnit)));
+  document.querySelectorAll("[data-delete-preschool-unit]").forEach(btn=>btn.addEventListener("click",()=>deletePreschoolUnit(btn.dataset.deletePreschoolUnit)));
+  document.querySelector("#export-preschool-unit-list")?.addEventListener("click",()=>timetablePdfPreview("class",state.timetableSelectedClassId));
   document.querySelectorAll("[data-timetable-view]").forEach(btn=>btn.addEventListener("click",()=>{
     state.timetableView=btn.dataset.timetableView;
     renderDashboard();
   }));
-  document.querySelector("#timetable-year")?.addEventListener("change",e=>{state.timetableAcademicYear=Number(e.currentTarget.value);state.timetableSelectedClassId=null;state.timetableExportClassId=null;renderDashboard();});
-  document.querySelector("#timetable-semester")?.addEventListener("change",e=>{state.timetableSemester=Number(e.currentTarget.value);state.timetableSelectedClassId=null;state.timetableExportClassId=null;renderDashboard();});
+  document.querySelector("#timetable-year")?.addEventListener("change",e=>{state.timetableAcademicYear=Number(e.currentTarget.value);state.timetableSelectedClassId=null;state.timetableSubjectMasterScope=null;state.timetableExportClassId=null;renderDashboard();});
+  document.querySelector("#timetable-semester")?.addEventListener("change",e=>{state.timetableSemester=Number(e.currentTarget.value);state.timetableSelectedClassId=null;state.timetableSubjectMasterScope=null;state.timetableExportClassId=null;renderDashboard();});
   document.querySelector("#timetable-class-select")?.addEventListener("change",e=>{state.timetableSelectedClassId=e.currentTarget.value||null;renderDashboard();});
   document.querySelectorAll("[data-select-timetable-class]").forEach(btn=>btn.addEventListener("click",()=>{state.timetableSelectedClassId=btn.dataset.selectTimetableClass;renderDashboard();}));
   document.querySelectorAll("#new-timetable-class").forEach(btn=>btn.addEventListener("click",()=>timetableClassModal()));
+  document.querySelector("#timetable-master-class-select")?.addEventListener("change",e=>{
+    state.timetableSubjectMasterScope=e.currentTarget.value;
+    if(e.currentTarget.value!=="preschool")state.timetableSelectedClassId=e.currentTarget.value;
+    renderDashboard();
+  });
   document.querySelectorAll("#new-timetable-subject").forEach(btn=>btn.addEventListener("click",()=>timetableSubjectModal()));
   document.querySelectorAll("#new-teaching-assignment").forEach(btn=>btn.addEventListener("click",()=>teachingAssignmentModal()));
   document.querySelectorAll("[data-open-period-settings]").forEach(btn=>btn.addEventListener("click",()=>{state.timetableView="periods";renderDashboard();}));
@@ -14202,10 +15190,29 @@ function bindDashboardEvents() {
     const {error}=await supabase.from("school_classes").delete().eq("id",c.id);if(error)return toast("ลบชั้น/ห้องไม่สำเร็จ",error.message,"error");state.timetableSelectedClassId=null;await renderDashboard();
   }));
   document.querySelectorAll("[data-delete-timetable-subject]").forEach(btn=>btn.addEventListener("click",async()=>{
-    if(!confirm("ลบรายวิชานี้หรือไม่?"))return;const {error}=await supabase.from("academic_subjects").delete().eq("id",btn.dataset.deleteTimetableSubject);if(error)return toast("ลบรายวิชาไม่ได้",error.message,"error");await renderDashboard();
+    const subject=state.timetableSubjects.find(s=>s.id===btn.dataset.deleteTimetableSubject);
+    const c=state.timetableClasses.find(c=>c.id===btn.dataset.subjectClass);
+    if(!subject||!c)return;
+    const linked=state.timetableAssignments.filter(a=>a.class_id===c.id&&a.subject_id===subject.id).length;
+    if(!confirm(`นำวิชา “${subject.subject_name}” ออกจาก Master ของ ${schoolClassLabel(c)} หรือไม่?${linked?`\n\nห้องนี้มีการมอบหมายสอน ${linked} รายการ ซึ่งจะถูกเก็บไว้เพื่อไม่ให้ตารางและเอกสารเดิมเสียหาย`:""}\n\nสามารถคืนรายวิชาเข้าห้องภายหลังได้`))return;
+    const {error}=await supabase.from("academic_class_subject_offerings").update({is_active:false}).eq("class_id",c.id).eq("subject_id",subject.id);
+    if(error)return toast("นำรายวิชาออกไม่ได้",error.message,"error");toast("นำวิชาออกจากห้องแล้ว","ตารางสอนและเอกสารเดิมยังอยู่","success");await renderDashboard();
+  }));
+  document.querySelectorAll("[data-restore-timetable-subject]").forEach(btn=>btn.addEventListener("click",async()=>{
+    const {error}=await supabase.from("academic_class_subject_offerings").update({is_active:true}).eq("class_id",btn.dataset.subjectClass).eq("subject_id",btn.dataset.restoreTimetableSubject);
+    if(error)return toast("คืนรายวิชาไม่ได้",error.message,"error");toast("คืนรายวิชาแล้ว","","success");await renderDashboard();
   }));
   document.querySelectorAll("[data-delete-teaching-assignment]").forEach(btn=>btn.addEventListener("click",async()=>{
-    if(!confirm("ลบการกำหนดวิชา/ครูนี้หรือไม่? คาบที่จัดไว้ของรายการนี้จะถูกนำออกด้วย"))return;const {error}=await supabase.from("teaching_assignments").delete().eq("id",btn.dataset.deleteTeachingAssignment);if(error)return toast("ลบการกำหนดการสอนไม่สำเร็จ",error.message,"error");await renderDashboard();
+    if(!confirm("ยกเลิกการกำหนดวิชา/ครูนี้หรือไม่?\n\nรายการจะหายจากหน้าจัดตารางสอน แต่ข้อสอบ คะแนนสอบ และเอกสารย้อนหลังจะยังอยู่ครบ\n\nหากรายการยังมีคาบในตาราง ต้องนำคาบออกก่อน"))return;
+    buttonLoading(btn,true,"กำลังยกเลิก...");
+    try {
+      const result=await archiveTeachingAssignment(btn.dataset.deleteTeachingAssignment);
+      if(result.blocked)return toast("ยังยกเลิกการกำหนดการสอนไม่ได้",`มีคาบที่จัดไว้ ${result.periods} คาบ กรุณานำคาบออกจากตารางสอนก่อน`,"error");
+      if(result.error)return toast("ยกเลิกการกำหนดการสอนไม่สำเร็จ",result.error.message,"error");
+      toast("ยกเลิกการกำหนดการสอนแล้ว","เก็บชุดข้อสอบ ผลสอบ และเอกสารเดิมไว้ สามารถเพิ่มวิชา/ครูเดิมเพื่อคืนรายการนี้ได้","success");
+      await renderDashboard();
+    } catch(error){toast("ยกเลิกการกำหนดการสอนไม่สำเร็จ",error?.message||"เกิดข้อผิดพลาด","error");}
+    finally { buttonLoading(btn,false); }
   }));
   document.querySelectorAll("[data-timetable-assignment-drag]").forEach(el=>el.addEventListener("dragstart",e=>e.dataTransfer.setData("text/plain",JSON.stringify({kind:"assignment",id:el.dataset.timetableAssignmentDrag}))));
   document.querySelectorAll("[data-timetable-entry-drag]").forEach(el=>el.addEventListener("dragstart",e=>e.dataTransfer.setData("text/plain",JSON.stringify({kind:"entry",id:el.dataset.timetableEntryDrag}))));
