@@ -891,7 +891,7 @@ async function fetchOwnProfile() {
   return data;
 }
 
-async function bootstrapApp() {
+async function bootstrapAppInner() {
   if (!state.systemSettings || !state.departments.length || !state.subjectGroups.length) await loadPublicData();
   const { data: { session } } = await supabase.auth.getSession();
   state.session = session;
@@ -917,6 +917,14 @@ async function bootstrapApp() {
 
   await loadActiveUserData();
   renderDashboard();
+}
+
+// Share the same in-flight boot operation across auth + explicit UI triggers.
+let bootstrapAppInFlight = null;
+function bootstrapApp() {
+  if (bootstrapAppInFlight) return bootstrapAppInFlight;
+  bootstrapAppInFlight = bootstrapAppInner().finally(() => { bootstrapAppInFlight = null; });
+  return bootstrapAppInFlight;
 }
 
 function renderPending() {
@@ -977,7 +985,8 @@ function renderPending() {
 }
 
 async function loadActiveUserData() {
-  await loadPublicData();
+  // The initial bootstrap already loaded shared catalog data.
+  if (!state.systemSettings || !state.departments.length || !state.subjectGroups.length) await loadPublicData();
   const [departmentsRes, modulesRes, notificationsRes, personnelOwnRes, academicTermsRes, academicCalendarSettingsRes, academicSupervisionSettingsRes, academicRegistrationSettingsRes, academicCertificateSettingsRes, academicDocumentServiceSettingsRes, procurementAccessRes] = await Promise.all([
     supabase.from("departments").select("*").eq("is_active", true).order("sort_order"),
     supabase.from("modules").select("*, departments(code,name_th,name_en)").eq("is_active", true).order("sort_order"),
@@ -15514,7 +15523,7 @@ function renderSystemError(title, message) {
 function subscribeRealtime() {
   return supabase
     .channel("school-os:user-events", { config: { private: false } })
-    .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, async () => {
+    .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `recipient_id=eq.${state.user.id}` }, async () => {
       if (!state.user || state.profile?.account_status !== "active") return;
       await loadActiveUserData();
       await renderDashboard();
@@ -15626,19 +15635,28 @@ document.addEventListener("click",event=>{
   const dsExport=event.target.closest?.("[data-document-service-export]");if(dsExport){event.preventDefault();return academicDocumentServiceExport(dsExport.dataset.documentServiceExport);}
 });
 
-supabase.auth.onAuthStateChange(async (event, session) => {
+supabase.auth.onAuthStateChange((event, session) => {
   state.session = session;
   state.user = session?.user || null;
 
+  // Initial loading is handled below. Token refreshes must not re-fetch
+  // every application module or recreate the Realtime subscription.
+  if (["INITIAL_SESSION", "TOKEN_REFRESHED", "USER_UPDATED"].includes(event)) return;
+  if (event === "SIGNED_IN" && state.profile?.id === state.user?.id && realtimeChannel) return;
+
   if (realtimeChannel) {
-    await supabase.removeChannel(realtimeChannel);
+    const previousChannel = realtimeChannel;
     realtimeChannel = null;
+    void supabase.removeChannel(previousChannel);
   }
 
   if (state.user) {
+    const signedInUserId = state.user.id;
     setTimeout(async () => {
       await bootstrapApp();
-      realtimeChannel = subscribeRealtime();
+      if (state.user?.id === signedInUserId && !realtimeChannel) {
+        realtimeChannel = subscribeRealtime();
+      }
     }, 0);
   } else {
     state.profile = null;
