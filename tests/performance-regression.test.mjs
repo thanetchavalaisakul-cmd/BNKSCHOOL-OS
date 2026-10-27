@@ -78,3 +78,47 @@ test("master entry respects stage role and timetable navigation skips refetch", 
   assert.ok(app.includes("function renderTimetableNavigation()"));
   assert.ok(app.includes("renderTimetableNavigation();"));
 });
+
+test("clicking a timetable subject exposes its edit, copy and safe remove actions", () => {
+  const panel = functionSnippet("function timetableMasterSubjectPanel(", "\nfunction ");
+  const modal = functionSnippet("function timetableManageSubjectModal(", "\nfunction timetableCopySubjectsModal(");
+  assert.match(panel, /data-manage-timetable-subject/);
+  assert.match(panel, /copy-timetable-subjects/);
+  assert.match(modal, /subject_name/);
+  assert.match(modal, /subject_code/);
+  assert.match(modal, /subject_group_id/);
+  assert.match(modal, /is_active:false/);
+  assert.match(modal, /linkedActive\.length>1/);
+  assert.doesNotMatch(modal, /\.delete\(\)/);
+});
+
+test("copy-room chooser is restricted to the same grade, academic year and semester", () => {
+  const source = functionSnippet("function timetableCopySubjectsModal(", "\nfunction bindTimetableSubjectManageEvents(");
+  const expression = source.match(/const targets=(timetableFilteredClasses\(\)\.filter\([^;]+\));/);
+  assert.ok(expression, "Target-room filter was not found");
+  const sourceClass = {id:"p11", academic_year:"2569",semester:2,level_name:"ป.1",stage_code:"stage1"};
+  const rooms = [
+    sourceClass,
+    {id:"p12",academic_year:"2569",semester:2,level_name:"ป.1",stage_code:"stage1"},
+    {id:"p13",academic_year:"2569",semester:2,level_name:"ป.1",stage_code:"stage1"},
+    {id:"p14",academic_year:"2569",semester:1,level_name:"ป.1",stage_code:"stage1"},
+    {id:"p21",academic_year:"2569",semester:2,level_name:"ป.2",stage_code:"stage1"},
+    {id:"p11old",academic_year:"2568",semester:2,level_name:"ป.1",stage_code:"stage1"},
+    {id:"p15",academic_year:"2569",semester:2,level_name:"ป.1",stage_code:"stage2"}
+  ];
+  const choose = new Function("source","timetableFilteredClasses","canManageTimetableSubjectForClass",
+    "return "+expression[1]);
+  const choices = choose(sourceClass,()=>rooms,c=>c.stage_code==="stage1");
+  assert.deepEqual(choices.map(x=>x.id),["p12","p13"]);
+  assert.match(source,/existing\?\.is_active!==false/);
+  assert.match(source,/\.insert\(inserts\)/);
+  assert.match(source,/\.update\(\{is_active:true\}\)/);
+});
+
+test("new subject actions are wired to both buttons and row title", () => {
+  const ui = functionSnippet("function bindTimetableSubjectManageEvents(", "\nfunction teachingAssignmentModal(");
+  assert.match(ui,/\[data-manage-timetable-subject\]/);
+  assert.match(ui,/\[data-copy-timetable-subject\]/);
+  assert.match(ui,/\#copy-timetable-subjects/);
+  assert.ok(app.includes("bindTimetableSubjectManageEvents();"));
+});
