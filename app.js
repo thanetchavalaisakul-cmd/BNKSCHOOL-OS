@@ -5138,7 +5138,7 @@ function timetableAssignmentDetails(id) {
   if (!a) return null;
   return {
     ...a,
-    subject: state.timetableSubjects.find(s => s.id === a.subject_id) || null,
+    subject: timetableSubjectInClass(a.class_id,a.subject_id),
     classRow: state.timetableClasses.find(c => c.id === a.class_id) || null,
   };
 }
@@ -5788,7 +5788,7 @@ function timetablePlannerHtml() {
       <aside class="panel timetable-palette">
         <div class="panel-head"><div class="panel-title-wrap"><h3>รายวิชาของห้องนี้</h3><p>${status==="draft"?"ลากการ์ดลงช่องตาราง":"นำกลับเป็นฉบับร่างก่อนแก้ไข"}</p></div></div>
         <div class="timetable-assignment-list">${assignments.length?assignments.map(a=>{
-          const s=state.timetableSubjects.find(x=>x.id===a.subject_id);
+          const s=timetableSubjectInClass(a.class_id,a.subject_id);
           const prog=timetableAssignmentProgress(a);
           const draggable=status==="draft"&&prog.remaining>0;
           return `<div class="timetable-assignment-card ${prog.remaining===0?"complete":""}" ${draggable?`draggable="true" data-timetable-assignment-drag="${a.id}"`:""}>
@@ -5805,9 +5805,15 @@ function timetableSubjectMasterScopeClass(){
   if(state.timetableSubjectMasterScope==="preschool")return classes.find(c=>c.stage_code==="early_childhood")||null;
   return classes.find(c=>c.id===state.timetableSubjectMasterScope)||selectedTimetableClass()||classes[0]||null;
 }
+function timetableSubjectInClass(classId, subjectId) {
+  const master=state.timetableSubjects.find(s=>s.id===subjectId);
+  if(!master)return null;
+  const offering=state.timetableSubjectOfferings.find(o=>o.class_id===classId&&o.subject_id===subjectId);
+  return offering?.subject_name_override ? {...master,subject_name:offering.subject_name_override} : master;
+}
 function timetableSubjectsOfferedForClass(classId,{includeArchived=false}={}){
   const offered=new Set(state.timetableSubjectOfferings.filter(row=>row.class_id===classId&&(includeArchived||row.is_active!==false)).map(row=>row.subject_id));
-  return state.timetableSubjects.filter(subject=>offered.has(subject.id));
+  return state.timetableSubjects.filter(subject=>offered.has(subject.id)).map(s=>timetableSubjectInClass(classId,s.id));
 }
 function timetableMasterSubjectPanel(classes){
   const c=timetableSubjectMasterScopeClass();
@@ -5816,15 +5822,15 @@ function timetableMasterSubjectPanel(classes){
   const archived=c&&!preschool?state.timetableSubjectOfferings.filter(x=>x.class_id===c.id&&x.is_active===false&&state.timetableSubjects.some(s=>s.id===x.subject_id)):[];
   return `<section class="panel timetable-subject-scope-panel">
     <div class="panel-head"><div class="panel-title-wrap"><h3>${preschool?"หน่วยการเรียนรู้ร่วมกัน (อนุบาล)":"Master รายวิชาที่เปิดสอน"}</h3><p>${preschool?"หน่วยรายสัปดาห์ชุดเดียวสำหรับทุกห้องอนุบาล":"รายวิชาแยกตามชั้น/ห้อง ไม่ปะปนกัน"}</p></div>
-    ${!preschool&&canManageTimetableSubjectForClass(c)?`<button class="btn btn-primary" id="new-timetable-subject" ${c&&!state.timetableSubjectOfferingsError?"":"disabled"}>＋ เพิ่มวิชาห้องนี้</button>`:""}</div>
+    ${!preschool&&canManageTimetableSubjectForClass(c)?`<div class="admin-actions"><button class="btn btn-secondary" id="copy-timetable-subjects" ${list.length?"":"disabled"}>คัดลอกทั้งชุด</button><button class="btn btn-primary" id="new-timetable-subject" ${c&&!state.timetableSubjectOfferingsError?"":"disabled"}>＋ เพิ่มวิชาห้องนี้</button></div>`:""}</div>
     <div class="field" style="margin-bottom:12px"><label>เลือกชั้น / ห้อง</label><select class="select" id="timetable-master-class-select">
       ${classes.some(c=>c.stage_code==="early_childhood")?`<option value="preschool" ${preschool?"selected":""}>อนุบาล — ดูหน่วยร่วมกันทุกห้อง</option>`:""}
       ${classes.filter(x=>x.stage_code!=="early_childhood").map(row=>`<option value="${row.id}" ${!preschool&&c?.id===row.id?"selected":""}>${escapeHtml(schoolClassLabel(row))}</option>`).join("")}
     </select></div>
     ${state.timetableSubjectOfferingsError&&!preschool?`<div class="drive-permission-warning">กรุณาติดตั้ง SQL v5.12.9.4 ก่อน (${escapeHtml(state.timetableSubjectOfferingsError)})</div>`:""}
     ${preschool?`${preschoolUnitTableHtml(c.id,{readonly:true})}<div class="preschool-tip">แก้ไขหน่วยได้ที่แท็บ “จัดตาราง” โดยเลือกห้องอนุบาลใดก็ได้ การแก้ไขจะสะท้อนทุกห้อง</div>`:
-    `<div class="list timetable-master-list">${list.length?list.map(s=>`<div class="list-item"><div class="list-body"><strong>${escapeHtml(s.subject_name)}</strong><p>${escapeHtml(s.subject_code||"ไม่มีรหัสวิชา")}</p></div>${canManageSchoolTimetableMaster()?`<button class="btn btn-danger" data-delete-timetable-subject="${s.id}" data-subject-class="${c.id}">นำออกจากห้อง</button>`:""}</div>`).join(""):`<div class="empty"><strong>ห้องนี้ยังไม่มีรายวิชาที่เปิดสอน</strong><span>กดเพิ่มรายวิชาเพื่อผูกกับห้องที่เลือก</span></div>`}</div>
-     ${archived.length&&canManageTimetableSubjectForClass(c)?`<details style="margin-top:10px"><summary>รายการที่นำออกจากห้อง (${archived.length})</summary><div class="list">${archived.map(row=>{const s=state.timetableSubjects.find(x=>x.id===row.subject_id);return `<div class="list-item"><span>${escapeHtml(s.subject_name)}</span><button class="btn btn-ghost" data-restore-timetable-subject="${s.id}" data-subject-class="${c.id}">คืนรายการ</button></div>`;}).join("")}</div></details>`:""}`}
+    `<div class="list timetable-master-list">${list.length?list.map(s=>`<div class="list-item"><div class="list-body"><strong>${canManageTimetableSubjectForClass(c)?`<button type="button" class="btn btn-ghost" style="padding:0;text-align:left;font-weight:700" data-edit-timetable-subject="${s.id}" data-subject-class="${c.id}">${escapeHtml(s.subject_name)} ✎</button>`:escapeHtml(s.subject_name)}</strong><p>${escapeHtml(s.subject_code||"ไม่มีรหัสวิชา")}</p></div>${canManageTimetableSubjectForClass(c)?`<div class="admin-actions"><button type="button" class="btn btn-secondary" data-copy-timetable-subject="${s.id}" data-subject-class="${c.id}">คัดลอก</button><button type="button" class="btn btn-danger" data-delete-timetable-subject="${s.id}" data-subject-class="${c.id}">นำออก</button></div>`:""}</div>`).join(""):`<div class="empty"><strong>ห้องนี้ยังไม่มีรายวิชาที่เปิดสอน</strong><span>กดเพิ่มรายวิชาเพื่อผูกกับห้องที่เลือก</span></div>`}</div>
+     ${archived.length&&canManageTimetableSubjectForClass(c)?`<details style="margin-top:10px"><summary>รายการที่นำออกจากห้อง (${archived.length})</summary><div class="list">${archived.map(row=>{const s=timetableSubjectInClass(c.id,row.subject_id);return `<div class="list-item"><span>${escapeHtml(s.subject_name)}</span><button class="btn btn-ghost" data-restore-timetable-subject="${s.id}" data-subject-class="${c.id}">คืนรายการ</button></div>`;}).join("")}</div></details>`:""}`}
   </section>`;
 }
 
@@ -5846,7 +5852,7 @@ function timetableSetupHtml() {
   <section class="panel" style="margin-top:16px">
     <div class="panel-head"><div class="panel-title-wrap"><h3>${currentClass?.stage_code==="early_childhood"?"การจัดประสบการณ์ปฐมวัย":"วิชา + ชั้น/ห้อง + ครูผู้สอน"}</h3><p>${currentClass?`กำลังดู ${escapeHtml(schoolClassLabel(currentClass))}`:"เลือกชั้น/ห้องก่อน"}</p></div>${currentClass?.stage_code!=="early_childhood"?`<button class="btn btn-primary" id="new-teaching-assignment" ${currentClass?"":"disabled"}>＋ กำหนดการสอน</button>`:""}</div>
     ${currentClass?.stage_code==="early_childhood"?`<div class="preschool-tip"><strong>ไม่ต้องกำหนดวิชาเป็นคาบ</strong><span>ใช้หน่วยจัดประสบการณ์รายสัปดาห์ร่วมกันทุกห้องอนุบาล จัดการได้ที่แท็บ “จัดตาราง”</span></div>`:(currentClass ? (assignments.length?`<div class="table-wrap"><table class="table"><thead><tr><th>วิชา</th><th>ครูผู้สอน</th><th>คาบ/สัปดาห์</th><th>จัดแล้ว</th><th></th></tr></thead><tbody>${assignments.map(a=>{
-      const s=state.timetableSubjects.find(x=>x.id===a.subject_id); const p=timetableAssignmentProgress(a);
+      const s=timetableSubjectInClass(a.class_id,a.subject_id); const p=timetableAssignmentProgress(a);
       return `<tr><td><strong>${escapeHtml(s?.subject_name||"—")}</strong><br><span class="table-muted">${escapeHtml(s?.subject_code||"")}</span></td><td>${escapeHtml(a.teacher_name||"ครูผู้สอน")}</td><td>${a.periods_per_week}</td><td>${p.used}/${p.target}</td><td><button class="btn btn-danger" data-delete-teaching-assignment="${a.id}">ยกเลิก</button></td></tr>`;
     }).join("")}</tbody></table></div>`:`<div class="empty"><strong>ยังไม่มีการกำหนดวิชา/ครู</strong></div>`) : `<div class="empty"><strong>เลือกชั้น/ห้อง</strong></div>`)}
   </section>`;
@@ -6089,6 +6095,80 @@ function timetablePeriodModal(classId) {
     toast("บันทึกโครงตารางแล้ว",`${n} คาบรวมพักกลางวัน · พักเป็นคาบ ${lunchPos}`,"success");
     await renderDashboard();
   });
+}
+
+
+function timetableEditSubjectModal(classId,subjectId) {
+  const c=state.timetableClasses.find(x=>x.id===classId);
+  const master=state.timetableSubjects.find(x=>x.id===subjectId);
+  const subject=timetableSubjectInClass(classId,subjectId);
+  if(!c||!master||!subject||!canManageTimetableSubjectForClass(c))return toast("ไม่มีสิทธิ์แก้ไขรายการนี้","","error");
+  const modal=document.createElement("div");modal.className="modal-backdrop";
+  modal.innerHTML='<div class="modal"><div class="modal-head"><div><h3>แก้ไขรายวิชา · '+escapeHtml(schoolClassLabel(c))+'</h3><p>ชื่อที่แก้ไขจะมีผลเฉพาะห้องนี้ ไม่เปลี่ยนชื่อในห้องอื่น</p></div><button class="modal-close">×</button></div>'+
+    '<div class="form-grid"><div class="field"><label>ชื่อรายวิชา</label><input class="input" id="edit-subject-name" required maxlength="200" value="'+escapeHtml(subject.subject_name)+'"></div>'+
+    '<div class="helper">รหัสวิชาและกลุ่มสาระยังอ้างอิงจาก Master กลาง</div></div>'+
+    '<div class="modal-actions" style="flex-wrap:wrap"><button class="btn btn-secondary" id="edit-subject-copy">คัดลอกไปห้องอื่น</button><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="edit-subject-save">บันทึกชื่อ</button></div></div>';
+  document.body.appendChild(modal);
+  const close=()=>modal.remove();
+  modal.querySelector(".modal-close").onclick=close;modal.querySelector(".modal-cancel").onclick=close;
+  modal.querySelector("#edit-subject-copy").onclick=()=>{close();timetableCopySubjectsModal(classId,subjectId);};
+  modal.querySelector("#edit-subject-save").onclick=async e=>{
+    const input=modal.querySelector("#edit-subject-name");
+    if(!input.reportValidity())return;
+    const name=input.value.trim();
+    if(!name||name.length>200)return toast("ชื่อรายวิชาไม่ถูกต้อง","ต้องมีความยาว 1–200 ตัวอักษร","error");
+    if(timetableSubjectsOfferedForClass(c.id).some(x=>x.id!==subjectId&&x.subject_name.trim()===name))
+      return toast("ชื่อรายวิชาซ้ำ","ห้องนี้มีชื่อรายวิชาดังกล่าวแล้ว","error");
+    buttonLoading(e.currentTarget,true,"กำลังบันทึก...");
+    try{
+      const override=name===master.subject_name?null:name;
+      const {data,error}=await supabase.from("academic_class_subject_offerings").update({subject_name_override:override})
+        .eq("class_id",c.id).eq("subject_id",subjectId).select("subject_id").single();
+      if(error||!data)throw error||new Error("ไม่พบรายการที่มีสิทธิ์แก้ไข");
+      close();toast("แก้ชื่อรายวิชาแล้ว",schoolClassLabel(c),"success");await renderDashboard();
+    }catch(error){toast("แก้ไขไม่สำเร็จ",error.message||String(error),"error");}
+    finally{buttonLoading(e.currentTarget,false);}
+  };
+}
+
+function timetableCopySubjectsModal(sourceClassId=null,subjectId=null) {
+  const source=state.timetableClasses.find(c=>c.id===(sourceClassId||timetableSubjectMasterScopeClass()?.id));
+  if(!source||!canManageTimetableSubjectForClass(source))return toast("ไม่มีสิทธิ์คัดลอกรายวิชา","","error");
+  const subjects=timetableSubjectsOfferedForClass(source.id).filter(s=>!subjectId||s.id===subjectId);
+  if(!subjects.length)return toast("ยังไม่มีรายวิชาให้คัดลอก","","error");
+  const targets=timetableFilteredClasses().filter(c=>c.id!==source.id&&c.level_name===source.level_name
+    &&c.stage_code===source.stage_code&&c.academic_year===source.academic_year
+    &&Number(c.semester)===Number(source.semester)&&canManageTimetableSubjectForClass(c));
+  if(!targets.length)return toast("ไม่มีห้องปลายทาง","เพิ่มห้องระดับชั้นเดียวกันในภาคเรียนนี้ก่อน","error");
+  const modal=document.createElement("div");modal.className="modal-backdrop";
+  const options=targets.map(c=>'<label style="display:flex;align-items:center;gap:10px;padding:8px"><input type="checkbox" data-target-class="'+c.id+'"><span>'+escapeHtml(schoolClassLabel(c))+'</span></label>').join("");
+  modal.innerHTML='<div class="modal"><div class="modal-head"><div><h3>คัดลอกรายวิชาไปห้องอื่น</h3><p>จาก '+escapeHtml(schoolClassLabel(source))+' · '+subjects.length+' รายการ</p></div><button class="modal-close">×</button></div>'+
+    '<div class="helper">เลือกห้องปลายทางหลายห้องได้ (ระดับชั้นและภาคเรียนเดียวกัน) คัดลอกเฉพาะรายวิชา ไม่คัดลอกครูหรือคาบเรียน รายการซ้ำจะข้ามโดยไม่เขียนทับ</div>'+
+    '<div style="max-height:38vh;overflow-y:auto">'+options+'</div>'+
+    '<div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="copy-subject-confirm">คัดลอกไปห้องที่เลือก</button></div></div>';
+  document.body.appendChild(modal);
+  const close=()=>modal.remove();modal.querySelector(".modal-close").onclick=close;modal.querySelector(".modal-cancel").onclick=close;
+  modal.querySelector("#copy-subject-confirm").onclick=async e=>{
+    const chosen=[...modal.querySelectorAll("[data-target-class]:checked")].map(x=>x.dataset.targetClass);
+    const valid=new Set(targets.map(x=>x.id));
+    if(!chosen.length||chosen.some(x=>!valid.has(x)))return toast("กรุณาเลือกห้องปลายทาง","","error");
+    const existing=new Set(state.timetableSubjectOfferings.map(o=>o.class_id+":"+o.subject_id));
+    const newRows=chosen.flatMap(classId=>subjects.filter(s=>!existing.has(classId+":"+s.id)).map(s=>({
+      class_id:classId,subject_id:s.id,created_by:state.user.id,is_active:true,
+      subject_name_override:state.timetableSubjectOfferings.find(o=>o.class_id===source.id&&o.subject_id===s.id)?.subject_name_override||null
+    })));
+    if(!newRows.length)return toast("รายวิชามีอยู่แล้ว","ห้องที่เลือกมีรายวิชาชุดนี้ครบแล้ว","default");
+    if(!confirm("คัดลอก "+newRows.length+" รายการไป "+chosen.length+" ห้องหรือไม่?\n\nไม่แก้รายการเดิมและข้อมูลตารางสอน"))return;
+    buttonLoading(e.currentTarget,true,"กำลังคัดลอก...");
+    try{
+      const {error}=await supabase.from("academic_class_subject_offerings")
+        .upsert(newRows,{onConflict:"class_id,subject_id",ignoreDuplicates:true});
+      if(error)throw error;
+      close();toast("คัดลอกรายวิชาแล้ว","คัดลอกได้สูงสุด "+newRows.length+" รายการ โดยข้ามรายการซ้ำ","success");
+      await renderDashboard();
+    }catch(error){toast("คัดลอกไม่สำเร็จ",error.message||String(error),"error");}
+    finally{buttonLoading(e.currentTarget,false);}
+  };
 }
 
 function timetableSubjectModal(){
@@ -15196,6 +15276,9 @@ function bindDashboardEvents() {
     renderTimetableNavigation();
   });
   document.querySelectorAll("#new-timetable-subject").forEach(btn=>btn.addEventListener("click",()=>timetableSubjectModal()));
+  document.querySelector("#copy-timetable-subjects")?.addEventListener("click",()=>timetableCopySubjectsModal());
+  document.querySelectorAll("[data-copy-timetable-subject]").forEach(btn=>btn.addEventListener("click",()=>timetableCopySubjectsModal(btn.dataset.subjectClass,btn.dataset.copyTimetableSubject)));
+  document.querySelectorAll("[data-edit-timetable-subject]").forEach(btn=>btn.addEventListener("click",()=>timetableEditSubjectModal(btn.dataset.subjectClass,btn.dataset.editTimetableSubject)));
   document.querySelectorAll("#new-teaching-assignment").forEach(btn=>btn.addEventListener("click",()=>teachingAssignmentModal()));
   document.querySelectorAll("[data-open-period-settings]").forEach(btn=>btn.addEventListener("click",()=>{state.timetableView="periods";renderDashboard();}));
   document.querySelectorAll("[data-configure-periods]").forEach(btn=>btn.addEventListener("click",()=>openTimetablePeriodModal(btn.dataset.configurePeriods)));
