@@ -5809,25 +5809,25 @@ function timetableSubjectsOfferedForClass(classId,{includeArchived=false}={}){
   const offered=new Set(state.timetableSubjectOfferings.filter(row=>row.class_id===classId&&(includeArchived||row.is_active!==false)).map(row=>row.subject_id));
   return state.timetableSubjects.filter(subject=>offered.has(subject.id));
 }
-function timetableMasterSubjectPanel(classes){
+function timetableMasterSubjectPanel(classes) {
   const c=timetableSubjectMasterScopeClass();
   const preschool=!!c&&c.stage_code==="early_childhood";
   const list=preschool?preschoolClassUnits(c.id):c?timetableSubjectsOfferedForClass(c.id):[];
   const archived=c&&!preschool?state.timetableSubjectOfferings.filter(x=>x.class_id===c.id&&x.is_active===false&&state.timetableSubjects.some(s=>s.id===x.subject_id)):[];
+  const canEdit=c&&!preschool&&canManageTimetableSubjectForClass(c);
   return `<section class="panel timetable-subject-scope-panel">
-    <div class="panel-head"><div class="panel-title-wrap"><h3>${preschool?"หน่วยการเรียนรู้ร่วมกัน (อนุบาล)":"Master รายวิชาที่เปิดสอน"}</h3><p>${preschool?"หน่วยรายสัปดาห์ชุดเดียวสำหรับทุกห้องอนุบาล":"รายวิชาแยกตามชั้น/ห้อง ไม่ปะปนกัน"}</p></div>
-    ${!preschool&&canManageTimetableSubjectForClass(c)?`<button class="btn btn-primary" id="new-timetable-subject" ${c&&!state.timetableSubjectOfferingsError?"":"disabled"}>＋ เพิ่มวิชาห้องนี้</button>`:""}</div>
+    <div class="panel-head"><div class="panel-title-wrap"><h3>${preschool?"หน่วยการเรียนรู้ร่วมกัน (อนุบาล)":"Master รายวิชาที่เปิดสอน"}</h3><p>${preschool?"หน่วยรายสัปดาห์ชุดเดียวสำหรับทุกห้องอนุบาล":"คลิกชื่อวิชาเพื่อแก้ไข นำออกจากห้อง หรือคัดลอกไปห้องอื่น"}</p></div>
+    ${canEdit?`<div class="lesson-hero-actions"><button class="btn btn-primary" id="new-timetable-subject" ${c&&!state.timetableSubjectOfferingsError?"":"disabled"}>＋ เพิ่มวิชาห้องนี้</button><button class="btn btn-secondary" id="copy-timetable-subjects" ${list.length?"":"disabled"}>คัดลอกทั้งชุดไปห้องอื่น</button></div>`:""}</div>
     <div class="field" style="margin-bottom:12px"><label>เลือกชั้น / ห้อง</label><select class="select" id="timetable-master-class-select">
       ${classes.some(c=>c.stage_code==="early_childhood")?`<option value="preschool" ${preschool?"selected":""}>อนุบาล — ดูหน่วยร่วมกันทุกห้อง</option>`:""}
       ${classes.filter(x=>x.stage_code!=="early_childhood").map(row=>`<option value="${row.id}" ${!preschool&&c?.id===row.id?"selected":""}>${escapeHtml(schoolClassLabel(row))}</option>`).join("")}
     </select></div>
     ${state.timetableSubjectOfferingsError&&!preschool?`<div class="drive-permission-warning">กรุณาติดตั้ง SQL v5.12.9.4 ก่อน (${escapeHtml(state.timetableSubjectOfferingsError)})</div>`:""}
     ${preschool?`${preschoolUnitTableHtml(c.id,{readonly:true})}<div class="preschool-tip">แก้ไขหน่วยได้ที่แท็บ “จัดตาราง” โดยเลือกห้องอนุบาลใดก็ได้ การแก้ไขจะสะท้อนทุกห้อง</div>`:
-    `<div class="list timetable-master-list">${list.length?list.map(s=>`<div class="list-item"><div class="list-body"><strong>${escapeHtml(s.subject_name)}</strong><p>${escapeHtml(s.subject_code||"ไม่มีรหัสวิชา")}</p></div>${canManageSchoolTimetableMaster()?`<button class="btn btn-danger" data-delete-timetable-subject="${s.id}" data-subject-class="${c.id}">นำออกจากห้อง</button>`:""}</div>`).join(""):`<div class="empty"><strong>ห้องนี้ยังไม่มีรายวิชาที่เปิดสอน</strong><span>กดเพิ่มรายวิชาเพื่อผูกกับห้องที่เลือก</span></div>`}</div>
-     ${archived.length&&canManageTimetableSubjectForClass(c)?`<details style="margin-top:10px"><summary>รายการที่นำออกจากห้อง (${archived.length})</summary><div class="list">${archived.map(row=>{const s=state.timetableSubjects.find(x=>x.id===row.subject_id);return `<div class="list-item"><span>${escapeHtml(s.subject_name)}</span><button class="btn btn-ghost" data-restore-timetable-subject="${s.id}" data-subject-class="${c.id}">คืนรายการ</button></div>`;}).join("")}</div></details>`:""}`}
+    `<div class="list timetable-master-list">${list.length?list.map(s=>`<div class="list-item"><div class="list-body">${canEdit?`<button type="button" class="btn btn-ghost" data-manage-timetable-subject="${s.id}" data-subject-class="${c.id}" style="padding:0;text-align:left;font-weight:700;white-space:normal">${escapeHtml(s.subject_name)} ✎</button>`:`<strong>${escapeHtml(s.subject_name)}</strong>`}<p>${escapeHtml(s.subject_code||"ไม่มีรหัสวิชา")}</p></div>${canEdit?`<button class="btn btn-secondary" data-copy-timetable-subject="${s.id}" data-subject-class="${c.id}">คัดลอก</button><button class="btn btn-ghost" data-manage-timetable-subject="${s.id}" data-subject-class="${c.id}">จัดการ</button>`:""}</div>`).join(""):`<div class="empty"><strong>ห้องนี้ยังไม่มีรายวิชาที่เปิดสอน</strong><span>กดเพิ่มรายวิชาเพื่อผูกกับห้องที่เลือก</span></div>`}</div>
+     ${archived.length&&canEdit?`<details style="margin-top:10px"><summary>รายการที่นำออกจากห้อง (${archived.length})</summary><div class="list">${archived.map(row=>{const s=state.timetableSubjects.find(x=>x.id===row.subject_id);return `<div class="list-item"><span>${escapeHtml(s.subject_name)}</span><button class="btn btn-ghost" data-restore-timetable-subject="${s.id}" data-subject-class="${c.id}">คืนรายการ</button></div>`;}).join("")}</div></details>`:""}`}
   </section>`;
 }
-
 function timetableSetupHtml() {
   const classes = timetableFilteredClasses();
   const currentClass = selectedTimetableClass() || classes[0] || null;
@@ -6123,6 +6123,128 @@ function timetableSubjectModal(){
       toast("เพิ่มรายวิชาไม่ได้",`${error.message||String(error)}${newlyCreated&&!isAcademicHead()?" · วิชาใหม่ถูกสร้างใน Master แล้ว แต่ยังผูกห้องไม่สำเร็จ สามารถเลือกวิชาเดิมเพื่อลองอีกครั้ง":""}`,"error");
     }finally{buttonLoading(e.currentTarget,false);}
   };
+}
+
+function timetableManageSubjectModal(subjectId,classId) {
+  const c=state.timetableClasses.find(row=>row.id===classId);
+  const subject=state.timetableSubjects.find(row=>row.id===subjectId);
+  if(!c||!subject||!canManageTimetableSubjectForClass(c))return toast("ไม่มีสิทธิ์จัดการรายวิชา","ตรวจสอบห้องและสิทธิ์ของคุณ","error");
+  const link=state.timetableSubjectOfferings.find(o=>o.class_id===c.id&&o.subject_id===subject.id&&o.is_active!==false);
+  if(!link)return toast("ไม่พบรายวิชาของห้องนี้","กรุณารีเฟรชรายวิชา","error");
+  const linkedEverywhere=state.timetableSubjectOfferings.filter(o=>o.subject_id===subject.id);
+  const linkedActive=linkedEverywhere.filter(o=>o.is_active!==false);
+  const otherManaged=linkedEverywhere.every(o=>{
+    const room=state.timetableClasses.find(row=>row.id===o.class_id);
+    return !!room&&canManageTimetableSubjectForClass(room);
+  });
+  const canEditMaster=isAcademicHead()||otherManaged;
+  const modal=document.createElement("div");
+  modal.className="modal-backdrop";
+  modal.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>จัดการรายวิชา — ${escapeHtml(schoolClassLabel(c))}</h3><p>แก้ไขข้อมูล นำออกจากห้อง หรือคัดลอกไปห้องอื่น</p></div><button class="modal-close">×</button></div>
+    <form class="form-grid" id="edit-timetable-subject-form">
+      <div class="field"><label>ชื่อรายวิชา</label><input class="input" name="subject_name" value="${escapeHtml(subject.subject_name)}" required ${canEditMaster?"":"disabled"}></div>
+      <div class="form-row"><div class="field"><label>รหัสวิชา (ไม่บังคับ)</label><input class="input" name="subject_code" value="${escapeHtml(subject.subject_code||"")}" ${canEditMaster?"":"disabled"}></div><div class="field"><label>กลุ่มสาระ</label><select class="select" name="subject_group_id" ${canEditMaster?"":"disabled"}><option value="">ไม่ระบุ</option>${state.subjectGroups.map(g=>`<option value="${g.id}" ${g.id===subject.subject_group_id?"selected":""}>${escapeHtml(g.name_th)}</option>`).join("")}</select></div></div>
+      <div class="field"><small>${linkedActive.length>1?`รายวิชานี้ใช้ร่วมกัน ${linkedActive.length} ห้อง การแก้ไขชื่อ รหัส หรือกลุ่มสาระจะเปลี่ยนในทุกห้องที่ใช้ร่วมกัน`:"การแก้ไขข้อมูลรายวิชาจะบันทึกที่ Master โดยไม่ลบตารางสอนเดิม"}${canEditMaster?"":" · รายวิชานี้เชื่อมกับห้องนอกช่วงชั้นของคุณ ต้องให้หัวหน้าวิชาการแก้ไขข้อมูล Master"}</small></div>
+    </form>
+    <div class="modal-actions" style="flex-wrap:wrap"><button class="btn btn-danger" id="remove-subject-from-room">นำออกจากห้องนี้</button><button class="btn btn-secondary" id="copy-subject-from-room">คัดลอกไปห้องอื่น</button><button class="btn btn-ghost modal-cancel">ยกเลิก</button>${canEditMaster?`<button class="btn btn-primary" id="save-edited-subject">บันทึกการแก้ไข</button>`:""}</div></div>`;
+  document.body.appendChild(modal);
+  const close=()=>modal.remove();
+  modal.querySelector(".modal-close").onclick=close;
+  modal.querySelector(".modal-cancel").onclick=close;
+  modal.querySelector("#copy-subject-from-room").onclick=()=>{close();timetableCopySubjectsModal(c.id,subject.id);};
+  modal.querySelector("#remove-subject-from-room").onclick=async e=>{
+    const count=state.timetableAssignments.filter(a=>a.class_id===c.id&&a.subject_id===subject.id).length;
+    if(!confirm(`นำ “${subject.subject_name}” ออกจากห้อง ${schoolClassLabel(c)} หรือไม่?\n\nรายวิชานี้จะไม่ปรากฏใน Master ของห้องนี้ แต่ข้อมูลตารางสอน/การมอบหมายเดิม ${count?"("+count+" รายการ) ":""}จะยังถูกเก็บไว้ สามารถคืนรายวิชาในภายหลังได้`))return;
+    buttonLoading(e.currentTarget,true,"กำลังนำออก...");
+    try {
+      const {data,error}=await supabase.from("academic_class_subject_offerings").update({is_active:false}).eq("class_id",c.id).eq("subject_id",subject.id).select("class_id");
+      if(error)throw error;
+      if(!data?.length)throw new Error("ไม่สามารถแก้ไขรายการได้ โปรดตรวจสอบสิทธิ์");
+      close();await loadTimetableWorkspace();await renderTimetableNavigation();
+      toast("นำรายวิชาออกจากห้องแล้ว","รายวิชาของห้องอื่นและข้อมูลย้อนหลังยังอยู่","success");
+    }catch(error){toast("นำรายวิชาออกไม่สำเร็จ",error.message||String(error),"error");}
+    finally{buttonLoading(e.currentTarget,false);}
+  };
+  if(!canEditMaster)return;
+  modal.querySelector("#save-edited-subject").onclick=async e=>{
+    const f=modal.querySelector("#edit-timetable-subject-form");
+    if(!f.reportValidity())return;
+    const fd=new FormData(f);
+    const name=String(fd.get("subject_name")||"").trim();
+    const code=String(fd.get("subject_code")||"").trim()||null;
+    const group=String(fd.get("subject_group_id")||"")||null;
+    if(!name)return toast("กรุณากรอกชื่อรายวิชา","","error");
+    const same=state.timetableSubjects.some(row=>row.id!==subject.id&&row.subject_name===name&&(row.subject_code||null)===code&&(row.subject_group_id||null)===group);
+    if(same)return toast("มีรายวิชานี้ใน Master แล้ว","ควรเลือกใช้รายวิชาที่มีอยู่ เพื่อป้องกันข้อมูลซ้ำ","error");
+    if(linkedActive.length>1&&!confirm(`ยืนยันแก้ไขรายวิชาที่ใช้ร่วมกัน ${linkedActive.length} ห้องหรือไม่?\n\nทุกห้องที่ใช้รายวิชานี้จะเห็นชื่อและกลุ่มสาระใหม่`))return;
+    buttonLoading(e.currentTarget,true,"กำลังบันทึก...");
+    try {
+      const {data,error}=await supabase.from("academic_subjects").update({subject_name:name,subject_code:code,subject_group_id:group}).eq("id",subject.id).select("id");
+      if(error)throw error;
+      if(!data?.length)throw new Error("ไม่มีสิทธิ์แก้ไข Master ที่เชื่อมกับห้องอื่น");
+      close();await loadTimetableWorkspace();await renderTimetableNavigation();
+      toast("แก้ไขรายวิชาเรียบร้อย",name,"success");
+    }catch(error){toast("แก้ไขรายวิชาไม่สำเร็จ",error.message||String(error),"error");}
+    finally{buttonLoading(e.currentTarget,false);}
+  };
+}
+
+function timetableCopySubjectsModal(fromClassId,subjectId=null) {
+  const source=state.timetableClasses.find(c=>c.id===fromClassId);
+  if(!source||!canManageTimetableSubjectForClass(source))return toast("ไม่มีสิทธิ์คัดลอก","โปรดเลือกห้องที่รับผิดชอบ","error");
+  const list=subjectId?timetableSubjectsOfferedForClass(source.id).filter(s=>s.id===subjectId):timetableSubjectsOfferedForClass(source.id);
+  if(!list.length)return toast("ไม่มีรายวิชาให้คัดลอก","เพิ่มรายวิชาในห้องต้นทางก่อน","error");
+  const targets=timetableFilteredClasses().filter(c=>c.id!==source.id&&c.academic_year===source.academic_year&&c.semester===source.semester&&c.level_name===source.level_name&&c.stage_code!=="early_childhood"&&canManageTimetableSubjectForClass(c));
+  if(!targets.length)return toast("ไม่พบห้องปลายทาง","สร้างห้องระดับชั้นเดียวกันก่อน จึงจะคัดลอกได้","error");
+  const modal=document.createElement("div");modal.className="modal-backdrop";
+  modal.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>คัดลอก${subjectId?"รายวิชา":"รายวิชาทั้งชุด"}จาก ${escapeHtml(schoolClassLabel(source))}</h3><p>ปีการศึกษา ${escapeHtml(source.academic_year)} ภาคเรียน ${source.semester} · เฉพาะระดับชั้นเดียวกัน</p></div><button class="modal-close">×</button></div>
+  <div class="field"><strong>รายวิชาที่จะคัดลอก ${list.length} รายการ</strong><p>${escapeHtml(list.map(s=>s.subject_name).join(" · "))}</p></div>
+  <div class="field"><label>เลือกห้องปลายทาง (เลือกได้หลายห้อง)</label><div class="list">${targets.map(c=>`<label class="list-item" style="cursor:pointer"><input type="checkbox" name="timetable-copy-target" value="${c.id}" checked style="margin-right:12px"> ${escapeHtml(schoolClassLabel(c))}</label>`).join("")}</div></div>
+  <small>รายวิชาที่มีอยู่แล้วจะไม่ถูกสร้างซ้ำ และรายการที่เคยนำออกจะถูกคืนให้ใช้งานได้อีกครั้ง · ไม่คัดลอกครูหรือคาบเรียน</small>
+  <div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button><button class="btn btn-primary" id="save-subject-room-copy">คัดลอกไปห้องที่เลือก</button></div></div>`;
+  document.body.appendChild(modal);
+  const close=()=>modal.remove();
+  modal.querySelector(".modal-close").onclick=close;
+  modal.querySelector(".modal-cancel").onclick=close;
+  modal.querySelector("#save-subject-room-copy").onclick=async e=>{
+    const selectedIds=[...modal.querySelectorAll('[name="timetable-copy-target"]:checked')].map(el=>el.value);
+    const chosen=targets.filter(c=>selectedIds.includes(c.id));
+    if(!chosen.length)return toast("กรุณาเลือกห้องปลายทาง","","error");
+    const inserts=[],restores=new Map();let skipped=0;
+    for(const c of chosen){
+      for(const s of list){
+        const existing=state.timetableSubjectOfferings.find(o=>o.class_id===c.id&&o.subject_id===s.id);
+        if(existing?.is_active!==false&&existing){skipped++;continue;}
+        if(existing){if(!restores.has(c.id))restores.set(c.id,[]);restores.get(c.id).push(s.id);}
+        else inserts.push({class_id:c.id,subject_id:s.id,created_by:state.user.id,is_active:true});
+      }
+    }
+    if(!inserts.length&&!restores.size){close();return toast("ทุกห้องมีรายวิชาเหล่านี้แล้ว","ไม่มีรายการใหม่ต้องคัดลอก","success");}
+    buttonLoading(e.currentTarget,true,"กำลังคัดลอก...");
+    try{
+      for(const [classId,subjectIds] of restores){
+        const {data,error}=await supabase.from("academic_class_subject_offerings").update({is_active:true}).eq("class_id",classId).in("subject_id",subjectIds).select("subject_id");
+        if(error)throw error;
+        if(data?.length!==subjectIds.length)throw new Error("ไม่สามารถคืนรายวิชาเก่าของห้องปลายทางได้ครบ");
+      }
+      if(inserts.length){
+        const {data,error}=await supabase.from("academic_class_subject_offerings").insert(inserts).select("class_id,subject_id");
+        if(error)throw error;
+        if(data?.length!==inserts.length)throw new Error("ไม่สามารถเพิ่มรายวิชาให้ห้องปลายทางได้ครบ");
+      }
+      close();await loadTimetableWorkspace();await renderTimetableNavigation();
+      toast("คัดลอกรายวิชาเรียบร้อย",`${chosen.length} ห้อง · เพิ่ม/คืน ${inserts.length+[...restores.values()].reduce((n,v)=>n+v.length,0)} รายการ · ข้ามที่มีแล้ว ${skipped} รายการ`,"success");
+    }catch(error){
+      await loadTimetableWorkspace().catch(()=>{});
+      toast("คัดลอกยังไม่ครบ",`${error.message||String(error)} · รายการที่บันทึกสำเร็จไม่ถูกลบ ลองคัดลอกซ้ำได้`,"error");
+    }finally{buttonLoading(e.currentTarget,false);}
+  };
+}
+
+function bindTimetableSubjectManageEvents(){
+  document.querySelectorAll("[data-manage-timetable-subject]").forEach(btn=>btn.addEventListener("click",()=>timetableManageSubjectModal(btn.dataset.manageTimetableSubject,btn.dataset.subjectClass)));
+  document.querySelectorAll("[data-copy-timetable-subject]").forEach(btn=>btn.addEventListener("click",()=>timetableCopySubjectsModal(btn.dataset.subjectClass,btn.dataset.copyTimetableSubject)));
+  document.querySelector("#copy-timetable-subjects")?.addEventListener("click",()=>timetableCopySubjectsModal(timetableSubjectMasterScopeClass()?.id));
 }
 
 function teachingAssignmentModal() {
@@ -15196,6 +15318,7 @@ function bindDashboardEvents() {
     renderTimetableNavigation();
   });
   document.querySelectorAll("#new-timetable-subject").forEach(btn=>btn.addEventListener("click",()=>timetableSubjectModal()));
+  bindTimetableSubjectManageEvents();
   document.querySelectorAll("#new-teaching-assignment").forEach(btn=>btn.addEventListener("click",()=>teachingAssignmentModal()));
   document.querySelectorAll("[data-open-period-settings]").forEach(btn=>btn.addEventListener("click",()=>{state.timetableView="periods";renderDashboard();}));
   document.querySelectorAll("[data-configure-periods]").forEach(btn=>btn.addEventListener("click",()=>openTimetablePeriodModal(btn.dataset.configurePeriods)));
