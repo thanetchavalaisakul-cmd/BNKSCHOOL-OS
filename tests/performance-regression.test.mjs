@@ -38,7 +38,7 @@ test("stage head timetable exports cannot include other stages", () => {
 });
 
 test("only active class offerings appear in subject picker by default", () => {
-  const source = functionSnippet("function timetableSubjectsOfferedForClass(", "\nfunction ");
+  const source = functionSnippet("function timetableSubjectInClass(", "\nfunction timetableMasterSubjectPanel(");
   const get = new Function("state", `${source}; return timetableSubjectsOfferedForClass;`)({
     timetableSubjectOfferings: [
       { class_id:"a", subject_id:"x", is_active:true },
@@ -74,7 +74,36 @@ test("realtime notifications are recipient-scoped and lightweight", () => {
 });
 
 test("master entry respects stage role and timetable navigation skips refetch", () => {
-  assert.ok(app.includes('canManageTimetableSubjectForClass(c)?`<button class="btn btn-primary" id="new-timetable-subject"'));
+  assert.ok(app.includes('id="new-timetable-subject"'));
   assert.ok(app.includes("function renderTimetableNavigation()"));
   assert.ok(app.includes("renderTimetableNavigation();"));
+});
+
+test("room-specific edits do not mutate shared Master or other classrooms", () => {
+  const source = functionSnippet("function timetableSubjectInClass(", "\nfunction timetableMasterSubjectPanel(");
+  const state = {
+    timetableSubjectOfferings: [
+      {class_id:"p1-1",subject_id:"science",is_active:true,subject_name_override:"นักวิทยาศาสตร์น้อย"},
+      {class_id:"p1-2",subject_id:"science",is_active:true,subject_name_override:null}
+    ],
+    timetableSubjects:[{id:"science",subject_name:"กิจกรรมนักวิทยาศาสตร์น้อย"}]
+  };
+  const get = new Function("state", source+"; return {timetableSubjectInClass,timetableSubjectsOfferedForClass};")(state);
+  assert.equal(get.timetableSubjectInClass("p1-1","science").subject_name,"นักวิทยาศาสตร์น้อย");
+  assert.equal(get.timetableSubjectInClass("p1-2","science").subject_name,"กิจกรรมนักวิทยาศาสตร์น้อย");
+  assert.equal(state.timetableSubjects[0].subject_name,"กิจกรรมนักวิทยาศาสตร์น้อย");
+  assert.equal(get.timetableSubjectsOfferedForClass("p1-1").length,1);
+});
+
+test("subject editing and copying are restricted to controlled classrooms and avoid overwriting duplicates",()=>{
+  assert.ok(app.includes("function timetableEditSubjectModal("));
+  assert.ok(app.includes("function timetableCopySubjectsModal("));
+  assert.ok(app.includes('c.level_name===source.level_name'));
+  assert.ok(app.includes('c.academic_year===source.academic_year'));
+  assert.ok(app.includes('Number(c.semester)===Number(source.semester)'));
+  assert.ok(app.includes("canManageTimetableSubjectForClass(c)"));
+  assert.ok(app.includes('ignoreDuplicates:true'));
+  assert.ok(app.includes('subject_name_override:'));
+  assert.ok(app.includes("data-edit-timetable-subject"));
+  assert.ok(app.includes("data-copy-timetable-subject"));
 });
