@@ -1,8 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
 import { createBehaviorFeature } from "./behavior.js?v=2";
 import { createEducationFeeFeature } from "./education-fees.js?v=2";
-import { createTimetableConstraintFeature } from "./timetable-constraints.js?v=3";
-import { createDemoTimetableFeature } from "./timetable-demo.js?v=1";
+import { createTimetableConstraintFeature } from "./timetable-constraints.js?v=4";
 import { openJointActivityModal } from "./timetable-joint.js?v=1";
 import html2canvas from "https://esm.sh/html2canvas@1.4.1";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
@@ -246,7 +245,6 @@ const state = {
   preschoolUnitsError: "",
   timetableSelectedClassId: null,
   timetableView: "planner",
-  timetableDemoClassIds: [],
   timetableAcademicYear: null,
   timetableSemester: null,
   timetableExportClassId: null,
@@ -1323,7 +1321,6 @@ function sidebarHtml() {
 const behaviorFeature=createBehaviorFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont});
 const educationFeeFeature=createEducationFeeFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont});
 const timetableConstraintFeature=createTimetableConstraintFeature({supabase,state,escapeHtml,toast,redraw:renderTimetableNavigation,reload:renderDashboard,scopeClasses:()=>timetableFilteredClasses({visibleOnly:true}),currentPeriod:currentTimetablePeriod});
-const timetableDemoFeature=createDemoTimetableFeature({supabase,state,escapeHtml,toast,redraw:renderTimetableNavigation,scopeClasses:()=>timetableFilteredClasses({visibleOnly:true}),currentPeriod:currentTimetablePeriod});
 async function renderDashboard() {
   if (state.currentView === "data_center" && state.profile?.role === "super_admin" && !state.dataCenterOverview && !state.dataCenterError) await loadDataCenterWorkspace();
   if (state.currentView === "approval_center") {
@@ -1384,7 +1381,7 @@ async function renderDashboard() {
   if (state.currentView === "module:timetable_management") {
     // Switching tabs/class filters must not refetch the same 13 datasets.
     if (state.timetableSkipNextLoad && state.timetableClasses?.length) state.timetableSkipNextLoad = false;
-    else { state.timetableSkipNextLoad = false; await loadTimetableWorkspace(); if(canManageTimetable()){await timetableConstraintFeature.load();await timetableDemoFeature.load();} }
+    else { state.timetableSkipNextLoad = false; await loadTimetableWorkspace(); if(canManageTimetable()){await timetableConstraintFeature.load();} }
   }
   if (state.currentView === "module:substitute_teaching") {
     await loadSubstituteWorkspace();
@@ -5098,20 +5095,18 @@ function canManageTimetableSubjectForClass(classRow) {
 }
 
 function canManageTimetable() {
-  return isAcademicHead() || isTimetableStageHead() || !!state.timetableDemoClassIds?.length;
+  return isAcademicHead() || isTimetableStageHead();
 }
 
 function canManageTimetableClassLocal(classRow) {
   if (!classRow) return false;
   if (isAcademicHead()) return true;
-  if(state.timetableDemoClassIds?.includes(classRow.id))return true;
   return timetableStageHeadRowsForYear(classRow.academic_year)
     .some(row => row.stage_code === classRow.stage_code);
 }
 
 function timetableManagerScopeLabel() {
   if (isAcademicHead()) return "ทั้งโรงเรียน";
-  if(state.timetableDemoClassIds?.length && !isTimetableStageHead())return "เฉพาะห้องทดลองที่ได้รับสิทธิ์";
   const labels = timetableStageHeadCodes().map(code => TIMETABLE_STAGE_LABEL[code] || code);
   return labels.length ? labels.join(" / ") : "เฉพาะช่วงชั้นที่ได้รับมอบหมาย";
 }
@@ -5240,8 +5235,6 @@ function timetableStudentExportClassIds() {
 }
 
 async function loadTimetableWorkspace() {
-  const demoAccessRes=await supabase.from("timetable_demo_managers").select("class_id").eq("teacher_id",state.user.id);
-  state.timetableDemoClassIds=demoAccessRes.error?[]:(demoAccessRes.data||[]).map(x=>x.class_id);
   const ownStageHeadsRes = await supabase
     .from("stage_heads")
     .select("*")
@@ -5334,7 +5327,7 @@ async function loadTimetableWorkspace() {
   state.preschoolRoster=preschoolRosterRes.error?[]:(preschoolRosterRes.data||[]);
   state.preschoolUnits=preschoolRes.error?[]:(preschoolRes.data||[]);
   state.preschoolUnitsError=preschoolRes.error ? preschoolRes.error.message : "";
-  if (canManageTimetable() && !["setup","periods","planner","export","mine","conditions","generate","demo"].includes(state.timetableView)) {
+  if (canManageTimetable() && !["setup","periods","planner","export","mine","conditions","generate"].includes(state.timetableView)) {
     state.timetableView = "planner";
   }
 }
@@ -5442,7 +5435,7 @@ function timetablePeriodSettingsHtml() {
             <td><strong>${escapeHtml(schoolClassLabel(c))}</strong><br><span class="table-muted">${escapeHtml(TIMETABLE_STAGE_LABEL[c.stage_code]||c.stage_code)}</span></td>
             <td><span class="pill ${tp?.period_mode==="shared"?"active":"neutral"}">${escapeHtml(timetablePeriodModeLabel(tp))}</span></td>
             <td>${periods.length || 0} คาบ${periods.find(x=>x.is_break)?.period_no ? ` · พักคาบ ${periods.find(x=>x.is_break).period_no}` : ""}</td>
-            <td>${hasEntries?`<span class="pill pending">จัดตารางแล้ว</span>`:`<span class="pill neutral">ยังไม่มีคาบสอน</span>`}</td>
+            <td>${c.stage_code==="early_childhood"?(preschoolClassUnits(c.id).length?`<span class="pill active">บันทึกหน่วยแล้ว ${preschoolClassUnits(c.id).length} สัปดาห์</span><small>หน่วยร่วมทุกห้อง · ไม่ใช้ตารางรายคาบ</small>`:`<span class="pill neutral">ยังไม่บันทึกหน่วยรายสัปดาห์</span>`):(hasEntries?`<span class="pill pending">จัดตารางแล้ว</span>`:`<span class="pill neutral">ยังไม่มีคาบสอน</span>`)}</td>
             <td><div class="admin-actions">
               ${tp?.period_mode==="shared"
                 ? `<button class="btn btn-secondary" data-period-mode-custom="${c.id}" ${tp?.status==="published"?"disabled":""}>แยกเป็นเฉพาะห้อง</button>`
@@ -5718,7 +5711,6 @@ function timetableTabsHtml() {
       <button class="lesson-view-tab ${state.timetableView==="planner"?"active":""}" data-timetable-view="planner">จัดด้วยมือ (ลาก–วาง)</button>
       <button class="lesson-view-tab" data-timetable-view="conditions">⚙ ตั้งค่าเงื่อนไข</button>
       <button class="lesson-view-tab" data-timetable-view="generate">✦ จัดอัตโนมัติ</button>
-      ${timetableDemoFeature.D.teachers.some(t=>timetableFilteredClasses({visibleOnly:true}).some(c=>c.id===t.class_id))?`<button class="lesson-view-tab ${state.timetableView==="demo"?"active":""}" data-timetable-view="demo">🧪 ทดลองกับครูตัวอย่าง</button>`:""}
       <button class="lesson-view-tab ${state.timetableView==="export"?"active":""}" data-timetable-view="export">Export PDF</button>
       <button class="lesson-view-tab ${state.timetableView==="mine"?"active":""}" data-timetable-view="mine">ตารางสอนของฉัน</button>
     </div>`;
@@ -5896,6 +5888,18 @@ function timetableMasterSubjectPanel(classes){
   </section>`;
 }
 
+function timetableP33StaffPanel(){
+ const c=state.timetableClasses.find(c=>c.academic_year==="2569"&&Number(c.semester)===2&&c.level_name==="ป.3"&&c.room_name==="3");
+ if(!c || !isAcademicHead() || currentTimetablePeriod().academicYear!==2569||currentTimetablePeriod().semester!==2)return "";
+ const names=["ครูตัวอย่าง 1","ครูตัวอย่าง 2","ครูตัวอย่าง 3"];
+ const users=names.map(name=>state.timetableTeachers.find(t=>(t.full_name||"").trim()===name&&t.role==="teacher"));
+ const existing=timetableAssignmentsForClass(c.id);
+ return `<section class="panel" style="margin:16px 0"><div class="panel-head"><div class="panel-title-wrap"><h3>บัญชีครูจริงสำหรับ ป.3/3</h3><p>ใช้บัญชีบุคลากรที่สมัครและได้รับอนุมัติแล้ว ไม่ใช้รายชื่อจำลอง</p></div></div>
+ <p class="helper">ให้ครูตัวอย่าง 1, 2 และ 3 สมัครด้วยอีเมลที่ใช้ได้จริงผ่านหน้าสมัครสมาชิกของโรงเรียน โดยใช้ชื่อด้านล่าง จากนั้นผู้ดูแลอนุมัติบัญชีในเมนูจัดการผู้ใช้งาน แล้วกลับมาหน้านี้เพื่อคัดลอกการมอบหมายวิชาจากครูธเนศ ครูพงษ์ศักดิ์ และครูมอเส่ (เฉพาะ ป.3/2)</p>
+ <div class="tt-rule-stats">${names.map((name,i)=>`<span class="pill ${users[i]?"active":"neutral"}">${escapeHtml(name)} · ${users[i]?"บัญชีพร้อม":"รอสมัครหรืออนุมัติ"}</span>`).join("")}</div>
+ <p class="helper">หลังผูกบัญชีแล้วจะได้รับ 22 วิชา รวม 35 คาบ/สัปดาห์ ในห้อง ป.3/3 เท่านั้น · ปัจจุบันมอบหมายจริงแล้ว ${existing.length} รายการ</p>
+ <button class="btn btn-primary" id="timetable-sync-p33-staff" ${users.every(Boolean)&&!existing.length?"":"disabled"}>มอบหมายรายวิชาให้ครูทั้งสามจาก ป.3/2</button></section>`;
+}
 function timetableSetupHtml() {
   const classes = timetableFilteredClasses();
   const currentClass = selectedTimetableClass() || classes[0] || null;
@@ -5906,11 +5910,12 @@ function timetableSetupHtml() {
       <div class="panel-head"><div class="panel-title-wrap"><h3>ชั้น / ห้อง</h3><p>สร้างโครงห้องเรียนก่อนจัดตาราง</p></div><button class="btn btn-primary" id="new-timetable-class">＋ เพิ่ม</button></div>
       ${classes.length?`<div class="list timetable-master-list">${classes.map(c=>{
         const tp=timetableProfileForClass(c.id);
-        return `<div class="list-item"><div class="list-body"><strong>${escapeHtml(schoolClassLabel(c))}</strong><p>${escapeHtml(TIMETABLE_STAGE_LABEL[c.stage_code]||c.stage_code)} · ${tp?.status==="published"?"เผยแพร่แล้ว":"ฉบับร่าง"} · ${escapeHtml(timetablePeriodModeLabel(tp))}</p></div><div class="admin-actions"><button class="btn btn-ghost" data-select-timetable-class="${c.id}">เลือก</button><button class="btn btn-danger" data-delete-timetable-class="${c.id}">ลบ</button></div></div>`;
+        return `<div class="list-item"><div class="list-body"><strong>${escapeHtml(schoolClassLabel(c))}</strong><p>${escapeHtml(TIMETABLE_STAGE_LABEL[c.stage_code]||c.stage_code)} · ${c.stage_code==="early_childhood"?(preschoolClassUnits(c.id).length?"บันทึกหน่วยแล้ว "+preschoolClassUnits(c.id).length+" สัปดาห์":"ยังไม่บันทึกหน่วย"):(tp?.status==="published"?"เผยแพร่แล้ว":"ฉบับร่าง")} · ${escapeHtml(timetablePeriodModeLabel(tp))}</p></div><div class="admin-actions"><button class="btn btn-ghost" data-select-timetable-class="${c.id}">เลือก</button><button class="btn btn-danger" data-delete-timetable-class="${c.id}">ลบ</button></div></div>`;
       }).join("")}</div>`:`<div class="empty"><strong>ยังไม่มีชั้น/ห้อง</strong></div>`}
     </section>
     ${timetableMasterSubjectPanel(classes)}
   </div>
+  ${timetableP33StaffPanel()}
   <section class="panel" style="margin-top:16px">
     <div class="panel-head"><div class="panel-title-wrap"><h3>${currentClass?.stage_code==="early_childhood"?"การจัดประสบการณ์ปฐมวัย":"วิชา + ชั้น/ห้อง + ครูผู้สอน"}</h3><p>${currentClass?`กำลังดู ${escapeHtml(schoolClassLabel(currentClass))}`:"เลือกชั้น/ห้องก่อน"}</p></div>${currentClass?.stage_code!=="early_childhood"?`<button class="btn btn-primary" id="new-teaching-assignment" ${currentClass?"":"disabled"}>＋ กำหนดการสอน</button>`:""}</div>
     ${currentClass?.stage_code==="early_childhood"?`<div class="preschool-tip"><strong>ไม่ต้องกำหนดวิชาเป็นคาบ</strong><span>ใช้หน่วยจัดประสบการณ์รายสัปดาห์ร่วมกันทุกห้องอนุบาล จัดการได้ที่แท็บ “จัดตาราง”</span></div>`:(currentClass ? (assignments.length?`<div class="table-wrap"><table class="table"><thead><tr><th>วิชา</th><th>ครูผู้สอน</th><th>คาบ/สัปดาห์</th><th>จัดแล้ว</th><th></th></tr></thead><tbody>${assignments.map(a=>{
@@ -5984,7 +5989,8 @@ function timetableMineHtml() {
 
 function timetableOverviewHtml() {
   const classes=timetableFilteredClasses({visibleOnly:true});
-  return `${timetableClassSelectorHtml()}<section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ตารางเรียน</h3><p>ดูตารางที่เผยแพร่ในช่วงที่เลือก</p></div></div>${state.timetableSelectedClassId?timetableGridHtml({readonly:true}):`<div class="empty"><strong>ยังไม่มีตารางที่มองเห็น</strong></div>`}</section>`;
+  const c=selectedTimetableClass();
+  return c&&c.stage_code==="early_childhood"?`${timetableClassSelectorHtml()}<section class="panel"><h3>หน่วยการจัดประสบการณ์ปฐมวัย · บันทึกแล้ว ${preschoolClassUnits(c.id).length} สัปดาห์</h3>${preschoolUnitTableHtml(c.id,{readonly:true})}</section>`:`${timetableClassSelectorHtml()}<section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ตารางเรียน</h3><p>ดูตารางที่เผยแพร่ในช่วงที่เลือก</p></div></div>${state.timetableSelectedClassId?timetableGridHtml({readonly:true}):`<div class="empty"><strong>ยังไม่มีตารางที่มองเห็น</strong></div>`}</section>`;
 }
 
 function timetableExportHtml() {
@@ -6009,7 +6015,7 @@ function timetableExportHtml() {
 function timetableWorkspaceHtml(module) {
   const tabs=timetableTabsHtml();
   if(canManageTimetable()){
-    return `${timetableHeroHtml()}${tabs}${state.timetableView==="setup"?timetableSetupHtml():state.timetableView==="periods"?timetablePeriodSettingsHtml():state.timetableView==="export"?timetableExportHtml():state.timetableView==="mine"?timetableMineHtml():state.timetableView==="conditions"?timetableConstraintFeature.conditionsHtml():state.timetableView==="generate"?timetableConstraintFeature.generatedHtml():state.timetableView==="demo"?timetableDemoFeature.html():timetablePlannerHtml()}`;
+    return `${timetableHeroHtml()}${tabs}${state.timetableView==="setup"?timetableSetupHtml():state.timetableView==="periods"?timetablePeriodSettingsHtml():state.timetableView==="export"?timetableExportHtml():state.timetableView==="mine"?timetableMineHtml():state.timetableView==="conditions"?timetableConstraintFeature.conditionsHtml():state.timetableView==="generate"?timetableConstraintFeature.generatedHtml():timetablePlannerHtml()}`;
   }
   if(["director","super_admin"].includes(state.profile.role)){
     if(!["overview","export"].includes(state.timetableView)) state.timetableView="overview";
@@ -15330,13 +15336,23 @@ function bindDashboardEvents() {
   document.querySelectorAll("[data-edit-preschool-unit]").forEach(btn=>btn.addEventListener("click",()=>preschoolUnitModal(btn.dataset.editPreschoolUnit)));
   document.querySelectorAll("[data-delete-preschool-unit]").forEach(btn=>btn.addEventListener("click",()=>deletePreschoolUnit(btn.dataset.deletePreschoolUnit)));
   document.querySelector("#export-preschool-unit-list")?.addEventListener("click",()=>timetablePdfPreview("class",state.timetableSelectedClassId));
-  if(state.currentView==="module:timetable_management"){timetableConstraintFeature.bind();if(state.timetableView==="demo")timetableDemoFeature.bind();}
+  if(state.currentView==="module:timetable_management")timetableConstraintFeature.bind();
   document.querySelectorAll("[data-timetable-view]").forEach(btn=>btn.addEventListener("click",()=>{
     state.timetableView=btn.dataset.timetableView;
     renderTimetableNavigation();
   }));
   document.querySelector("#timetable-year")?.addEventListener("change",e=>{state.timetableAcademicYear=Number(e.currentTarget.value);state.timetableSelectedClassId=null;state.timetableSubjectMasterScope=null;state.timetableExportClassId=null;state.timetableSkipNextLoad=false;renderDashboard();});
   document.querySelector("#timetable-semester")?.addEventListener("change",e=>{state.timetableSemester=Number(e.currentTarget.value);state.timetableSelectedClassId=null;state.timetableSubjectMasterScope=null;state.timetableExportClassId=null;state.timetableSkipNextLoad=false;renderDashboard();});
+  document.querySelector("#timetable-sync-p33-staff")?.addEventListener("click",async()=>{
+    const names=["ครูตัวอย่าง 1","ครูตัวอย่าง 2","ครูตัวอย่าง 3"];
+    const users=names.map(name=>state.timetableTeachers.find(t=>(t.full_name||"").trim()===name&&t.role==="teacher"));
+    if(users.some(x=>!x))return toast("ยังไม่มีบัญชีครูจริงครบสามคน","สมัครและอนุมัติบัญชีก่อน","error");
+    if(!confirm("ยืนยันมอบหมาย 22 รายวิชา รวม 35 คาบ ให้บัญชีครูจริงทั้งสามสำหรับห้อง ป.3/3?"))return;
+    const {data,error}=await supabase.rpc("timetable_assign_p33_staff",{p_teacher_ids:users.map(x=>x.id)});
+    if(error)return toast("มอบหมายรายวิชาไม่สำเร็จ",error.message,"error");
+    toast("มอบหมายรายวิชาให้ ป.3/3 สำเร็จ",(data?.subjects||0)+" รายวิชา · "+(data?.periods||0)+" คาบ","success");
+    await renderDashboard();
+  });
   document.querySelector("#timetable-class-select")?.addEventListener("change",e=>{state.timetableSelectedClassId=e.currentTarget.value||null;renderTimetableNavigation();});
   document.querySelectorAll("[data-select-timetable-class]").forEach(btn=>btn.addEventListener("click",()=>{state.timetableSelectedClassId=btn.dataset.selectTimetableClass;renderTimetableNavigation();}));
   document.querySelectorAll("#new-timetable-class").forEach(btn=>btn.addEventListener("click",()=>timetableClassModal()));

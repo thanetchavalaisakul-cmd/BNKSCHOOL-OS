@@ -1,7 +1,7 @@
 
-import {generateTimetablePlan} from "./timetable-solver.js?v=1";
+import {generateTimetablePlan} from "./timetable-solver.js?v=2";
 export function createTimetableConstraintFeature({supabase,state,escapeHtml,toast,redraw,reload,scopeClasses,currentPeriod}){
- const C={blocks:[],locks:[],demoTeachers:[],error:"",loaded:false,teacher:"",selectedDays:[],weekday:2,period:1,length:1,
+ const C={blocks:[],locks:[],error:"",loaded:false,teacher:"",selectedDays:[],weekday:2,period:1,length:1,
  subject:"",stage:"",grade:"",selectedRooms:[],generatorRooms:[],preview:null,settingTab:"subjects",pending:false};
  const e=v=>escapeHtml(String(v??""));
  const days={1:"จันทร์",2:"อังคาร",3:"พุธ",4:"พฤหัสบดี",5:"ศุกร์",6:"เสาร์",7:"อาทิตย์"};
@@ -31,13 +31,12 @@ export function createTimetableConstraintFeature({supabase,state,escapeHtml,toas
  }
  async function load(){
   C.error="";
-  const [a,b,demo]=await Promise.all([
+  const [a,b]=await Promise.all([
    supabase.from("timetable_teacher_unavailability").select("*").eq("academic_year",selectedYear()).eq("semester",selectedTerm()).order("weekday"),
-   supabase.from("timetable_fixed_slots").select("*").order("weekday"),
-   supabase.from("timetable_demo_teachers").select("*").order("demo_number")
+   supabase.from("timetable_fixed_slots").select("*").order("weekday")
   ]);
   if(a.error||b.error)C.error=(a.error||b.error).message;
-  C.blocks=a.data||[];C.demoTeachers=demo.error?[]:(demo.data||[]);const ids=new Set(currentClasses().map(c=>c.id));
+  C.blocks=a.data||[];const ids=new Set(currentClasses().map(c=>c.id));
   C.locks=(b.data||[]).filter(f=>ids.has(f.class_id));
   C.loaded=true;syncState();
  }
@@ -186,19 +185,10 @@ export function createTimetableConstraintFeature({supabase,state,escapeHtml,toas
      '<section class="panel"><h3>ช่วงเวลาที่ห้ามสอนอยู่แล้ว</h3>'+
      (blocks.length?'<div class="tt-rule-list">'+blocks.map(b=>'<div><div><strong>'+e(days[b.weekday])+' คาบที่ '+e(b.period_no)+'</strong><small>'+e(teacherName(b.teacher_id))+'</small></div><button class="btn btn-ghost" data-tt-unblock="'+e(b.id)+'">ยกเลิก</button></div>').join("")+'</div>':'<p>ยังไม่ได้กำหนดช่วงเวลาห้ามสอน</p>')+'</section></div>';
  }
- function demoTeachersHtml(){
-  const classes=currentClasses();
-  const rows=C.demoTeachers.filter(t=>classes.some(c=>c.id===t.class_id));
-  if(!rows.length)return "";
-  return '<section class="panel tt-demo-teacher-panel"><h3>ครูตัวอย่างสำหรับทดลองจัดตาราง</h3>'+
-    '<p class="helper">รายชื่อจำลองของห้องทดลอง ป.3/3 เท่านั้น ไม่ใช่บัญชีเข้าสู่ระบบ แต่สามารถมอบหมายวิชา จำนวนคาบ และทดลองจัดตารางในแท็บ “ทดลองกับครูตัวอย่าง” ได้ โดยไม่กระทบตารางจริง</p>'+
-    '<div class="tt-demo-teacher-list">'+rows.map(t=>'<div><strong>'+e(t.display_name)+'</strong><span class="pill neutral">'+e(classLabel(classes.find(c=>c.id===t.class_id)))+'</span></div>').join("")+'</div></section>';
- }
  function conditionsHtml(){
   syncView();
   return '<section class="panel tt-rule-intro"><div><h2>ตั้งค่าเงื่อนไขการจัดตารางสอน</h2><p>กำหนดล่วงหน้าได้ตามต้องการ หรือข้ามขั้นตอนนี้แล้วจัดตารางด้วยมือ/อัตโนมัติได้เลย</p></div><span class="pill neutral">ปี '+e(selectedYear())+' · ภาคเรียน '+e(selectedTerm())+'</span></section>'+
     (C.error?'<div class="tt-rule-warning">'+e(C.error)+'</div>':'')+
-    demoTeachersHtml()+
     '<div class="tt-rule-pills"><button class="'+(C.settingTab==="subjects"?"active":"")+'" data-tt-rule-tab="subjects">ล็อกคาบวิชา</button><button class="'+(C.settingTab==="teacher"?"active":"")+'" data-tt-rule-tab="teacher">ห้ามสอนรายบุคคล</button></div>'+
     (C.settingTab==="subjects"?subjectView():teacherView());
  }
@@ -210,11 +200,11 @@ export function createTimetableConstraintFeature({supabase,state,escapeHtml,toas
  function generatedHtml(){
   const classes=currentClasses();
   const preview=C.preview,rows=preview?.suggestions||[];
-  return '<section class="panel tt-rule-intro"><div><h2>จัดตารางสอนอัตโนมัติ</h2><p>ใช้วิชา ครู และชั่วโมงสอนที่กำหนดไว้แล้ว เคารพคาบที่ล็อกและเวลาห้ามสอน ไม่แก้ไขตารางจริงจนกว่าจะยืนยัน</p></div><span class="pill neutral">ฉบับร่างเท่านั้น</span></section>'+
+  return '<section class="panel tt-rule-intro"><div><h2>จัดตารางสอนอัตโนมัติ</h2><p>ใช้วิชา ครู และชั่วโมงสอนที่กำหนดไว้แล้ว เคารพคาบที่ล็อกและเวลาห้ามสอน จัดตารางจริงได้โดยตรวจชั่วโมงสอนและคาบชนก่อนเผยแพร่</p></div><span class="pill neutral">พร้อมใช้งานจริง</span></section>'+
   '<section class="panel"><h3>เลือกห้องที่จะให้ระบบช่วยจัดคาบที่เหลือ</h3><div class="tt-rule-rooms">'+roomCheckboxes(C.generatorRooms,"data-tt-generate-class")+'</div>'+
-  '<div class="tt-rule-buttons"><button class="btn btn-secondary" id="tt-generate-preview" '+(!C.generatorRooms.length?"disabled":"")+'>สร้างตัวอย่างตารางอัตโนมัติ</button>'+
-  (preview&&preview.complete&&rows.length?'<button class="btn btn-primary" id="tt-generate-apply">ยืนยันบันทึกลงตารางจริง ('+rows.length+' คาบ)</button>':'')+'</div></section>'+
-  (preview?'<section class="panel"><h3>ผลการคำนวณฉบับร่าง</h3><div class="tt-rule-stats"><strong>ห้องที่เลือก '+preview.classesAttempted+'</strong><strong>คาบที่ระบบจัดได้ '+rows.length+'</strong><strong>ปัญหาที่พบ '+preview.errors.length+'</strong></div>'+
+  '<div class="tt-rule-buttons"><button class="btn btn-secondary" id="tt-generate-preview" '+(!C.generatorRooms.length?"disabled":"")+'>คำนวณตารางอัตโนมัติ</button>'+
+  (preview&&preview.complete?(rows.length?'<button class="btn btn-secondary" id="tt-generate-apply">บันทึกคาบไว้ปรับแก้ ('+rows.length+' คาบ)</button>':'')+'<button class="btn btn-primary" id="tt-generate-publish">ยืนยันเผยแพร่ตารางจริง</button>':'')+'</div></section>'+
+  (preview?'<section class="panel"><h3>ผลการตรวจสอบตาราง</h3><div class="tt-rule-stats"><strong>ห้องที่เลือก '+preview.classesAttempted+'</strong><strong>คาบที่ระบบจัดได้ '+rows.length+'</strong><strong>ปัญหาที่พบ '+preview.errors.length+'</strong></div>'+
   (preview.errors.length?'<div class="tt-rule-warning"><strong>ยังไม่สามารถจัดครบตามเงื่อนไข จึงไม่เปิดให้บันทึก</strong><ul>'+first30(preview.errors).map(x=>'<li>'+e(x)+'</li>').join("")+'</ul></div>':!rows.length?'<p>ชั่วโมงสอนถูกจัดครบอยู่แล้ว ไม่มีคาบที่ต้องเพิ่ม</p>':'<p class="helper">ตรวจรายการก่อนกดยืนยัน การบันทึกเป็นธุรกรรมเดียว หากคาบใดชนระบบจะยกเลิกการบันทึกทั้งหมด</p>')+
   (rows.length?'<div class="table-wrap"><table class="table"><thead><tr><th>ห้องเรียน</th><th>วัน</th><th>คาบ</th><th>วิชา</th><th>ครูผู้สอน</th></tr></thead><tbody>'+first30(rows).map(x=>{
    const a=state.timetableAssignments.find(v=>v.id===x.assignment_id),c=classes.find(v=>v.id===x.class_id);
@@ -250,12 +240,15 @@ export function createTimetableConstraintFeature({supabase,state,escapeHtml,toas
   });
   C.preview=all;redraw();
  }
- async function apply(){
-  const p=C.preview;if(!p?.complete||!p.suggestions.length)return;
-  if(!confirm("ยืนยันเพิ่ม "+p.suggestions.length+" คาบลงตารางฉบับร่าง? ระบบจะตรวจคาบชนอีกครั้งและไม่เผยแพร่โดยอัตโนมัติ"))return;
-  C.pending=true;const {data,error}=await supabase.rpc("timetable_apply_generated",{p_placements:p.suggestions});C.pending=false;
-  if(error){C.preview=null;toast("บันทึกตารางอัตโนมัติไม่สำเร็จ",error.message,"error");return await refresh()}
-  C.preview=null;toast("บันทึกตารางฉบับร่างแล้ว",data+" คาบ · ยังไม่ได้เผยแพร่","success");await refresh();
+ async function apply(publish=false){
+  const p=C.preview;if(!p?.complete||(!publish&&!p.suggestions.length))return;
+  if(!confirm(publish?"ยืนยันเผยแพร่ตารางจริงทุกห้องที่เลือก? ต้องจัดจำนวนคาบรายวิชาให้ครบ ระบบจะยกเลิกทั้งหมดหากตรวจไม่ผ่าน":"บันทึกคาบที่จัดไว้ก่อนโดยยังไม่เผยแพร่?"))return;
+  C.pending=true;
+  const {data,error}=await supabase.rpc("timetable_commit_generated",{p_class_ids:C.generatorRooms,p_placements:p.suggestions,p_publish:publish});
+  C.pending=false;C.preview=null;
+  if(error){toast("บันทึกหรือเผยแพร่ไม่สำเร็จ",error.message,"error");return await refresh()}
+  toast(publish?"เผยแพร่ตารางสอนจริงแล้ว":"บันทึกคาบเพื่อแก้ไขแล้ว",(data?.added||0)+" คาบ · เผยแพร่ "+(data?.published||0)+" ห้อง","success");
+  await refresh();
  }
  function bind(){
   document.querySelectorAll("[data-tt-rule-tab]").forEach(b=>b.addEventListener("click",()=>{C.settingTab=b.dataset.ttRuleTab;redraw()}));
@@ -292,7 +285,8 @@ export function createTimetableConstraintFeature({supabase,state,escapeHtml,toas
    C.generatorRooms=Array.from(document.querySelectorAll("[data-tt-generate-class]:checked")).map(x=>x.dataset.ttGenerateClass);C.preview=null;redraw();
   }));
   document.querySelector("#tt-generate-preview")?.addEventListener("click",generate);
-  document.querySelector("#tt-generate-apply")?.addEventListener("click",apply);
+  document.querySelector("#tt-generate-apply")?.addEventListener("click",()=>apply(false));
+  document.querySelector("#tt-generate-publish")?.addEventListener("click",()=>apply(true));
  }
  return {load,conditionsHtml,generatedHtml,bind,C};
 }

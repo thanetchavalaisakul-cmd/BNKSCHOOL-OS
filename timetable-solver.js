@@ -39,6 +39,7 @@ export function generateTimetablePlan({classes=[],profiles=[],periods=[],assignm
    .flatMap(p=>(profile.weekdays||[1,2,3,4,5]).map(day=>({day,period:p}))).sort(sortSlots);
   const tasks=assignments.filter(a=>a.class_id===c.id&&a.is_active!==false).map(a=>({a,remaining:Math.max(0,Number(a.periods_per_week||0)-(usedByAssignment.get(a.id)||0))}));
   if(!slots.length){errors.push(c.level_name+"/"+c.room_name+": ยังไม่ได้ตั้งคาบเรียน");continue}
+  if(!tasks.length){errors.push(c.level_name+"/"+c.room_name+": ยังไม่มอบหมายวิชาและครูผู้สอน");continue}
   // Scarce scheduling options first; prefer even distribution of each subject.
   tasks.sort((a,b)=>b.remaining-a.remaining);
   for(const {a,remaining} of tasks){
