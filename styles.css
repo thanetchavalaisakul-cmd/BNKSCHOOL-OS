@@ -6047,3 +6047,9 @@ body.procurement-master-open{overflow:hidden!important}
 .tt-rule-form select{max-width:100%;min-width:0}
 .tt-rule-rooms:empty{margin:0}
 #tt-rule-all-rooms{margin:-6px 0 14px}
+
+/* Non-login demonstration teacher list, scoped to test classroom only */
+.tt-demo-teacher-panel{margin:12px 0}
+.tt-demo-teacher-list{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+.tt-demo-teacher-list>div{border:1px solid #d4e0da;border-radius:9px;padding:10px 13px;display:flex;align-items:center;gap:8px}
+.tt-demo-teacher-list strong{font-size:13px}

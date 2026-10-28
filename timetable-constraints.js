@@ -1,7 +1,7 @@
 
 import {generateTimetablePlan} from "./timetable-solver.js?v=1";
 export function createTimetableConstraintFeature({supabase,state,escapeHtml,toast,redraw,reload,scopeClasses,currentPeriod}){
- const C={blocks:[],locks:[],error:"",loaded:false,teacher:"",selectedDays:[],weekday:2,period:1,length:1,
+ const C={blocks:[],locks:[],demoTeachers:[],error:"",loaded:false,teacher:"",selectedDays:[],weekday:2,period:1,length:1,
  subject:"",stage:"",grade:"",selectedRooms:[],generatorRooms:[],preview:null,settingTab:"subjects",pending:false};
  const e=v=>escapeHtml(String(v??""));
  const days={1:"จันทร์",2:"อังคาร",3:"พุธ",4:"พฤหัสบดี",5:"ศุกร์",6:"เสาร์",7:"อาทิตย์"};
@@ -31,12 +31,13 @@ export function createTimetableConstraintFeature({supabase,state,escapeHtml,toas
  }
  async function load(){
   C.error="";
-  const [a,b]=await Promise.all([
+  const [a,b,demo]=await Promise.all([
    supabase.from("timetable_teacher_unavailability").select("*").eq("academic_year",selectedYear()).eq("semester",selectedTerm()).order("weekday"),
-   supabase.from("timetable_fixed_slots").select("*").order("weekday")
+   supabase.from("timetable_fixed_slots").select("*").order("weekday"),
+   supabase.from("timetable_demo_teachers").select("*").order("demo_number")
   ]);
   if(a.error||b.error)C.error=(a.error||b.error).message;
-  C.blocks=a.data||[];const ids=new Set(currentClasses().map(c=>c.id));
+  C.blocks=a.data||[];C.demoTeachers=demo.error?[]:(demo.data||[]);const ids=new Set(currentClasses().map(c=>c.id));
   C.locks=(b.data||[]).filter(f=>ids.has(f.class_id));
   C.loaded=true;syncState();
  }
@@ -185,10 +186,19 @@ export function createTimetableConstraintFeature({supabase,state,escapeHtml,toas
      '<section class="panel"><h3>ช่วงเวลาที่ห้ามสอนอยู่แล้ว</h3>'+
      (blocks.length?'<div class="tt-rule-list">'+blocks.map(b=>'<div><div><strong>'+e(days[b.weekday])+' คาบที่ '+e(b.period_no)+'</strong><small>'+e(teacherName(b.teacher_id))+'</small></div><button class="btn btn-ghost" data-tt-unblock="'+e(b.id)+'">ยกเลิก</button></div>').join("")+'</div>':'<p>ยังไม่ได้กำหนดช่วงเวลาห้ามสอน</p>')+'</section></div>';
  }
+ function demoTeachersHtml(){
+  const classes=currentClasses();
+  const rows=C.demoTeachers.filter(t=>classes.some(c=>c.id===t.class_id));
+  if(!rows.length)return "";
+  return '<section class="panel tt-demo-teacher-panel"><h3>ครูตัวอย่างสำหรับทดลองจัดตาราง</h3>'+
+    '<p class="helper">รายชื่อจำลองของห้องทดลอง ป.3/3 เท่านั้น ยังไม่ใช่บัญชีครูที่ล็อกอินได้ และยังไม่สามารถมอบหมายสอนในตารางจริงจนกว่าจะผูกกับบัญชีบุคลากร</p>'+
+    '<div class="tt-demo-teacher-list">'+rows.map(t=>'<div><strong>'+e(t.display_name)+'</strong><span class="pill neutral">'+e(classLabel(classes.find(c=>c.id===t.class_id)))+'</span></div>').join("")+'</div></section>';
+ }
  function conditionsHtml(){
   syncView();
   return '<section class="panel tt-rule-intro"><div><h2>ตั้งค่าเงื่อนไขการจัดตารางสอน</h2><p>กำหนดล่วงหน้าได้ตามต้องการ หรือข้ามขั้นตอนนี้แล้วจัดตารางด้วยมือ/อัตโนมัติได้เลย</p></div><span class="pill neutral">ปี '+e(selectedYear())+' · ภาคเรียน '+e(selectedTerm())+'</span></section>'+
     (C.error?'<div class="tt-rule-warning">'+e(C.error)+'</div>':'')+
+    demoTeachersHtml()+
     '<div class="tt-rule-pills"><button class="'+(C.settingTab==="subjects"?"active":"")+'" data-tt-rule-tab="subjects">ล็อกคาบวิชา</button><button class="'+(C.settingTab==="teacher"?"active":"")+'" data-tt-rule-tab="teacher">ห้ามสอนรายบุคคล</button></div>'+
     (C.settingTab==="subjects"?subjectView():teacherView());
  }
