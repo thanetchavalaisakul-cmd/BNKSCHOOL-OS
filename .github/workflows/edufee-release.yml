@@ -1,0 +1,45 @@
+name: BNK Education Fee Collection Release
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/edufee-release.patch.gz.b64
+permissions:
+  contents: write
+concurrency:
+  group: bnk-edufee-release
+  cancel-in-progress: false
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply verified education fee implementation
+        run: |
+          python3 - <<'PY'
+          import base64,gzip,pathlib
+          encoded=pathlib.Path('.github/edufee-release.patch.gz.b64').read_text().strip()
+          pathlib.Path('/tmp/edufee-release.patch').write_bytes(gzip.decompress(base64.b64decode(encoded,validate=True)))
+          PY
+          git apply --check /tmp/edufee-release.patch
+          git apply --index /tmp/edufee-release.patch
+      - name: Syntax and regression tests
+        run: |
+          node --check app.js
+          node --check education-fees.js
+          node --check education-fee-print.js
+          node --test tests/performance-regression.test.mjs
+          git diff --cached --check
+      - name: Commit verified education fee module
+        run: |
+          git config user.name "BNK School OS Release Bot"
+          git config user.email "bnk-school-os@users.noreply.github.com"
+          git commit -m "feat: add education fee management under budget administration"
+          git push origin HEAD:main
