@@ -245,6 +245,7 @@ const state = {
   preschoolUnitsError: "",
   timetableSelectedClassId: null,
   timetableView: "planner",
+  timetableDemoClassIds: [],
   timetableAcademicYear: null,
   timetableSemester: null,
   timetableExportClassId: null,
@@ -5095,18 +5096,20 @@ function canManageTimetableSubjectForClass(classRow) {
 }
 
 function canManageTimetable() {
-  return isAcademicHead() || isTimetableStageHead();
+  return isAcademicHead() || isTimetableStageHead() || !!state.timetableDemoClassIds?.length;
 }
 
 function canManageTimetableClassLocal(classRow) {
   if (!classRow) return false;
   if (isAcademicHead()) return true;
+  if(state.timetableDemoClassIds?.includes(classRow.id))return true;
   return timetableStageHeadRowsForYear(classRow.academic_year)
     .some(row => row.stage_code === classRow.stage_code);
 }
 
 function timetableManagerScopeLabel() {
   if (isAcademicHead()) return "ทั้งโรงเรียน";
+  if(state.timetableDemoClassIds?.length && !isTimetableStageHead())return "เฉพาะห้องทดลองที่ได้รับสิทธิ์";
   const labels = timetableStageHeadCodes().map(code => TIMETABLE_STAGE_LABEL[code] || code);
   return labels.length ? labels.join(" / ") : "เฉพาะช่วงชั้นที่ได้รับมอบหมาย";
 }
@@ -5235,6 +5238,8 @@ function timetableStudentExportClassIds() {
 }
 
 async function loadTimetableWorkspace() {
+  const demoAccessRes=await supabase.from("timetable_demo_managers").select("class_id").eq("teacher_id",state.user.id);
+  state.timetableDemoClassIds=demoAccessRes.error?[]:(demoAccessRes.data||[]).map(x=>x.class_id);
   const ownStageHeadsRes = await supabase
     .from("stage_heads")
     .select("*")
