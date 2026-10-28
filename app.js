@@ -1143,7 +1143,7 @@ async function loadActiveUserData() {
       .select("id,email,full_name,employee_code,phone,role,department_id,requested_department_id,subject_group_id,account_status,created_at,approved_at,deleted_at")
       .neq("account_status", "deleted")
       .order("created_at", { ascending: false });
-    state.pendingUsers = data || [];
+    state.pendingUsers = (data || []).filter(u => u.role !== "pa_evaluator");
     const permissionRes=await supabase.from("procurement_module_permissions").select("user_id,can_access_control,can_access_documents,can_access_school_lunch,updated_by,updated_at").order("updated_at",{ascending:false});
     state.procurementPermissionRows=permissionRes.error?[]:(permissionRes.data||[]);
     if(permissionRes.error)state.procurementPermissionError=permissionRes.error.message||String(permissionRes.error);
@@ -2512,14 +2512,14 @@ async function loadPersonnelWorkspace() {
   const [recordsRes, rosterRes, publicRes] = await Promise.all([
     supabase.from("personnel_records").select("*").order("updated_at", { ascending: false }),
     reviewer
-      ? supabase.from("profiles").select("id,email,full_name,employee_code,phone,role,department_id,requested_department_id,subject_group_id,account_status").eq("account_status","active").is("deleted_at", null).order("full_name")
+      ? supabase.from("profiles").select("id,email,full_name,employee_code,phone,role,department_id,requested_department_id,subject_group_id,account_status").eq("account_status","active").is("deleted_at", null).neq("role","pa_evaluator").order("full_name")
       : Promise.resolve({ data: [state.profile], error: null }),
     supabase.from("personnel_public_directory").select("*").order("full_name"),
   ]);
 
   state.personnelRecords = recordsRes.error ? [] : (recordsRes.data || []);
   state.personnelRoster = rosterRes.error ? [state.profile] : (rosterRes.data || []);
-  state.publicPersonnelDirectory = publicRes.error ? [] : (publicRes.data || []);
+  state.publicPersonnelDirectory = publicRes.error ? [] : (publicRes.data || []).filter(p => p.role !== "pa_evaluator");
   state.personnelOwnRecord = state.personnelRecords.find(r => r.user_id === state.user.id) || state.personnelOwnRecord || null;
 
   const photoUrls = {};
@@ -10816,7 +10816,7 @@ function officialAttendanceDailyRows(date=state.officialAttendanceReportDate){
 function officialAttendanceSummaryForDate(date=state.officialAttendanceReportDate){const rows=officialAttendanceDailyRows(date),pending=rows.filter(x=>x.code==="pending_checkin").length,missing=rows.filter(x=>x.code==="missing").length;return {total:rows.length,checked:rows.filter(x=>x.record).length,onTime:rows.filter(x=>x.code==="on_time").length,late:rows.filter(x=>x.code==="late").length,leave:rows.filter(x=>x.code==="leave").length,duty:rows.filter(x=>x.code==="duty").length,pending,missing,notChecked:pending+missing,rows};}
 async function loadOfficialAttendanceWorkspace(){
   if(!state.officialAttendanceReportDate)state.officialAttendanceReportDate=officialAttendanceDateValue();if(!state.officialAttendanceReportMonth)state.officialAttendanceReportMonth=officialAttendanceMonthValue();if(!state.officialAttendanceReportAcademicYear)state.officialAttendanceReportAcademicYear=currentAcademicPeriod().academicYear;if(!state.officialAttendanceReportSemester)state.officialAttendanceReportSemester=currentAcademicPeriod().semester;
-  const manager=officialAttendanceCanManageUi(),canceller=officialAttendanceCanCancelUi(),elevated=manager||canceller,range=officialAttendanceRangeForYear();const [settingsRes,dayRes,recordsRes,dutyRes,rosterRes,personnelRes,leavesRes,typesRes]=await Promise.all([supabase.from("official_attendance_settings").select("*").eq("id",1).maybeSingle(),supabase.from("official_attendance_day_settings").select("*").gte("attendance_date",range.start).lte("attendance_date",range.end).order("attendance_date"),supabase.from("official_attendance_records").select("*").gte("attendance_date",range.start).lte("attendance_date",range.end).order("attendance_date",{ascending:false}).order("checkin_at"),supabase.from("official_attendance_duty_records").select("*").gte("duty_date",range.start).lte("duty_date",range.end).order("duty_date",{ascending:false}),elevated?supabase.from("profiles").select("id,email,full_name,role,department_id,account_status,deleted_at").eq("account_status","active").neq("role","super_admin").is("deleted_at",null).order("full_name"):Promise.resolve({data:[state.profile],error:null}),elevated?supabase.from("personnel_records").select("user_id,position_title,person_category,employment_type"):Promise.resolve({data:state.personnelOwnRecord?[state.personnelOwnRecord]:[],error:null}),supabase.from("leave_requests").select("id,requester_id,requester_name,leave_type_code,other_leave_text,start_date,end_date,status,reason").eq("status","approved").lte("start_date",range.end).gte("end_date",range.start),supabase.from("leave_types").select("code,name_th,sort_order,is_active").eq("is_active",true).order("sort_order")]);
+  const manager=officialAttendanceCanManageUi(),canceller=officialAttendanceCanCancelUi(),elevated=manager||canceller,range=officialAttendanceRangeForYear();const [settingsRes,dayRes,recordsRes,dutyRes,rosterRes,personnelRes,leavesRes,typesRes]=await Promise.all([supabase.from("official_attendance_settings").select("*").eq("id",1).maybeSingle(),supabase.from("official_attendance_day_settings").select("*").gte("attendance_date",range.start).lte("attendance_date",range.end).order("attendance_date"),supabase.from("official_attendance_records").select("*").gte("attendance_date",range.start).lte("attendance_date",range.end).order("attendance_date",{ascending:false}).order("checkin_at"),supabase.from("official_attendance_duty_records").select("*").gte("duty_date",range.start).lte("duty_date",range.end).order("duty_date",{ascending:false}),elevated?supabase.from("profiles").select("id,email,full_name,role,department_id,account_status,deleted_at").eq("account_status","active").neq("role","super_admin").neq("role","pa_evaluator").is("deleted_at",null).order("full_name"):Promise.resolve({data:[state.profile],error:null}),elevated?supabase.from("personnel_records").select("user_id,position_title,person_category,employment_type"):Promise.resolve({data:state.personnelOwnRecord?[state.personnelOwnRecord]:[],error:null}),supabase.from("leave_requests").select("id,requester_id,requester_name,leave_type_code,other_leave_text,start_date,end_date,status,reason").eq("status","approved").lte("start_date",range.end).gte("end_date",range.start),supabase.from("leave_types").select("code,name_th,sort_order,is_active").eq("is_active",true).order("sort_order")]);
   state.officialAttendanceSettings=settingsRes.error?null:settingsRes.data;state.officialAttendanceDaySettings=dayRes.error?[]:(dayRes.data||[]);state.officialAttendanceRecords=recordsRes.error?[]:(recordsRes.data||[]);state.officialAttendanceDutyRecords=dutyRes.error?[]:(dutyRes.data||[]);state.officialAttendanceRoster=rosterRes.error?[state.profile]:(rosterRes.data||[]);state.officialAttendancePersonnel=personnelRes.error?[]:(personnelRes.data||[]);state.officialAttendanceLeaves=leavesRes.error?[]:(leavesRes.data||[]);state.officialAttendanceLeaveTypes=typesRes.error?[]:(typesRes.data||[]);
   state.officialAttendanceQr=null;state.officialAttendanceFaceStatus=null;state.officialAttendanceFaceStatuses=[];state.officialAttendanceCancellations=[];
   if(state.user&&!isSuperAdminUser()){const {data}=await supabase.rpc("get_my_official_attendance_face_status");state.officialAttendanceFaceStatus=Array.isArray(data)?(data[0]||{registered:false}):(data||{registered:false});}
@@ -13463,7 +13463,7 @@ async function loadElectricityWorkspace(){
   const responses=await Promise.all(queries);
   for(const res of responses)if(res.error)throw res.error;
   state.electricityMeters=responses[0].data||[];state.electricityPeriods=responses[1].data||[];
-  state.electricityReadings=responses[2].data||[];state.electricityStaff=mgr?(responses[3].data||[]).map(p=>({id:p.user_id,full_name:p.full_name,role:p.role})):[];
+  state.electricityReadings=responses[2].data||[];state.electricityStaff=mgr?(responses[3].data||[]).filter(p=>p.role!=='pa_evaluator').map(p=>({id:p.user_id,full_name:p.full_name,role:p.role})):[];
   if(!state.electricityPeriods.some(p=>p.id===state.electricityPeriodId))state.electricityPeriodId=state.electricityPeriods[0]?.id||null;
  }catch(e){console.error('Electricity workspace',e);state.electricityError=e.message||String(e);}
 }
