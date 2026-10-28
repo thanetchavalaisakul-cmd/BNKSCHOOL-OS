@@ -114,3 +114,13 @@ test("electricity meter picker reads the active personnel directory instead of r
   assert.ok(source.includes("map(p=>({id:p.user_id,full_name:p.full_name,role:p.role}))"));
   assert.ok(!source.includes("supabase.from('profiles')"), "Manager picker must not use role-scoped profiles");
 });
+
+test("PA evaluator accounts remain PA-only and are hidden from shared staff lists", () => {
+  assert.ok(app.includes('state.modules = state.modules.filter(m=>m.code === "personnel_pa")'));
+  assert.ok(app.includes('state.pendingUsers = (data || []).filter(u => u.role !== "pa_evaluator");'));
+  assert.ok(app.includes('.neq("role","pa_evaluator").order("full_name")'));
+  assert.ok(app.includes('state.publicPersonnelDirectory = publicRes.error ? [] : (publicRes.data || []).filter(p => p.role !== "pa_evaluator");'));
+  assert.ok(app.includes('.neq("role","super_admin").neq("role","pa_evaluator")'));
+  assert.ok(app.includes(".filter(p=>p.role!=='pa_evaluator').map(p=>({id:p.user_id,full_name:p.full_name,role:p.role}))"));
+  assert.ok(app.includes('function personnelPaIsEvaluatorUi(){return state.profile?.role==="pa_evaluator";}'));
+});
