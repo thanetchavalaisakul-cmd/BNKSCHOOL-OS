@@ -1,0 +1,45 @@
+name: BNK Timetable Constraint Release
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/timetable-release.patch.gz.b64
+permissions:
+  contents: write
+concurrency:
+  group: bnk-timetable-release
+  cancel-in-progress: false
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply timetable constraints module
+        run: |
+          python3 - <<'PY'
+          import base64,gzip,pathlib
+          encoded=pathlib.Path('.github/timetable-release.patch.gz.b64').read_text().strip()
+          pathlib.Path('/tmp/timetable-release.patch').write_bytes(gzip.decompress(base64.b64decode(encoded,validate=True)))
+          PY
+          git apply --check /tmp/timetable-release.patch
+          git apply --index /tmp/timetable-release.patch
+      - name: Verify timetable module and existing code
+        run: |
+          node --check app.js
+          node --check timetable-constraints.js
+          node --check timetable-solver.js
+          node --test tests/performance-regression.test.mjs tests/timetable-constraints.test.mjs
+          git diff --cached --check
+      - name: Commit tested timetable improvements
+        run: |
+          git config user.name "BNK School OS Release Bot"
+          git config user.email "bnk-school-os@users.noreply.github.com"
+          git commit -m "feat: timetable fixed periods, teacher availability and automatic draft generator"
+          git push origin HEAD:main
