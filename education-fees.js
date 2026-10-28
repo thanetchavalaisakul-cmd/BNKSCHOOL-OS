@@ -1,0 +1,203 @@
+
+import { educationPrint } from "./education-fee-print.js?v=1";
+export function createEducationFeeFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont}){
+ const F={tab:"dashboard",year:"2569",semester:2,loaded:false,loading:false,error:"",access:false,manager:false,admin:false,
+ roster:[],payments:[],rates:[],windows:[],staff:[],people:[],classFilter:"all",
+ receiveGrade:"",receiveClass:"",receiveStudent:"",historyStudent:"",pending:false};
+ const e=v=>escapeHtml(String(v??""));
+ const cats=[["tuition","ค่าบำรุงการศึกษา","รายภาคเรียน"],["deposit","ค่าประกัน","รายปีการศึกษา"],["water","ค่าน้ำ","รายปีการศึกษา"]];
+ const catName=k=>cats.find(c=>c[0]===k)?.[1]||k;
+ const fmt=v=>Number(v||0).toLocaleString("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2});
+ const htmlMoney=v=>fmt(v)+" ฿";
+ const selectedPeriod=()=>({year:F.year,semester:F.semester});
+ const myClassStaff=()=>F.staff.filter(v=>v.user_id===state.user?.id && v.role==="collector");
+ const canCollect=cid=>F.manager||myClassStaff().some(v=>!v.class_id||v.class_id===cid);
+ const className=s=>s?.class_name||"ไม่ระบุ";
+ const allClasses=()=>[...new Map(F.roster.map(s=>[s.class_id,{id:s.class_id,name:s.class_name}])).values()]
+   .sort((a,b)=>a.name.localeCompare(b.name,"th",{numeric:true}));
+ const grades=()=>[...new Set(allClasses().map(c=>c.name.replace(/\/[^/]*$/,"")))].filter(Boolean).sort((a,b)=>a.localeCompare(b,"th",{numeric:true}));
+ const rooms=()=>allClasses().filter(c=>c.name.replace(/\/[^/]*$/,"")===F.receiveGrade);
+ const selectedRooms=()=>F.roster.filter(s=>s.class_id===F.receiveClass).sort((a,b)=>Number(a.student_number||0)-Number(b.student_number||0));
+ const activeWindow=(year,sem,cat)=>F.windows.find(x=>x.academic_year===String(year)&&Number(x.semester)===Number(sem)&&x.category===cat)?.enabled===true;
+ const rate=(cat,semester=F.semester)=>Number(F.rates.find(r=>r.academic_year===F.year&&Number(r.semester)===(cat==="tuition"?semester:0)&&r.category===cat)?.amount||0);
+ const yearlyActive=(cat)=>activeWindow(F.year,1,cat)||activeWindow(F.year,2,cat);
+ const target=cat=>cat==="tuition"?(activeWindow(F.year,F.semester,cat)?rate(cat):0):(yearlyActive(cat)?rate(cat):0);
+ const paid=(sid,cat,sem=F.semester)=>F.payments.filter(p=>p.student_id===sid&&p.academic_year===F.year&&p.category===cat
+   &&(cat!=="tuition"||Number(p.semester)===sem)&&!p.voided_at).reduce((n,p)=>n+Number(p.amount),0);
+ const bill=(s,cat)=>({due:target(cat),paid:paid(s.student_id,cat),balance:Math.max(0,target(cat)-paid(s.student_id,cat))});
+ const totals=s=>{const x=cats.map(c=>bill(s,c[0]));return {student:s,due:x.reduce((n,b)=>n+b.due,0),paid:x.reduce((n,b)=>n+b.paid,0),balance:x.reduce((n,b)=>n+b.balance,0)}};
+ const rosterFiltered=()=>F.roster.filter(s=>F.classFilter==="all"||s.class_id===F.classFilter);
+ const sc=(v,t,selected)=>'<option value="'+e(v)+'" '+(String(v)===String(selected)?"selected":"")+'>'+e(t)+'</option>';
+ async function allPayments(){
+  const rows=[];for(let i=0;i<12;i++){const {data,error}=await supabase.from("edufee_payments").select("*").eq("academic_year",F.year).order("recorded_at",{ascending:false}).range(i*1000,i*1000+999);if(error)throw error;rows.push(...(data||[]));if((data||[]).length<1000)break}return rows;
+ }
+ async function load(){
+  F.loading=true;F.error="";
+  try{
+   const results=await Promise.all([
+    supabase.rpc("edufee_is_manager"),supabase.rpc("edufee_is_leader"),
+    supabase.rpc("edufee_roster",{p_year:F.year,p_semester:F.semester}),
+    supabase.from("edufee_rates").select("*").eq("academic_year",F.year),
+    supabase.from("edufee_windows").select("*").eq("academic_year",F.year),
+    supabase.from("edufee_staff").select("*"),
+    supabase.from("personnel_public_directory").select("user_id,full_name,role").order("full_name"),
+    allPayments()
+   ]);
+   for(const [i,label] of [[2,"ทะเบียนนักเรียน"],[3,"อัตราค่าบำรุง"],[4,"รอบการจัดเก็บ"]])if(results[i].error)throw new Error(label+": "+results[i].error.message);
+   F.manager=results[0].data===true;F.admin=state.profile?.role==="super_admin";
+   F.roster=results[2].data||[];F.rates=results[3].data||[];F.windows=results[4].data||[];
+   F.staff=results[5].data||[];F.people=results[6].data||[];F.payments=results[7]||[];
+   F.access=results[1].data===true||F.roster.length>0||F.staff.some(s=>s.user_id===state.user?.id);
+   if(F.classFilter!=="all"&&!F.roster.some(s=>s.class_id===F.classFilter))F.classFilter="all";
+   if(F.receiveClass&&!F.roster.some(s=>s.class_id===F.receiveClass))F.receiveClass="";
+  }catch(err){F.error=err.message||String(err)}finally{F.loaded=true;F.loading=false}
+ }
+ const scope=()=>'<div class="edufee-filter"><label>ปีการศึกษา <select id="edufee-year">'+[F.year,...(state.academicTerms||[]).map(x=>String(x.academic_year))].filter((x,i,a)=>a.indexOf(x)===i).map(x=>sc(x,x,F.year)).join("")+'</select></label><label>ภาคเรียน <select id="edufee-sem">'+sc("1","ภาคเรียนที่ 1",F.semester)+sc("2","ภาคเรียนที่ 2",F.semester)+'</select></label><label>ห้องเรียน <select id="edufee-class">'+sc("all","ทุกห้องที่มีสิทธิ์",F.classFilter)+allClasses().map(x=>sc(x.id,x.name,F.classFilter)).join("")+'</select></label></div>';
+ const stats=()=>{const all=rosterFiltered().map(totals),due=all.reduce((n,x)=>n+x.due,0),got=all.reduce((n,x)=>n+x.paid,0),rest=all.reduce((n,x)=>n+x.balance,0),complete=all.filter(x=>x.balance===0&&x.due>0).length;return {all,due,got,rest,complete}};
+ const status=row=>row.due<=0?"ยังไม่เปิดเก็บ":row.balance<=0?"ชำระครบ":row.paid>0?"ชำระบางส่วน":"ยังไม่ชำระ";
+ function feeRows(s){return cats.map(([k,name])=>{const b=bill(s,k);return '<tr><td>'+name+'</td><td class="num">'+fmt(b.due)+'</td><td class="num">'+fmt(b.paid)+'</td><td class="num">'+fmt(b.balance)+'</td></tr>'}).join("")}
+ const colhead='<thead><tr><th>นักเรียน</th><th>ห้อง</th><th class="num">ต้องชำระ</th><th class="num">รับแล้ว</th><th class="num">คงค้าง</th><th>สถานะ</th><th>ดูรายการ</th></tr></thead>';
+ function rosterTable(rows){
+  return '<div class="table-wrap"><table class="table edufee-table">'+colhead+'<tbody>'+rows.map(r=>'<tr><td>'+e(r.student.full_name)+'</td><td>'+e(className(r.student))+'</td><td class="num">'+fmt(r.due)+'</td><td class="num">'+fmt(r.paid)+'</td><td class="num">'+fmt(r.balance)+'</td><td><span class="edufee-pill '+(r.balance<=0?"ok":r.paid>0?"half":"pending")+'">'+status(r)+'</span></td><td><button class="btn btn-ghost" data-fee-person="'+e(r.student.student_id)+'">รายละเอียด</button></td></tr>').join("")+'</tbody></table></div>'
+ }
+ const noRates=()=>!cats.some(x=>target(x[0])>0);
+ function dashboard(){
+  const m=stats(),pct=m.due?Math.max(0,Math.min(100,m.got/m.due*100)):0;
+  return '<div class="edufee-statgrid">'+[
+   ["ยอดที่ต้องจัดเก็บ",htmlMoney(m.due)],["รับชำระแล้ว",htmlMoney(m.got)],["คงค้าง",htmlMoney(m.rest)],["ชำระครบ",m.complete.toLocaleString("th-TH")+" คน"]
+  ].map(([k,v])=>'<article class="edufee-stat"><span>'+k+'</span><strong>'+v+'</strong></article>').join("")+'</div>'+
+  (noRates()?'<div class="edufee-notice">ยังไม่มีอัตราที่เปิดจัดเก็บในรอบนี้ โปรดตั้งค่าอัตราและเปิดรายการก่อนเริ่มรับเงิน</div>':"")+
+  '<div class="edufee-chartgrid"><section class="panel"><h3>สัดส่วนยอดจัดเก็บ</h3><div class="edufee-ring" style="--p:'+pct+'%"><div><strong>'+pct.toFixed(1)+'%</strong><small>รับชำระ</small></div></div><p class="edufee-legend">รับแล้ว '+fmt(m.got)+' บาท · คงค้าง '+fmt(m.rest)+' บาท</p></section><section class="panel"><h3>สรุปตามประเภทเงิน</h3>'+cats.map(([k,name])=>{const b=m.all.reduce((n,r)=>{const x=bill(r.student,k);n.due+=x.due;n.paid+=x.paid;return n},{due:0,paid:0});const pct=b.due?Math.min(100,b.paid/b.due*100):0;return '<div class="edufee-bar"><div><b>'+name+'</b><span>'+fmt(b.paid)+' / '+fmt(b.due)+' บาท</span></div><i><em style="width:'+pct+'%"></em></i></div>'}).join("")+'</section></div>'+
+  '<section class="panel"><h3>ภาพรวมรายห้อง</h3>'+allClasses().filter(c=>F.classFilter==="all"||c.id===F.classFilter).map(c=>{const rows=m.all.filter(v=>v.student.class_id===c.id),due=rows.reduce((n,v)=>n+v.due,0),got=rows.reduce((n,v)=>n+v.paid,0);return '<button class="edufee-room" data-fee-room="'+e(c.id)+'"><b>'+e(c.name)+'</b><span>'+rows.length+' คน</span><span>รับแล้ว '+fmt(got)+' ฿</span><span>คงค้าง '+fmt(Math.max(0,due-got))+' ฿</span></button>'}).join("")+'</section>'
+ }
+ function selector(){
+  return '<div class="edufee-selector"><label>๑. ระดับชั้น<select id="edufee-grade"><option value="">— เลือกระดับชั้น —</option>'+grades().map(x=>sc(x,x,F.receiveGrade)).join("")+'</select></label><label>๒. ห้องเรียน<select id="edufee-room" '+(!F.receiveGrade?"disabled":"")+'><option value="">— เลือกห้อง —</option>'+rooms().map(x=>sc(x.id,x.name,F.receiveClass)).join("")+'</select></label><label>๓. ชื่อนักเรียน<select id="edufee-student" '+(!F.receiveClass?"disabled":"")+'><option value="">— เลือกนักเรียน —</option>'+selectedRooms().map(s=>sc(s.student_id,(s.student_number?"เลขที่ "+s.student_number+" · ":"")+s.full_name,F.receiveStudent)).join("")+'</select></label></div>';
+ }
+ function collect(){
+  const s=F.roster.find(x=>x.student_id===F.receiveStudent&&x.class_id===F.receiveClass);
+  return '<section class="panel"><h3>รับชำระเงินจากผู้ปกครอง</h3><p>เลือกชั้น → ห้อง → นักเรียน รายชื่อจะเปลี่ยนตามห้องเรียนจริง</p>'+selector()+
+  (s?'<div class="edufee-person-head"><strong>'+e(s.full_name)+'</strong><span>เลขประจำตัว '+e(s.student_code||"—")+' · '+e(s.class_name)+'</span><span>ผู้ปกครอง '+e(s.guardian_name||"—")+'</span></div>'+
+  (canCollect(s.class_id)?'<form id="edufee-payment"><h3>เลือกประเภทที่ต้องการรับเงิน</h3><p class="helper">ติ๊กเฉพาะรายการที่รับเงินจริง สามารถแก้จำนวนเงินเพื่อรับชำระบางส่วนได้</p>'+
+  cats.map(([k,name,cycle])=>{const b=bill(s,k),enabled=activeWindow(F.year,F.semester,k)&&b.balance>0&&rate(k)>0;
+   return '<div class="edufee-payrow"><label><input type="checkbox" name="selected" value="'+k+'" '+(!enabled?"disabled":"")+'> <b>'+name+'</b><small>'+cycle+'</small></label><div><span>ยอดค้าง '+fmt(b.balance)+' ฿</span><input type="number" name="amount_'+k+'" min="0.01" max="'+b.balance+'" step="0.01" value="'+b.balance+'" '+(!enabled?"disabled":"")+'></div><small>'+(enabled?"พร้อมรับชำระ":(!activeWindow(F.year,F.semester,k)?"ไม่เปิดเก็บในเทอมนี้":b.balance===0?"ชำระครบแล้ว":"กรุณาตั้งค่าอัตรา"))+'</small></div>'
+  }).join("")+'<div class="edufee-fields"><label>วันที่รับเงินจริง<input name="paid_on" type="date" required value="'+new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Bangkok"})+'"></label><label>ผู้ชำระเงิน<input name="payer" maxlength="120" value="'+e(s.guardian_name||"")+'"></label><label class="wide">หมายเหตุ / กรณีบันทึกย้อนหลัง<textarea name="note" maxlength="500" placeholder="เช่น รับเงินภาคเรียนที่ 1 ก่อนเริ่มใช้งานระบบ"></textarea></label></div><button class="btn btn-primary" type="submit" '+(F.pending?"disabled":"")+'>บันทึกรับเงิน</button></form>':'<div class="edufee-notice">บัญชีนี้ยังไม่มีสิทธิ์รับเงินของห้องนี้</div>')+
+  '<section class="edufee-subtable"><h3>สถานะการชำระเงิน</h3><div class="table-wrap"><table class="table"><thead><tr><th>รายการ</th><th class="num">ต้องชำระ</th><th class="num">จ่ายแล้ว</th><th class="num">ค้าง</th></tr></thead><tbody>'+feeRows(s)+'</tbody></table></div></section>'
+  :'<div class="edufee-empty">เลือกนักเรียนเพื่อเริ่มรับเงินและดูยอดคงค้าง</div>')+'</section>'
+ }
+ function history(){
+  const people=rosterFiltered(),allowed=new Set(people.map(x=>x.student_id));
+  const p=F.payments.filter(x=>allowed.has(x.student_id)&&(!F.historyStudent||x.student_id===F.historyStudent));
+  return '<section class="panel"><h3>ประวัติการรับเงินและใบรับเงิน</h3><div class="edufee-filter"><label>นักเรียน<select id="edufee-history-student">'+sc("","ทุกคน",F.historyStudent)+people.map(x=>sc(x.student_id,x.full_name+" · "+x.class_name,F.historyStudent)).join("")+'</select></label></div><div class="table-wrap"><table class="table edufee-table"><thead><tr><th>เลขอ้างอิง</th><th>วันที่รับจริง</th><th>นักเรียน</th><th>รายการ</th><th>ภาคเรียน</th><th class="num">จำนวน</th><th>ผู้บันทึก/สถานะ</th><th>เอกสาร</th></tr></thead><tbody>'+
+  p.map(x=>{const s=people.find(s=>s.student_id===x.student_id);return '<tr><td>'+e(x.sequence_no)+'</td><td>'+e(x.paid_on)+'</td><td>'+e(s?.full_name||"")+'</td><td>'+catName(x.category)+'</td><td>'+e(x.semester)+'</td><td class="num">'+fmt(x.amount)+'</td><td>'+e(F.people.find(z=>z.user_id===x.recorded_by)?.full_name||"—")+(x.voided_at?'<br><strong class="edufee-void">ยกเลิกแล้ว</strong>':'')+'</td><td><button class="btn btn-ghost" data-fee-receipt="'+e(x.id)+'">ใบรับเงิน</button>'+(F.manager&&!x.voided_at?'<button class="btn btn-ghost" data-fee-void="'+e(x.id)+'">ยกเลิก</button>':'')+'</td></tr>'}).join("")+
+  '</tbody></table></div>'+(p.length?"":'<p class="edufee-empty">ยังไม่มีรายการรับชำระในขอบเขตที่เลือก</p>')+'</section>';
+ }
+ function register(){
+  const rows=rosterFiltered().map(totals);return '<section class="panel"><div class="edufee-head"><h3>ทะเบียนสถานะการชำระเงินรายบุคคล</h3><button class="btn btn-ghost" id="edufee-csv">ส่งออก Excel (CSV)</button></div>'+rosterTable(rows)+'</section>'
+ }
+ function person(){
+  const s=F.roster.find(s=>s.student_id===F.historyStudent);if(!s)return history();
+  const m=totals(s);return '<section class="panel"><button class="btn btn-ghost" id="edufee-person-back">ย้อนกลับทะเบียน</button><h3>'+e(s.full_name)+' · '+e(s.class_name)+'</h3><div class="edufee-statgrid"><article class="edufee-stat"><span>รวมต้องชำระ</span><strong>'+htmlMoney(m.due)+'</strong></article><article class="edufee-stat"><span>รับแล้ว</span><strong>'+htmlMoney(m.paid)+'</strong></article><article class="edufee-stat"><span>ค้างชำระ</span><strong>'+htmlMoney(m.balance)+'</strong></article></div><div class="table-wrap"><table class="table"><thead><tr><th>รายการ</th><th class="num">ต้องชำระ</th><th class="num">รับแล้ว</th><th class="num">ค้าง</th></tr></thead><tbody>'+feeRows(s)+'</tbody></table></div></section>'+history();
+ }
+ function settings(){
+  if(!F.manager)return '<section class="panel"><div class="edufee-empty">เฉพาะผู้ดูแลด้านการเงินที่ได้รับสิทธิ์เท่านั้น</div></section>';
+  return '<section class="panel"><h3>กำหนดอัตราจัดเก็บ · ปีการศึกษา '+e(F.year)+'</h3><p class="helper">ค่าประกันและค่าน้ำกำหนดอัตราครั้งเดียวต่อปี ส่วนค่าบำรุงการศึกษาตั้งแยกภาคเรียนได้</p><form id="edufee-settings-rates" class="edufee-settings-rates">'+
+    cats.map(([k,n,cycle])=>{let vals=k==="tuition"?[1,2]:[0];return vals.map(sem=>'<label>'+n+' · '+(sem===0?"รายปี":'ภาคเรียนที่ '+sem)+'<input name="rate_'+k+'_'+sem+'" type="number" min="0" max="1000000" step="0.01" required value="'+rate(k,sem===0?F.semester:sem)+'"></label>').join("")}).join("")+
+    '<button class="btn btn-primary">บันทึกอัตราการจัดเก็บ</button></form></section>'+
+  '<section class="panel"><h3>เปิด / ปิดการจัดเก็บรายเทอม</h3><p class="helper">รายการรายปีเรียกเก็บเพียงครั้งเดียวในปีการศึกษา ไม่คิดยอดซ้ำหากนักเรียนชำระแล้วในอีกเทอมหนึ่ง</p><form id="edufee-settings-windows"><div class="edufee-windowgrid">'+[1,2].map(sem=>'<div><h4>ภาคเรียนที่ '+sem+'</h4>'+cats.map(([k,name])=>'<label class="edufee-switch"><input type="checkbox" name="window_'+sem+'_'+k+'" '+(activeWindow(F.year,sem,k)?"checked":"")+'> '+name+'</label>').join("")+'</div>').join("")+'</div><button class="btn btn-primary">บันทึกการเปิด / ปิด</button></form></section>'+
+  '<section class="panel"><h3>ผู้รับผิดชอบการเงิน</h3><p>ผู้ดูแลหลักสามารถกำหนดอัตราและดูทุกห้อง ส่วนผู้รับเงินเฉพาะห้องจะบันทึกได้เฉพาะห้องที่ได้รับมอบหมาย</p>'+
+  (F.admin?'<form id="edufee-staff-form" class="edufee-staff-form"><select name="user_id" required>'+sc("","เลือกบุคลากร",null)+F.people.filter(x=>x.user_id).map(x=>sc(x.user_id,x.full_name,null)).join("")+'</select><select name="role" id="edufee-staff-role">'+sc("collector","ผู้รับเงิน",null)+sc("manager","ผู้ดูแลการเงิน",null)+'</select><select name="class_id"><option value="">ทุกห้อง</option>'+allClasses().map(c=>sc(c.id,c.name,"")).join("")+'</select><button class="btn btn-primary">มอบหมายสิทธิ์</button></form>':'')+
+  '<div class="edufee-stafflist">'+F.staff.map(x=>'<div><strong>'+e(F.people.find(v=>v.user_id===x.user_id)?.full_name||"บุคลากร")+'</strong><span>'+(x.role==="manager"?"ผู้ดูแลการเงิน":"ผู้รับเงิน")+' · '+e(allClasses().find(c=>c.id===x.class_id)?.name||"ทุกห้อง")+'</span>'+(F.admin?'<button class="btn btn-ghost" data-fee-revoke="'+e(x.id)+'">ถอนสิทธิ์</button>':"")+'</div>').join("")+'</div></section>';
+ }
+ const tabs=()=>{const arr=[["dashboard","Dashboard"],["registry","ทะเบียนการชำระเงิน"],["history","ประวัติ / ใบรับเงิน"],["reports","รายงาน"]];if(F.manager||myClassStaff().length)arr.splice(1,0,["collect","บันทึกรับเงิน"]);if(F.manager)arr.push(["settings","ตั้งค่าการจัดเก็บ"]);return '<div class="edufee-tabs">'+arr.map(([k,n])=>'<button data-fee-tab="'+k+'" class="'+(k===F.tab?"active":"")+'">'+n+'</button>').join("")+'</div>'};
+ function view(){
+  const hero='<div class="edufee-hero"><div><small>กลุ่มงานบริหารแผนและงบประมาณ</small><h2>ระบบจัดเก็บค่าบำรุงการศึกษา</h2><p>ค่าบำรุงการศึกษา · ค่าประกัน · ค่าน้ำ · เชื่อมทะเบียนนักเรียน BNK SCHOOL OS</p></div><img src="./school-logo.png" alt="ตราโรงเรียน"></div>';
+  if(F.loading)return hero+'<section class="panel">กำลังโหลดข้อมูลการรับชำระ…</section>';
+  if(F.error)return hero+'<section class="panel"><h3>เกิดข้อผิดพลาดในการโหลดข้อมูล</h3><p>'+e(F.error)+'</p><button class="btn btn-ghost" id="edufee-reload">ลองใหม่</button></section>';
+  if(!F.access)return hero+'<section class="panel"><h3>ยังไม่ได้รับสิทธิ์ใช้งาน</h3><p>กรุณาให้ Super Admin แต่งตั้งผู้รับผิดชอบการเงิน หรือใช้บัญชีผู้บริหารที่ได้รับสิทธิ์ดูรายงาน</p></section>';
+  const contents=F.tab==="dashboard"?dashboard():F.tab==="collect"?collect():F.tab==="registry"?register():F.tab==="person"?person():F.tab==="history"?history():F.tab==="settings"?settings():
+   '<section class="panel"><h3>รายงานสรุปรายห้องและทั้งโรงเรียน</h3><p>เลือกระดับปีการศึกษา ภาคเรียน และห้องจากตัวกรอง แล้วส่งออกเอกสาร</p><div class="edufee-actions"><button class="btn btn-primary" id="edufee-print-report">พิมพ์รายงาน A4 / PDF</button><button class="btn btn-ghost" id="edufee-csv">ส่งออก Excel (CSV)</button></div>'+rosterTable(rosterFiltered().map(totals))+'</section>';
+  return hero+tabs()+scope()+contents;
+ }
+ const rerender=()=>renderDashboard();
+ function exportCSV(){
+  const columns=["รหัสนักเรียน","ชื่อ-นามสกุล","ห้อง","ค่าบำรุงต้องชำระ","ค่าบำรุงรับแล้ว","ค่าประกันต้องชำระ","ค่าประกันรับแล้ว","ค่าน้ำต้องชำระ","ค่าน้ำรับแล้ว","รวมต้องชำระ","รับแล้ว","คงค้าง"];
+  const safe=v=>{const x=String(v??"");return '"'+(/^[=+@\-\t\r]/.test(x)?"'"+x:x).replace(/"/g,'""')+'"';};
+  const rows=rosterFiltered().map(s=>[s.student_code,s.full_name,s.class_name,bill(s,"tuition").due,bill(s,"tuition").paid,bill(s,"deposit").due,bill(s,"deposit").paid,bill(s,"water").due,bill(s,"water").paid,totals(s).due,totals(s).paid,totals(s).balance]);
+  const blob=new Blob(["\ufeff"+[columns,...rows].map(row=>row.map(safe).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="BNK_education_fees_"+F.year+"_term_"+F.semester+".csv";a.click();URL.revokeObjectURL(url);
+ }
+ const printOpts=()=>({fontsCss:officialPdfFontFaceCss(),ensureFont:ensureOfficialPdfFont,toast});
+ function reportPdf(){
+  const rows=rosterFiltered().map(totals),scopeName=F.classFilter==="all"?"ทุกห้องที่มีสิทธิ์":allClasses().find(c=>c.id===F.classFilter)?.name||"รายห้อง";
+  educationPrint({type:"summary",data:{rows,year:F.year,semester:F.semester,scope:scopeName,schoolName:state.systemSettings?.school_name_th},...printOpts()});
+ }
+ function receiptPdf(id){
+  const p=F.payments.find(x=>x.id===id),s=F.roster.find(x=>x.student_id===p?.student_id);if(!p||!s)return toast("ไม่พบรายการ","ไม่สามารถสร้างใบรับเงิน","error");
+  const collector=F.people.find(x=>x.user_id===p.recorded_by)?.full_name||"";
+  educationPrint({type:"receipt",data:{payment:p,student:s,schoolName:state.systemSettings?.school_name_th,collectorName:collector},...printOpts()});
+ }
+ function bind(){
+  document.querySelector("#edufee-reload")?.addEventListener("click",async()=>{await load();rerender()});
+  document.querySelectorAll("[data-fee-tab]").forEach(b=>b.addEventListener("click",()=>{F.tab=b.dataset.feeTab;F.historyStudent="";rerender()}));
+  document.querySelector("#edufee-year")?.addEventListener("change",async ev=>{F.year=ev.target.value;F.classFilter="all";F.receiveGrade=F.receiveClass=F.receiveStudent="";await load();rerender()});
+  document.querySelector("#edufee-sem")?.addEventListener("change",async ev=>{F.semester=Number(ev.target.value);F.classFilter="all";F.receiveGrade=F.receiveClass=F.receiveStudent="";await load();rerender()});
+  document.querySelector("#edufee-class")?.addEventListener("change",ev=>{F.classFilter=ev.target.value;rerender()});
+  document.querySelectorAll("[data-fee-room]").forEach(b=>b.onclick=()=>{F.classFilter=b.dataset.feeRoom;F.tab="registry";rerender()});
+  document.querySelectorAll("[data-fee-person]").forEach(b=>b.onclick=()=>{F.historyStudent=b.dataset.feePerson;F.tab="person";rerender()});
+  document.querySelector("#edufee-person-back")?.addEventListener("click",()=>{F.historyStudent="";F.tab="registry";rerender()});
+  document.querySelector("#edufee-grade")?.addEventListener("change",ev=>{F.receiveGrade=ev.target.value;F.receiveClass="";F.receiveStudent="";rerender()});
+  document.querySelector("#edufee-room")?.addEventListener("change",ev=>{F.receiveClass=ev.target.value;F.receiveStudent="";rerender()});
+  document.querySelector("#edufee-student")?.addEventListener("change",ev=>{F.receiveStudent=ev.target.value;rerender()});
+  document.querySelector("#edufee-history-student")?.addEventListener("change",ev=>{F.historyStudent=ev.target.value;rerender()});
+  document.querySelector("#edufee-csv")?.addEventListener("click",exportCSV);
+  document.querySelector("#edufee-print-report")?.addEventListener("click",reportPdf);
+  document.querySelectorAll("[data-fee-receipt]").forEach(b=>b.onclick=()=>receiptPdf(b.dataset.feeReceipt));
+  document.querySelectorAll("[data-fee-void]").forEach(b=>b.onclick=async()=>{
+   const reason=prompt("ระบุเหตุผลการยกเลิกรายการ (อย่างน้อย 8 ตัวอักษร)");if(!reason)return;
+   const {error}=await supabase.rpc("edufee_void_payment",{p_id:b.dataset.feeVoid,p_reason:reason});
+   if(error)return toast("ยกเลิกไม่สำเร็จ",error.message,"error");await load();rerender();toast("ยกเลิกรายการแล้ว","","success");
+  });
+  document.querySelector("#edufee-payment")?.addEventListener("submit",async ev=>{
+   ev.preventDefault();if(F.pending)return;
+   const s=F.roster.find(x=>x.student_id===F.receiveStudent&&x.class_id===F.receiveClass);
+   if(!s||!canCollect(s.class_id))return toast("ไม่มีสิทธิ์รับเงิน","กรุณาตรวจสอบห้องเรียน","error");
+   const form=ev.currentTarget,d=new FormData(form),items=d.getAll("selected");if(!items.length)return toast("ยังไม่ได้เลือกรายการ","ติ๊กรายการที่รับเงินอย่างน้อยหนึ่งประเภท","error");
+   const paidOn=String(d.get("paid_on")||""),notes=String(d.get("note")||"");
+   const requests=items.map(k=>({k,amount:Number(d.get("amount_"+k)),request:crypto.randomUUID()}));
+   for(const item of requests)if(!Number.isFinite(item.amount)||item.amount<=0||item.amount>bill(s,item.k).balance)return toast("จำนวนเงินไม่ถูกต้อง","ตรวจสอบจำนวนเงิน "+catName(item.k),"error");
+   if(!confirm("ยืนยันรับเงินจริง "+fmt(requests.reduce((n,x)=>n+x.amount,0))+" บาท จาก "+s.full_name+" หรือไม่?"))return;
+   F.pending=true;form.querySelector("[type=submit]").disabled=true;
+   let done=0;
+   for(const item of requests){
+    const {error}=await supabase.rpc("edufee_record_payment",{p_student:s.student_id,p_class:s.class_id,p_year:F.year,p_semester:F.semester,p_category:item.k,p_amount:item.amount,p_paid_on:paidOn,p_payer:String(d.get("payer")||""),p_note:notes,p_request:item.request});
+    if(error){F.pending=false;await load();rerender();return toast("บันทึกบางรายการไม่สำเร็จ",done+" รายการสำเร็จแล้ว; "+catName(item.k)+": "+error.message,"error")}done++;
+   }
+   F.pending=false;await load();rerender();toast("บันทึกรับเงินสำเร็จ",done+" รายการ","success");
+  });
+  document.querySelector("#edufee-settings-rates")?.addEventListener("submit",async ev=>{
+    ev.preventDefault();if(!F.manager)return;const d=new FormData(ev.currentTarget);
+    const payload=[{category:"tuition",semester:1},{category:"tuition",semester:2},{category:"deposit",semester:0},{category:"water",semester:0}]
+     .map(c=>({...c,academic_year:F.year,amount:Number(d.get("rate_"+c.category+"_"+c.semester)),updated_by:state.user.id,updated_at:new Date().toISOString()}));
+    const {error}=await supabase.from("edufee_rates").upsert(payload,{onConflict:"academic_year,semester,category"});
+    if(error)return toast("ตั้งค่าไม่สำเร็จ",error.message,"error");await load();rerender();toast("บันทึกอัตราแล้ว","","success");
+  });
+  document.querySelector("#edufee-settings-windows")?.addEventListener("submit",async ev=>{
+    ev.preventDefault();if(!F.manager)return;const d=new FormData(ev.currentTarget),payload=[];
+    for(let sem=1;sem<=2;sem++)for(const [category] of cats)payload.push({academic_year:F.year,semester:sem,category,enabled:d.has("window_"+sem+"_"+category),updated_by:state.user.id,updated_at:new Date().toISOString()});
+    const {error}=await supabase.from("edufee_windows").upsert(payload,{onConflict:"academic_year,semester,category"});
+    if(error)return toast("เปิด/ปิดรายการไม่สำเร็จ",error.message,"error");await load();rerender();toast("บันทึกรอบจัดเก็บแล้ว","","success");
+  });
+  document.querySelector("#edufee-staff-form")?.addEventListener("submit",async ev=>{
+   ev.preventDefault();if(!F.admin)return;const d=new FormData(ev.currentTarget);
+   const role=String(d.get("role"));const row={user_id:d.get("user_id"),role,class_id:role==="manager"?null:d.get("class_id")||null,granted_by:state.user.id};
+   const {error}=await supabase.from("edufee_staff").insert(row);
+   if(error)return toast("มอบหมายสิทธิ์ไม่สำเร็จ",error.message,"error");await load();rerender();toast("มอบหมายสิทธิ์แล้ว","","success");
+  });
+  document.querySelectorAll("[data-fee-revoke]").forEach(b=>b.addEventListener("click",async()=>{
+    if(!F.admin||!confirm("ยืนยันถอนสิทธิ์รับเงินรายนี้?"))return;
+    const {error}=await supabase.from("edufee_staff").delete().eq("id",b.dataset.feeRevoke);
+    if(error)return toast("ถอนสิทธิ์ไม่สำเร็จ",error.message,"error");await load();rerender();
+  }));
+ }
+ return {load,view,bind,F};
+}
