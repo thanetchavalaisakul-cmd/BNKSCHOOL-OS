@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
+import { createBehaviorFeature } from "./behavior.js?v=1";
 import { openJointActivityModal } from "./timetable-joint.js?v=1";
 import html2canvas from "https://esm.sh/html2canvas@1.4.1";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
@@ -1315,6 +1316,7 @@ function sidebarHtml() {
     </aside>`;
 }
 
+const behaviorFeature=createBehaviorFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod});
 async function renderDashboard() {
   if (state.currentView === "data_center" && state.profile?.role === "super_admin" && !state.dataCenterOverview && !state.dataCenterError) await loadDataCenterWorkspace();
   if (state.currentView === "approval_center") {
@@ -1348,6 +1350,7 @@ async function renderDashboard() {
   if (state.currentView === "module:school_lunch_documents" && procurementHasModuleAccess("school_lunch_documents")) {
     await loadSchoolLunchWorkspace();
   }
+  if(state.currentView === "module:student_behavior")await behaviorFeature.load();
   if(state.currentView === "module:housing_electricity")await loadElectricityWorkspace();
   if (state.currentView === "module:lesson_plans") {
     await loadLessonPlanWorkspace();
@@ -13571,6 +13574,7 @@ function moduleView(code) {
   if(code==="school_lunch_documents"&&!procurementHasModuleAccess(code))return procurementAccessDeniedHtml("ระบบจัดทำเอกสารอาหารกลางวัน");
   const module = state.modules.find(m => m.code === code);
   if (!module) return `<div class="empty"><strong>ไม่พบระบบย่อย</strong></div>`;
+  if (code === "student_behavior") return behaviorFeature.html();
   if (code === "academic_calendar") return academicCalendarWorkspaceHtml(module);
   if (code === "academic_registration") return academicRegistrationWorkspaceHtml(module);
   if (code === "academic_submissions") return academicSubmissionWorkspaceHtml(module);
@@ -14846,6 +14850,7 @@ function bindDashboardEvents() {
   if (state.currentView === "module:personnel_pa") bindPersonnelPaEvents();
   if (state.currentView === "module:procurement_document_control") bindProcurementControlEvents();
   if (state.currentView === "module:procurement_documents") bindProcurementEvents();
+  if (state.currentView === "module:student_behavior") behaviorFeature.bind();
   if (state.currentView === "module:school_lunch_documents") bindSchoolLunchEvents();
   if (state.currentView === "module:housing_electricity") bindElectricityEvents();
   if (state.currentView === "approval_center") bindApprovalCenterEvents();
