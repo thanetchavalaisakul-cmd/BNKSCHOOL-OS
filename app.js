@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
 import { createBehaviorFeature } from "./behavior.js?v=2";
 import { createEducationFeeFeature } from "./education-fees.js?v=2";
+import { createTimetableConstraintFeature } from "./timetable-constraints.js?v=1";
 import { openJointActivityModal } from "./timetable-joint.js?v=1";
 import html2canvas from "https://esm.sh/html2canvas@1.4.1";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
@@ -1319,6 +1320,7 @@ function sidebarHtml() {
 
 const behaviorFeature=createBehaviorFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont});
 const educationFeeFeature=createEducationFeeFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont});
+const timetableConstraintFeature=createTimetableConstraintFeature({supabase,state,escapeHtml,toast,redraw:renderTimetableNavigation,reload:renderDashboard,scopeClasses:()=>timetableFilteredClasses({visibleOnly:true}),currentPeriod:currentTimetablePeriod});
 async function renderDashboard() {
   if (state.currentView === "data_center" && state.profile?.role === "super_admin" && !state.dataCenterOverview && !state.dataCenterError) await loadDataCenterWorkspace();
   if (state.currentView === "approval_center") {
@@ -1379,7 +1381,7 @@ async function renderDashboard() {
   if (state.currentView === "module:timetable_management") {
     // Switching tabs/class filters must not refetch the same 13 datasets.
     if (state.timetableSkipNextLoad && state.timetableClasses?.length) state.timetableSkipNextLoad = false;
-    else { state.timetableSkipNextLoad = false; await loadTimetableWorkspace(); }
+    else { state.timetableSkipNextLoad = false; await loadTimetableWorkspace(); if(canManageTimetable())await timetableConstraintFeature.load(); }
   }
   if (state.currentView === "module:substitute_teaching") {
     await loadSubstituteWorkspace();
@@ -5325,7 +5327,7 @@ async function loadTimetableWorkspace() {
   state.preschoolRoster=preschoolRosterRes.error?[]:(preschoolRosterRes.data||[]);
   state.preschoolUnits=preschoolRes.error?[]:(preschoolRes.data||[]);
   state.preschoolUnitsError=preschoolRes.error ? preschoolRes.error.message : "";
-  if (canManageTimetable() && !["setup","periods","planner","export","mine"].includes(state.timetableView)) {
+  if (canManageTimetable() && !["setup","periods","planner","export","mine","conditions","generate"].includes(state.timetableView)) {
     state.timetableView = "planner";
   }
 }
@@ -5706,7 +5708,9 @@ function timetableTabsHtml() {
     return `<div class="lesson-view-tabs timetable-tabs">
       <button class="lesson-view-tab ${state.timetableView==="setup"?"active":""}" data-timetable-view="setup">ข้อมูลก่อนจัดตาราง</button>
       <button class="lesson-view-tab ${state.timetableView==="periods"?"active":""}" data-timetable-view="periods">ตั้งค่าคาบเรียน</button>
-      <button class="lesson-view-tab ${state.timetableView==="planner"?"active":""}" data-timetable-view="planner">จัดตาราง</button>
+      <button class="lesson-view-tab ${state.timetableView==="planner"?"active":""}" data-timetable-view="planner">จัดด้วยมือ (ลาก–วาง)</button>
+      <button class="lesson-view-tab" data-timetable-view="conditions">⚙ ตั้งค่าเงื่อนไข</button>
+      <button class="lesson-view-tab" data-timetable-view="generate">✦ จัดอัตโนมัติ</button>
       <button class="lesson-view-tab ${state.timetableView==="export"?"active":""}" data-timetable-view="export">Export PDF</button>
       <button class="lesson-view-tab ${state.timetableView==="mine"?"active":""}" data-timetable-view="mine">ตารางสอนของฉัน</button>
     </div>`;
@@ -5997,7 +6001,7 @@ function timetableExportHtml() {
 function timetableWorkspaceHtml(module) {
   const tabs=timetableTabsHtml();
   if(canManageTimetable()){
-    return `${timetableHeroHtml()}${tabs}${state.timetableView==="setup"?timetableSetupHtml():state.timetableView==="periods"?timetablePeriodSettingsHtml():state.timetableView==="export"?timetableExportHtml():state.timetableView==="mine"?timetableMineHtml():timetablePlannerHtml()}`;
+    return `${timetableHeroHtml()}${tabs}${state.timetableView==="setup"?timetableSetupHtml():state.timetableView==="periods"?timetablePeriodSettingsHtml():state.timetableView==="export"?timetableExportHtml():state.timetableView==="mine"?timetableMineHtml():state.timetableView==="conditions"?timetableConstraintFeature.conditionsHtml():state.timetableView==="generate"?timetableConstraintFeature.generatedHtml():timetablePlannerHtml()}`;
   }
   if(["director","super_admin"].includes(state.profile.role)){
     if(!["overview","export"].includes(state.timetableView)) state.timetableView="overview";
@@ -15318,12 +15322,13 @@ function bindDashboardEvents() {
   document.querySelectorAll("[data-edit-preschool-unit]").forEach(btn=>btn.addEventListener("click",()=>preschoolUnitModal(btn.dataset.editPreschoolUnit)));
   document.querySelectorAll("[data-delete-preschool-unit]").forEach(btn=>btn.addEventListener("click",()=>deletePreschoolUnit(btn.dataset.deletePreschoolUnit)));
   document.querySelector("#export-preschool-unit-list")?.addEventListener("click",()=>timetablePdfPreview("class",state.timetableSelectedClassId));
+  if(state.currentView==="module:timetable_management")timetableConstraintFeature.bind();
   document.querySelectorAll("[data-timetable-view]").forEach(btn=>btn.addEventListener("click",()=>{
     state.timetableView=btn.dataset.timetableView;
     renderTimetableNavigation();
   }));
-  document.querySelector("#timetable-year")?.addEventListener("change",e=>{state.timetableAcademicYear=Number(e.currentTarget.value);state.timetableSelectedClassId=null;state.timetableSubjectMasterScope=null;state.timetableExportClassId=null;renderTimetableNavigation();});
-  document.querySelector("#timetable-semester")?.addEventListener("change",e=>{state.timetableSemester=Number(e.currentTarget.value);state.timetableSelectedClassId=null;state.timetableSubjectMasterScope=null;state.timetableExportClassId=null;renderTimetableNavigation();});
+  document.querySelector("#timetable-year")?.addEventListener("change",e=>{state.timetableAcademicYear=Number(e.currentTarget.value);state.timetableSelectedClassId=null;state.timetableSubjectMasterScope=null;state.timetableExportClassId=null;state.timetableSkipNextLoad=false;renderDashboard();});
+  document.querySelector("#timetable-semester")?.addEventListener("change",e=>{state.timetableSemester=Number(e.currentTarget.value);state.timetableSelectedClassId=null;state.timetableSubjectMasterScope=null;state.timetableExportClassId=null;state.timetableSkipNextLoad=false;renderDashboard();});
   document.querySelector("#timetable-class-select")?.addEventListener("change",e=>{state.timetableSelectedClassId=e.currentTarget.value||null;renderTimetableNavigation();});
   document.querySelectorAll("[data-select-timetable-class]").forEach(btn=>btn.addEventListener("click",()=>{state.timetableSelectedClassId=btn.dataset.selectTimetableClass;renderTimetableNavigation();}));
   document.querySelectorAll("#new-timetable-class").forEach(btn=>btn.addEventListener("click",()=>timetableClassModal()));

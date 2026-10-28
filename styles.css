@@ -6003,3 +6003,37 @@ body.procurement-master-open{overflow:hidden!important}
 .edufee-plan-amounts label[hidden]{display:none!important}
 .edufee-locked{margin:8px 0;color:#845613;font-size:12px}
 @media(max-width:720px){.edufee-plan-amounts{grid-template-columns:1fr}.edufee-filter label{max-width:none}}
+
+
+/* Timetable constraints and automatic generation */
+.tt-rule-intro{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.tt-rule-intro h2{margin:0 0 6px;font-size:20px}
+.tt-rule-intro p{margin:0;color:var(--muted,#586c67)}
+.tt-rule-pills{display:flex;gap:9px;flex-wrap:wrap;margin:13px 0}
+.tt-rule-pills button{padding:10px 16px;background:#fff;border:1px solid #cdded4;border-radius:10px;color:#25644c;font:inherit;cursor:pointer}
+.tt-rule-pills button.active{background:#16765a;color:white;border-color:#16765a}
+.tt-rule-layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(260px,.9fr);gap:13px}
+.tt-rule-layout>.panel{min-width:0}
+.tt-rule-layout h3{margin-top:0}
+.tt-rule-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:15px 0}
+.tt-rule-form label{font-weight:600;font-size:13px;display:grid;gap:6px}
+.tt-rule-rooms{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 18px;max-height:250px;overflow:auto}
+.tt-rule-room{display:flex;align-items:center;gap:7px;border-radius:8px;padding:9px 10px;background:var(--surface,#f5f7f4);font-size:13px;cursor:pointer}
+.tt-rule-list{display:grid;gap:7px;max-height:480px;overflow:auto}
+.tt-rule-list>div{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #e2eae5;padding:10px 0}
+.tt-rule-list>div div{display:grid;gap:4px}.tt-rule-list strong{font-size:13px}.tt-rule-list small{font-size:12px;color:#667b6d}
+.tt-rule-warning{padding:12px 15px;border:1px solid #e9cf97;background:#fff7df;color:#7b5314;border-radius:9px;margin:12px 0}
+.tt-rule-warning ul{margin:8px 0 0 20px}
+.tt-rule-table-scroll{width:100%;overflow-x:auto;margin:12px 0}
+.tt-rule-grid{width:100%;border-collapse:separate;border-spacing:4px;min-width:630px}
+.tt-rule-grid th{text-align:center;font-size:12px;padding:8px 4px}
+.tt-rule-grid td{text-align:center;padding:0}.tt-rule-grid td label{display:flex;align-items:center;justify-content:center;min-height:37px;background:#edf5ee;border-radius:6px;cursor:pointer}
+.tt-rule-grid td label.already{background:#ffe4e3}
+.tt-rule-grid td label span{font-size:12px}
+.tt-rule-grid td input{width:15px;height:15px;margin-right:4px;accent-color:#c54242}
+.tt-rule-stats{display:flex;gap:13px;flex-wrap:wrap;padding:10px 0}
+.tt-rule-stats strong{font-size:13px;color:#167053}
+.tt-rule-buttons{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.tt-locked-chip{display:inline-block;font-size:10px;background:#fde9be;color:#79530c;border-radius:4px;padding:2px 4px}
+@media(max-width:1100px){.tt-rule-layout{grid-template-columns:1fr}}
+@media(max-width:700px){.tt-rule-rooms{grid-template-columns:repeat(2,minmax(0,1fr))}.tt-rule-form{grid-template-columns:1fr}.tt-rule-intro h2{font-size:18px}}
