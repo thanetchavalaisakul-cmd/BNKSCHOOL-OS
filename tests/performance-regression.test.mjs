@@ -124,3 +124,35 @@ test("PA evaluator accounts remain PA-only and are hidden from shared staff list
   assert.ok(app.includes(".filter(p=>p.role!=='pa_evaluator').map(p=>({id:p.user_id,full_name:p.full_name,role:p.role}))"));
   assert.ok(app.includes('function personnelPaIsEvaluatorUi(){return state.profile?.role==="pa_evaluator";}'));
 });
+
+test("director dashboard exposes approval workflows only to configured executives", () => {
+  const source = functionSnippet("function directorApprovalShortcutsHtml(){", "\nfunction dashboardTaskQueue(metrics){");
+  const state = {
+    profile: {role:"director"},
+    approvalControlCenter: {can_access:true},
+    modules: [{code:"leave_management"}, {code:"lesson_plans"}, {code:"academic_registration"}]
+  };
+  const render = new Function("state","dashboardModuleIcon","escapeHtml", `${source}; return directorApprovalShortcutsHtml;`)(
+    state, code => code, text => String(text)
+  );
+  const html = render();
+  assert.match(html, /ทางลัดงานอนุมัติของผู้อำนวยการ/);
+  assert.match(html, /data-view="module:leave_management"/);
+  assert.match(html, /data-view="module:lesson_plans"/);
+  assert.match(html, /data-view="module:academic_registration"/);
+  assert.match(html, /data-view="approval_center"/);
+  assert.ok(!html.includes('data-view="module:project_management"'), "Only available modules are offered");
+  state.profile.role = "teacher";
+  assert.equal(render(), "", "Teachers must not get director shortcuts");
+  state.profile.role = "pa_evaluator";
+  assert.equal(render(), "", "PA evaluators must not get director shortcuts");
+  state.profile.role = "director";
+  state.approvalControlCenter.can_access = false;
+  assert.equal(render(), "", "Inactive central executive must not get shortcuts");
+});
+
+test("director approval shortcuts appear in dashboard without changing approval decisions", () => {
+  const source = functionSnippet("function homeView(metrics) {", "\nfunction notificationList(");
+  assert.match(source, /directorApprovalShortcutsHtml\(\)/);
+  assert.match(app, /การอนุมัติต้องพิจารณาในแต่ละระบบ/);
+});

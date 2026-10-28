@@ -1838,6 +1838,21 @@ function dashboardPaOverview(metrics){
   }
   return "";
 }
+function directorApprovalShortcutsHtml(){
+  if(state.profile?.role!=="director" || !state.approvalControlCenter?.can_access)return "";
+  const choices=[
+    {code:"leave_management",name:"อนุมัติคำขอลา",detail:"ตรวจขั้นสุดท้ายหลังฝ่ายบุคคล"},
+    {code:"lesson_plans",name:"อนุมัติแผนการสอน",detail:"ตรวจหลังหัวหน้างานวิชาการ"},
+    {code:"academic_submissions",name:"อนุมัติรายงานวิชาการ",detail:"บันทึกหลังสอน วิจัย สื่อ และกิจกรรม"},
+    {code:"academic_registration",name:"อนุมัติคำร้องนักเรียน",detail:"ย้ายนักเรียนและเอกสารทางการศึกษา"},
+    {code:"project_management",name:"ลงนามเอกสารเบิกจ่าย",detail:"ลงนามตามหน้าที่ที่ได้รับมอบหมาย"},
+    {code:"timetable_management",name:"ลงนามตารางสอน",detail:"รับรองเอกสารตารางเรียนและตารางสอน"}
+  ];
+  const available=choices.filter(item=>state.modules.some(m=>m.code===item.code));
+  if(!available.length)return "";
+  const cards=available.map(item=>'<button class="home-module-card" data-view="module:'+item.code+'"><span class="home-module-icon">'+escapeHtml(dashboardModuleIcon(item.code))+'</span><div><strong>'+escapeHtml(item.name)+'</strong><small>'+escapeHtml(item.detail)+'</small></div><em>เปิดงาน →</em></button>').join("");
+  return '<section class="panel home-director-approval-panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ทางลัดงานอนุมัติของผู้อำนวยการ</h3><p>เลือกงานเพื่อตรวจเอกสารและพิจารณาตามลำดับขั้นของแต่ละระบบ</p></div><button class="btn btn-ghost" data-view="approval_center">ศูนย์อนุมัติและลายเซ็น</button></div><div class="home-module-grid">'+cards+'</div><p class="home-inline-note">การอนุมัติต้องพิจารณาในแต่ละระบบและเป็นไปตามสิทธิ์และลำดับขั้นที่กำหนด ไม่ได้อนุมัติเอกสารอัตโนมัติ</p></section>';
+}
 function dashboardTaskQueue(metrics){
   const items=[];
   if(metrics.paReview){
@@ -1891,6 +1906,8 @@ function homeView(metrics) {
     </section>
     ${personnelProfileReminderHtml()}${signatureProfileReminderHtml()}
     <section class="home-summary-grid">${summaryCards.map((x,i)=>`<article class="home-summary-card tone-${i+1}"><div><span>${escapeHtml(String(x[0]))}</span><strong>${escapeHtml(String(x[1]))}</strong><small>${escapeHtml(String(x[2]))}</small></div><b>${dashboardModuleIcon(x[3])}</b></article>`).join("")}</section>
+
+    ${directorApprovalShortcutsHtml()}
 
     <div class="home-primary-grid">
       <section class="panel home-systems-panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ระบบที่ควรใช้ตอนนี้</h3><p>${state.dashboardShowAllModules?"แสดงระบบทั้งหมดที่บัญชีนี้เข้าถึงได้":"เลือกแสดง 4 ระบบเด่น เพื่อลดความแน่นของหน้า Dashboard"}</p></div><button class="btn btn-ghost" id="dashboard-toggle-systems">${state.dashboardShowAllModules?"แสดงเฉพาะระบบเด่น":"ดูระบบทั้งหมด"}</button></div><div class="home-module-grid">${shown.length?shown.map(m=>`<button class="home-module-card dep-${escapeHtml(m.departments?.code||"other")}" data-view="module:${escapeHtml(m.code)}"><span class="home-module-icon">${escapeHtml(dashboardModuleIcon(m.code))}</span><div><strong>${escapeHtml(m.name_th)}</strong><small>${escapeHtml(m.departments?.name_th||"ระบบโรงเรียน")}</small></div><em>เข้าใช้งาน →</em></button>`).join(""):`<div class="empty"><strong>ยังไม่มีระบบที่เปิดใช้งาน</strong></div>`}</div></section>
