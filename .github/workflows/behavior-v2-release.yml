@@ -1,0 +1,44 @@
+name: BNK Behavior PDF and Student Selector Release
+on:
+  push:
+    branches: [main]
+    paths: [.github/behavior-v2-release.patch.gz.b64]
+permissions:
+  contents: write
+concurrency:
+  group: bnk-behavior-document-release
+  cancel-in-progress: false
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply behavior update
+        run: |
+          python3 - <<'PY'
+          import base64,gzip,pathlib
+          p=pathlib.Path('.github/behavior-v2-release.patch.gz.b64').read_text().strip()
+          pathlib.Path('/tmp/behavior-v2.patch').write_bytes(gzip.decompress(base64.b64decode(p,validate=True)))
+          PY
+          git apply --check /tmp/behavior-v2.patch
+          git apply --index /tmp/behavior-v2.patch
+      - name: Syntax, test, whitespace
+        run: |
+          node --check app.js
+          node --check behavior.js
+          node --check behavior-print.js
+          node --test tests/performance-regression.test.mjs
+          git diff --cached --check
+      - name: Commit and push updated module
+        run: |
+          git config user.name "BNK School OS Release Bot"
+          git config user.email "bnk-school-os@users.noreply.github.com"
+          git commit -m "fix: filter behavior students by grade and classroom; official paginated Thai PDF"
+          git push origin HEAD:main
