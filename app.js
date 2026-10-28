@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
-import { createBehaviorFeature } from "./behavior.js?v=1";
+import { createBehaviorFeature } from "./behavior.js?v=2";
 import { openJointActivityModal } from "./timetable-joint.js?v=1";
 import html2canvas from "https://esm.sh/html2canvas@1.4.1";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
@@ -1316,7 +1316,7 @@ function sidebarHtml() {
     </aside>`;
 }
 
-const behaviorFeature=createBehaviorFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod});
+const behaviorFeature=createBehaviorFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont});
 async function renderDashboard() {
   if (state.currentView === "data_center" && state.profile?.role === "super_admin" && !state.dataCenterOverview && !state.dataCenterError) await loadDataCenterWorkspace();
   if (state.currentView === "approval_center") {
