@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
 import { createBehaviorFeature } from "./behavior.js?v=2";
-import { createEducationFeeFeature } from "./education-fees.js?v=1";
+import { createEducationFeeFeature } from "./education-fees.js?v=2";
 import { openJointActivityModal } from "./timetable-joint.js?v=1";
 import html2canvas from "https://esm.sh/html2canvas@1.4.1";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
