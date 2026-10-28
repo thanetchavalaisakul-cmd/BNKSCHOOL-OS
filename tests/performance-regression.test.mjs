@@ -107,3 +107,10 @@ test("subject editing and copying are restricted to controlled classrooms and av
   assert.ok(app.includes("data-edit-timetable-subject"));
   assert.ok(app.includes("data-copy-timetable-subject"));
 });
+
+test("electricity meter picker reads the active personnel directory instead of role-scoped profiles", () => {
+  const source = functionSnippet("async function loadElectricityWorkspace(){", "\nfunction electricityStatusBadge(");
+  assert.ok(source.includes("supabase.from('personnel_public_directory').select('user_id,full_name,role')"));
+  assert.ok(source.includes("map(p=>({id:p.user_id,full_name:p.full_name,role:p.role}))"));
+  assert.ok(!source.includes("supabase.from('profiles')"), "Manager picker must not use role-scoped profiles");
+});

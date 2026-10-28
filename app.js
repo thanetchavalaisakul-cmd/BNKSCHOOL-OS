@@ -13459,11 +13459,11 @@ async function loadElectricityWorkspace(){
   state.electricitySettings=setting.data||null;
   const mgr=electricityManagerUi();
   const queries=[supabase.from('electricity_meters').select('*').order('house_label'),supabase.from('electricity_periods').select('*').order('billing_month',{ascending:false}),supabase.from('electricity_readings').select('*').order('created_at',{ascending:false})];
-  if(mgr)queries.push(supabase.from('profiles').select('id,full_name,role,account_status').eq('account_status','active').is('deleted_at',null).order('full_name'));
+  if(mgr)queries.push(supabase.from('personnel_public_directory').select('user_id,full_name,role').order('full_name'));
   const responses=await Promise.all(queries);
   for(const res of responses)if(res.error)throw res.error;
   state.electricityMeters=responses[0].data||[];state.electricityPeriods=responses[1].data||[];
-  state.electricityReadings=responses[2].data||[];state.electricityStaff=mgr?(responses[3].data||[]):[];
+  state.electricityReadings=responses[2].data||[];state.electricityStaff=mgr?(responses[3].data||[]).map(p=>({id:p.user_id,full_name:p.full_name,role:p.role})):[];
   if(!state.electricityPeriods.some(p=>p.id===state.electricityPeriodId))state.electricityPeriodId=state.electricityPeriods[0]?.id||null;
  }catch(e){console.error('Electricity workspace',e);state.electricityError=e.message||String(e);}
 }
