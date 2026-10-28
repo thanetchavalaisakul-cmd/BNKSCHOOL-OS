@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
+import { openJointActivityModal } from "./timetable-joint.js?v=1";
 import html2canvas from "https://esm.sh/html2canvas@1.4.1";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
 import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
@@ -5237,7 +5238,7 @@ async function loadTimetableWorkspace() {
   const canLoadRoster = isAcademicHead() || hasStageHeadCapability || ["director","super_admin"].includes(state.profile.role);
   const canLoadPeriodMaster = isAcademicHead() || hasStageHeadCapability || ["director","super_admin"].includes(state.profile.role);
 
-  const [classesRes, profilesRes, periodsRes, periodTemplatesRes, periodTemplateItemsRes, subjectsRes, assignmentsRes, entriesRes, homeroomsRes, stageHeadsRes, teachersRes, offeringsRes, sharedUnitsRes] = await Promise.all([
+  const [classesRes, profilesRes, periodsRes, periodTemplatesRes, periodTemplateItemsRes, subjectsRes, assignmentsRes, entriesRes, homeroomsRes, stageHeadsRes, teachersRes, offeringsRes, sharedUnitsRes, jointActivitiesRes, jointTeachersRes] = await Promise.all([
     supabase.from("school_classes").select("*").eq("is_active",true).order("academic_year",{ascending:false}).order("semester").order("sort_order").order("level_name").order("room_name"),
     supabase.from("timetable_profiles").select("*").order("created_at"),
     supabase.from("timetable_periods").select("*").order("sort_order"),
@@ -5259,6 +5260,8 @@ async function loadTimetableWorkspace() {
       : Promise.resolve({ data: [{id:state.user.id,email:state.profile.email,full_name:state.profile.full_name,role:state.profile.role,department_id:state.profile.department_id}], error:null }),
     supabase.from("academic_class_subject_offerings").select("*").order("created_at"),
     supabase.from("preschool_shared_weekly_units").select("*").order("week_start"),
+    supabase.from("timetable_joint_activities").select("*"),
+    supabase.from("timetable_joint_activity_teachers").select("*"),
   ]);
 
   state.timetableClasses = classesRes.error ? [] : (classesRes.data || []);
@@ -5273,6 +5276,8 @@ async function loadTimetableWorkspace() {
   state.preschoolSharedUnitsError = sharedUnitsRes.error?.message || "";
   state.timetableAssignments = assignmentsRes.error ? [] : (assignmentsRes.data || []);
   state.timetableEntries = entriesRes.error ? [] : (entriesRes.data || []);
+  state.timetableJointActivities = jointActivitiesRes.error ? [] : (jointActivitiesRes.data || []);
+  state.timetableJointTeachers = jointTeachersRes.error ? [] : (jointTeachersRes.data || []);
   state.timetableHomerooms = homeroomsRes.error ? [] : (homeroomsRes.data || []);
   state.timetableStageHeads = stageHeadsRes.error ? state.timetableStageHeads : (stageHeadsRes.data || []);
   state.timetableTeachers = teachersRes.error ? [] : (teachersRes.data || []);
@@ -5742,6 +5747,25 @@ function timetableAssignmentProgress(a) {
   return { used, remaining: Math.max(0, Number(a.periods_per_week)-used), target:Number(a.periods_per_week) };
 }
 
+function timetableJointActivityForEntry(e) {
+  return e?.joint_activity_id ? (state.timetableJointActivities || []).find(g=>g.id===e.joint_activity_id) || null : null;
+}
+function timetableJointTeacherNames(e) {
+  if(!e?.joint_activity_id) return [];
+  return [...new Set((state.timetableJointTeachers || [])
+    .filter(t=>t.activity_id===e.joint_activity_id)
+    .map(t=>timetableTeacherName(t.teacher_id)).filter(Boolean))];
+}
+function timetableJointTeacherDisplay(e,primary) {
+  return [...new Set([primary,...timetableJointTeacherNames(e)].filter(Boolean))].join(" / ");
+}
+function timetableTeacherClassNames(entries, assignments) {
+  return [...new Set(entries.map(e=>{
+    const a=assignments.find(x=>x.id===e.assignment_id);
+    return schoolClassLabel(state.timetableClasses.find(x=>x.id===a?.class_id));
+  }).filter(x=>x&&x!=="—"))].join(" / ");
+}
+
 function timetableGridHtml({classId = state.timetableSelectedClassId, readonly = false} = {}) {
   const c = state.timetableClasses.find(x => x.id === classId);
   if(c?.stage_code==="early_childhood")return preschoolUnitTableHtml(classId,{readonly:true});
@@ -5772,10 +5796,13 @@ function timetableGridHtml({classId = state.timetableSelectedClassId, readonly =
         if(!e) return `<td class="timetable-drop-cell ${editable?"editable":""}" ${editable?`data-timetable-drop="1" data-day="${day}" data-period-id="${p.id}"`:""}><span class="drop-placeholder">${editable?"ลากวิชามาวาง":"—"}</span></td>`;
         const a=aMap[e.assignment_id];
         const s=subjectMap[a?.subject_id];
+        const joint=timetableJointActivityForEntry(e);
         return `<td class="timetable-drop-cell filled ${editable?"editable":""}" ${editable?`data-timetable-drop="1" data-day="${day}" data-period-id="${p.id}"`:""}>
           <div class="timetable-entry-card" ${editable?`draggable="true" data-timetable-entry-drag="${e.id}"`:""}>
             <strong>${escapeHtml(s?.subject_name || "รายวิชา")}</strong>
-            <span>${escapeHtml(a?.teacher_name || "ครูผู้สอน")}</span>
+            <span>${escapeHtml(timetableJointTeacherDisplay(e,a?.teacher_name || "ครูผู้สอน"))}</span>
+            ${joint?`<small style="font-size:10px;opacity:.85">🔗 ${escapeHtml(joint.title)} · คาบร่วม</small>`:""}
+            ${editable?`<button type="button" data-joint-activity-entry="${e.id}" style="border:1px solid currentColor;border-radius:6px;padding:2px 5px;font-size:11px;max-width:max-content;cursor:pointer;background:transparent;color:inherit">＋ สอนร่วม</button>`:""}
             ${editable?`<button type="button" class="timetable-entry-remove" data-remove-timetable-entry="${e.id}" title="นำออก">×</button>`:""}
           </div>
         </td>`;
@@ -5883,7 +5910,10 @@ function teacherTimetableData(teacherId) {
       return c && Number(c.academic_year)===p.academicYear && Number(c.semester)===p.semester;
     });
   const assignmentIds = new Set(assignments.map(a=>a.id));
-  const entries = state.timetableEntries.filter(e=>assignmentIds.has(e.assignment_id));
+  const jointGroupIds = new Set((state.timetableJointTeachers || []).filter(t=>t.teacher_id===teacherId).map(t=>t.activity_id));
+  const entries = state.timetableEntries.filter(e=>assignmentIds.has(e.assignment_id) || (e.joint_activity_id && jointGroupIds.has(e.joint_activity_id)));
+  const includedIds=new Set(entries.map(e=>e.assignment_id));
+  const visibleAssignments=state.timetableAssignments.filter(a=>includedIds.has(a.id));
   const profileIds = new Set(entries.map(e=>e.timetable_id));
   const periods = state.timetablePeriods.filter(p=>profileIds.has(p.timetable_id));
   const periodById = Object.fromEntries(periods.map(p=>[p.id,p]));
@@ -5894,7 +5924,7 @@ function teacherTimetableData(teacherId) {
   }
   const columns=[...columnMap.values()].sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)) || Number(a.sort_order)-Number(b.sort_order));
   const days=[...new Set(state.timetableProfiles.filter(tp=>profileIds.has(tp.id)).flatMap(tp=>tp.weekdays||[]))].sort((a,b)=>a-b);
-  return {assignments,entries,periodById,columns,days};
+  return {assignments:visibleAssignments,entries,periodById,columns,days};
 }
 
 function teacherScheduleGridHtml(teacherId) {
@@ -5906,13 +5936,13 @@ function teacherScheduleGridHtml(teacherId) {
   for(const e of data.entries){
     const per=data.periodById[e.period_id]; if(!per) continue;
     const key=`${e.weekday}:${timeShort(per.start_time)}-${timeShort(per.end_time)}-${per.is_break?1:0}`;
-    entryMap.set(key,e);
+    entryMap.set(key,[...(entryMap.get(key)||[]),e]);
   }
   return `<div class="timetable-grid-wrap"><table class="timetable-grid teacher-grid"><thead><tr><th>วัน</th>${data.columns.map(c=>c.is_break?`<th class="break-head"><strong>${c.period_no||""}</strong><span>พักกลางวัน</span><small>${timeShort(c.start_time)}–${timeShort(c.end_time)}</small></th>`:`<th><strong>${c.period_no||""}</strong><small>${timeShort(c.start_time)}–${timeShort(c.end_time)}</small></th>`).join("")}</tr></thead><tbody>${data.days.map(day=>`<tr><th>${escapeHtml(TIMETABLE_DAY_LABEL[day]||String(day))}</th>${data.columns.map(c=>{
     if(c.is_break) return `<td class="timetable-break-cell"><span>${escapeHtml(c.label||"พักกลางวัน")}</span></td>`;
-    const e=entryMap.get(`${day}:${c.key}`); if(!e) return `<td>—</td>`;
-    const a=aMap[e.assignment_id]; const s=subjectMap[a?.subject_id]; const cl=state.timetableClasses.find(x=>x.id===a?.class_id);
-    return `<td><div class="timetable-entry-card readonly"><strong>${escapeHtml(s?.subject_name||"รายวิชา")}</strong><span>${escapeHtml(schoolClassLabel(cl))}</span></div></td>`;
+    const cellEntries=entryMap.get(`${day}:${c.key}`); if(!cellEntries?.length) return `<td>—</td>`;
+    const e=cellEntries[0],a=aMap[e.assignment_id],s=subjectMap[a?.subject_id],joint=timetableJointActivityForEntry(e);
+    return `<td><div class="timetable-entry-card readonly"><strong>${escapeHtml(joint?.title||s?.subject_name||"รายวิชา")}</strong><span>${escapeHtml(timetableTeacherClassNames(cellEntries,data.assignments))}</span></div></td>`;
   }).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
 
@@ -6363,7 +6393,7 @@ function timetableClassPdfData(classId) {
   const periods=timetablePeriodsFor(tp.id),days=[...(tp.weekdays||[])].sort((a,b)=>a-b),entries=timetableEntriesFor(tp.id);
   const aMap=Object.fromEntries(state.timetableAssignments.map(a=>[a.id,a])),sMap=Object.fromEntries(state.timetableSubjects.map(s=>[s.id,s]));
   const map=new Map(entries.map(e=>[`${e.weekday}:${e.period_id}`,e]));
-  return {c,tp,periods,days,cell(day,p){const e=map.get(`${day}:${p.id}`);if(!e)return null;const a=aMap[e.assignment_id],s=sMap[a?.subject_id];return {subject:s?.subject_name||"รายวิชา",sub:a?.teacher_name||"ครูผู้สอน"};}};
+  return {c,tp,periods,days,cell(day,p){const e=map.get(`${day}:${p.id}`);if(!e)return null;const a=aMap[e.assignment_id],s=sMap[a?.subject_id];return {subject:timetableJointActivityForEntry(e)?.title||s?.subject_name||"รายวิชา",sub:timetableJointTeacherDisplay(e,a?.teacher_name||"ครูผู้สอน")};}};
 }
 
 function buildTimetablePdfTable(data) {
@@ -6399,8 +6429,8 @@ function teacherPdfData(teacherId) {
   const d=teacherTimetableData(teacherId); if(!d.entries.length)return null;
   const aMap=Object.fromEntries(d.assignments.map(a=>[a.id,a])),sMap=Object.fromEntries(state.timetableSubjects.map(s=>[s.id,s]));
   const entryMap=new Map();
-  for(const e of d.entries){const per=d.periodById[e.period_id];if(!per)continue;entryMap.set(`${e.weekday}:${timeShort(per.start_time)}-${timeShort(per.end_time)}-${per.is_break?1:0}`,e);}
-  return {periods:d.columns,days:d.days,cell(day,p){const e=entryMap.get(`${day}:${p.key}`);if(!e)return null;const a=aMap[e.assignment_id],s=sMap[a?.subject_id],c=state.timetableClasses.find(x=>x.id===a?.class_id);return {subject:s?.subject_name||"รายวิชา",sub:schoolClassLabel(c)};}};
+  for(const e of d.entries){const per=d.periodById[e.period_id];if(!per)continue;const key=`${e.weekday}:${timeShort(per.start_time)}-${timeShort(per.end_time)}-${per.is_break?1:0}`;entryMap.set(key,[...(entryMap.get(key)||[]),e]);}
+  return {periods:d.columns,days:d.days,cell(day,p){const cellEntries=entryMap.get(`${day}:${p.key}`);if(!cellEntries?.length)return null;const e=cellEntries[0],a=aMap[e.assignment_id],s=sMap[a?.subject_id];return {subject:timetableJointActivityForEntry(e)?.title||s?.subject_name||"รายวิชา",sub:timetableTeacherClassNames(cellEntries,d.assignments)};}};
 }
 
 function buildTeacherTimetableA4(teacherId,assets={}) {
@@ -15308,6 +15338,21 @@ function bindDashboardEvents() {
   document.querySelector("#clear-timetable")?.addEventListener("click",()=>clearSelectedTimetable());
   document.querySelectorAll("[data-remove-timetable-entry]").forEach(btn=>btn.addEventListener("click",async e=>{
     e.stopPropagation();const {error}=await supabase.from("timetable_entries").delete().eq("id",btn.dataset.removeTimetableEntry);if(error)return toast("นำคาบออกไม่ได้",error.message,"error");await renderDashboard();
+  }));
+  document.querySelectorAll("[data-joint-activity-entry]").forEach(btn=>btn.addEventListener("click",e=>{
+    e.stopPropagation();
+    const entry=state.timetableEntries.find(x=>x.id===btn.dataset.jointActivityEntry);
+    if(!entry)return;
+    openJointActivityModal({
+      entry,classes:state.timetableClasses,profiles:state.timetableProfiles,periods:state.timetablePeriods,
+      assignments:state.timetableAssignments,entries:state.timetableEntries,
+      teachers:state.timetableTeachers,activities:state.timetableJointActivities || [],
+      members:state.timetableJointTeachers || [],canManageClass:canManageTimetableClassLocal,
+      notify:toast,refresh:renderDashboard,supabase,esc:escapeHtml,
+      classLabel:schoolClassLabel,teacherName:timetableTeacherName,
+      subjectName:id=>state.timetableSubjects.find(x=>x.id===id)?.subject_name || "",
+      dayLabel:day=>TIMETABLE_DAY_LABEL[day] || String(day)
+    });
   }));
   document.querySelectorAll("[data-delete-timetable-class]").forEach(btn=>btn.addEventListener("click",async()=>{
     const c=state.timetableClasses.find(x=>x.id===btn.dataset.deleteTimetableClass);if(!c||!confirm(`ลบ ${schoolClassLabel(c)} และข้อมูลตารางทั้งหมดหรือไม่?`))return;
