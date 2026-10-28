@@ -6053,3 +6053,30 @@ body.procurement-master-open{overflow:hidden!important}
 .tt-demo-teacher-list{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
 .tt-demo-teacher-list>div{border:1px solid #d4e0da;border-radius:9px;padding:10px 13px;display:flex;align-items:center;gap:8px}
 .tt-demo-teacher-list strong{font-size:13px}
+
+
+/* BNK School OS isolated demo timetable workspace */
+.tt-demo-section{margin-top:14px}
+.tt-demo-section h3{margin-top:0}
+.tt-demo-summary{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.tt-demo-summary>div{background:var(--surface,#f3f6f4);border:1px solid #d9e3dd;border-radius:10px;padding:12px 15px;display:grid;gap:5px;min-width:150px;flex:1}
+.tt-demo-summary strong{font-size:14px}
+.tt-demo-summary span,.tt-demo-assignment-list small{font-size:12px;color:var(--muted,#61756c)}
+.tt-demo-assignment-list{display:grid;gap:6px;margin-top:14px;max-height:580px;overflow:auto}
+.tt-demo-assignment-list>div{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:10px 0;border-bottom:1px solid #e1e9e2}
+.tt-demo-assignment-list>div>div:first-child{display:grid;gap:4px}
+.tt-demo-assignment-list strong{font-size:13px}
+.tt-demo-item-actions{display:flex;gap:5px;flex-wrap:wrap}
+.tt-demo-check{display:flex!important;align-items:center;gap:8px!important;font-weight:normal!important}
+.tt-demo-grid{min-width:780px}
+.tt-demo-grid th{white-space:nowrap}
+.tt-demo-grid td{vertical-align:middle;min-width:85px;padding:2px!important}
+.tt-demo-grid-cell>button{width:100%;min-height:70px;border:0;background:#eef8f2;border-radius:7px;cursor:pointer;padding:6px;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;font:inherit;color:var(--text,#24493d)}
+.tt-demo-grid-cell>button strong{font-size:11px;line-height:1.2}
+.tt-demo-grid-cell>button small{font-size:10px;color:#61756c}
+.tt-demo-grid-cell.has-lesson>button{background:#d6efe2}
+.tt-demo-grid-cell.is-locked>button{background:#ffeed1}
+.tt-demo-grid-cell.is-break{background:#eaedef;color:#778087;font-size:12px;font-weight:600}
+.tt-demo-grid-cell.is-break span{display:block;padding:18px 4px}
+.tt-demo-grid-cell:not(.has-lesson)>button:hover{background:#ccebdc}
+@media(max-width:750px){.tt-demo-summary>div{min-width:125px}.tt-demo-item-actions{justify-content:flex-end}}

@@ -191,7 +191,7 @@ export function createTimetableConstraintFeature({supabase,state,escapeHtml,toas
   const rows=C.demoTeachers.filter(t=>classes.some(c=>c.id===t.class_id));
   if(!rows.length)return "";
   return '<section class="panel tt-demo-teacher-panel"><h3>ครูตัวอย่างสำหรับทดลองจัดตาราง</h3>'+
-    '<p class="helper">รายชื่อจำลองของห้องทดลอง ป.3/3 เท่านั้น ยังไม่ใช่บัญชีครูที่ล็อกอินได้ และยังไม่สามารถมอบหมายสอนในตารางจริงจนกว่าจะผูกกับบัญชีบุคลากร</p>'+
+    '<p class="helper">รายชื่อจำลองของห้องทดลอง ป.3/3 เท่านั้น ไม่ใช่บัญชีเข้าสู่ระบบ แต่สามารถมอบหมายวิชา จำนวนคาบ และทดลองจัดตารางในแท็บ “ทดลองกับครูตัวอย่าง” ได้ โดยไม่กระทบตารางจริง</p>'+
     '<div class="tt-demo-teacher-list">'+rows.map(t=>'<div><strong>'+e(t.display_name)+'</strong><span class="pill neutral">'+e(classLabel(classes.find(c=>c.id===t.class_id)))+'</span></div>').join("")+'</div></section>';
  }
  function conditionsHtml(){

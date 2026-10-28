@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
 import { createBehaviorFeature } from "./behavior.js?v=2";
 import { createEducationFeeFeature } from "./education-fees.js?v=2";
 import { createTimetableConstraintFeature } from "./timetable-constraints.js?v=3";
+import { createDemoTimetableFeature } from "./timetable-demo.js?v=1";
 import { openJointActivityModal } from "./timetable-joint.js?v=1";
 import html2canvas from "https://esm.sh/html2canvas@1.4.1";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
@@ -1322,6 +1323,7 @@ function sidebarHtml() {
 const behaviorFeature=createBehaviorFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont});
 const educationFeeFeature=createEducationFeeFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont});
 const timetableConstraintFeature=createTimetableConstraintFeature({supabase,state,escapeHtml,toast,redraw:renderTimetableNavigation,reload:renderDashboard,scopeClasses:()=>timetableFilteredClasses({visibleOnly:true}),currentPeriod:currentTimetablePeriod});
+const timetableDemoFeature=createDemoTimetableFeature({supabase,state,escapeHtml,toast,redraw:renderTimetableNavigation,scopeClasses:()=>timetableFilteredClasses({visibleOnly:true}),currentPeriod:currentTimetablePeriod});
 async function renderDashboard() {
   if (state.currentView === "data_center" && state.profile?.role === "super_admin" && !state.dataCenterOverview && !state.dataCenterError) await loadDataCenterWorkspace();
   if (state.currentView === "approval_center") {
@@ -1382,7 +1384,7 @@ async function renderDashboard() {
   if (state.currentView === "module:timetable_management") {
     // Switching tabs/class filters must not refetch the same 13 datasets.
     if (state.timetableSkipNextLoad && state.timetableClasses?.length) state.timetableSkipNextLoad = false;
-    else { state.timetableSkipNextLoad = false; await loadTimetableWorkspace(); if(canManageTimetable())await timetableConstraintFeature.load(); }
+    else { state.timetableSkipNextLoad = false; await loadTimetableWorkspace(); if(canManageTimetable()){await timetableConstraintFeature.load();await timetableDemoFeature.load();} }
   }
   if (state.currentView === "module:substitute_teaching") {
     await loadSubstituteWorkspace();
@@ -5332,7 +5334,7 @@ async function loadTimetableWorkspace() {
   state.preschoolRoster=preschoolRosterRes.error?[]:(preschoolRosterRes.data||[]);
   state.preschoolUnits=preschoolRes.error?[]:(preschoolRes.data||[]);
   state.preschoolUnitsError=preschoolRes.error ? preschoolRes.error.message : "";
-  if (canManageTimetable() && !["setup","periods","planner","export","mine","conditions","generate"].includes(state.timetableView)) {
+  if (canManageTimetable() && !["setup","periods","planner","export","mine","conditions","generate","demo"].includes(state.timetableView)) {
     state.timetableView = "planner";
   }
 }
@@ -5716,6 +5718,7 @@ function timetableTabsHtml() {
       <button class="lesson-view-tab ${state.timetableView==="planner"?"active":""}" data-timetable-view="planner">จัดด้วยมือ (ลาก–วาง)</button>
       <button class="lesson-view-tab" data-timetable-view="conditions">⚙ ตั้งค่าเงื่อนไข</button>
       <button class="lesson-view-tab" data-timetable-view="generate">✦ จัดอัตโนมัติ</button>
+      ${timetableDemoFeature.D.teachers.some(t=>timetableFilteredClasses({visibleOnly:true}).some(c=>c.id===t.class_id))?`<button class="lesson-view-tab ${state.timetableView==="demo"?"active":""}" data-timetable-view="demo">🧪 ทดลองกับครูตัวอย่าง</button>`:""}
       <button class="lesson-view-tab ${state.timetableView==="export"?"active":""}" data-timetable-view="export">Export PDF</button>
       <button class="lesson-view-tab ${state.timetableView==="mine"?"active":""}" data-timetable-view="mine">ตารางสอนของฉัน</button>
     </div>`;
@@ -6006,7 +6009,7 @@ function timetableExportHtml() {
 function timetableWorkspaceHtml(module) {
   const tabs=timetableTabsHtml();
   if(canManageTimetable()){
-    return `${timetableHeroHtml()}${tabs}${state.timetableView==="setup"?timetableSetupHtml():state.timetableView==="periods"?timetablePeriodSettingsHtml():state.timetableView==="export"?timetableExportHtml():state.timetableView==="mine"?timetableMineHtml():state.timetableView==="conditions"?timetableConstraintFeature.conditionsHtml():state.timetableView==="generate"?timetableConstraintFeature.generatedHtml():timetablePlannerHtml()}`;
+    return `${timetableHeroHtml()}${tabs}${state.timetableView==="setup"?timetableSetupHtml():state.timetableView==="periods"?timetablePeriodSettingsHtml():state.timetableView==="export"?timetableExportHtml():state.timetableView==="mine"?timetableMineHtml():state.timetableView==="conditions"?timetableConstraintFeature.conditionsHtml():state.timetableView==="generate"?timetableConstraintFeature.generatedHtml():state.timetableView==="demo"?timetableDemoFeature.html():timetablePlannerHtml()}`;
   }
   if(["director","super_admin"].includes(state.profile.role)){
     if(!["overview","export"].includes(state.timetableView)) state.timetableView="overview";
@@ -15327,7 +15330,7 @@ function bindDashboardEvents() {
   document.querySelectorAll("[data-edit-preschool-unit]").forEach(btn=>btn.addEventListener("click",()=>preschoolUnitModal(btn.dataset.editPreschoolUnit)));
   document.querySelectorAll("[data-delete-preschool-unit]").forEach(btn=>btn.addEventListener("click",()=>deletePreschoolUnit(btn.dataset.deletePreschoolUnit)));
   document.querySelector("#export-preschool-unit-list")?.addEventListener("click",()=>timetablePdfPreview("class",state.timetableSelectedClassId));
-  if(state.currentView==="module:timetable_management")timetableConstraintFeature.bind();
+  if(state.currentView==="module:timetable_management"){timetableConstraintFeature.bind();if(state.timetableView==="demo")timetableDemoFeature.bind();}
   document.querySelectorAll("[data-timetable-view]").forEach(btn=>btn.addEventListener("click",()=>{
     state.timetableView=btn.dataset.timetableView;
     renderTimetableNavigation();
