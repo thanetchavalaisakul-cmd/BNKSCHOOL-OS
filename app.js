@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
 import { createBehaviorFeature } from "./behavior.js?v=2";
 import { createEducationFeeFeature } from "./education-fees.js?v=2";
 import { createTimetableConstraintFeature } from "./timetable-constraints.js?v=4";
+import { staffDutyTeachingDisplay } from "./staff-duty-label.js?v=1";
 import { openJointActivityModal } from "./timetable-joint.js?v=1";
 import html2canvas from "https://esm.sh/html2canvas@1.4.1";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
@@ -1153,7 +1154,7 @@ async function loadActiveUserData() {
     if(permissionRes.error)state.procurementPermissionError=permissionRes.error.message||String(permissionRes.error);
     const dutyPeriod=currentAcademicPeriod();
     const [dutyRes,stageDutyRes,subjectHeadRes]=await Promise.all([
-      supabase.rpc("get_staff_teacher_duty_audit",{p_academic_year:String(dutyPeriod.academicYear),p_semester:Number(dutyPeriod.semester)}),
+      supabase.rpc("get_staff_teacher_duty_audit_v2",{p_academic_year:String(dutyPeriod.academicYear),p_semester:Number(dutyPeriod.semester)}),
       supabase.from("stage_heads").select("academic_year,stage_code,teacher_id").eq("academic_year",String(dutyPeriod.academicYear)),
       supabase.from("academic_subject_group_heads").select("academic_year,subject_group_id,head_user_id").eq("academic_year",String(dutyPeriod.academicYear))
     ]);
@@ -1970,11 +1971,11 @@ function usersView() {
       <div class="panel-head">
         <div class="panel-title-wrap">
           <h3>ผู้ใช้งานและคำขอสมัคร</h3>
-          <p>Role คือสิทธิ์บริหาร ส่วนหน้าที่ครูเชื่อมจากรายวิชาที่สอน · ครูประจำชั้น · หัวหน้าช่วงชั้น · หัวหน้ากลุ่มสาระ โดย Super Admin เป็นผู้กำหนดหน้าที่บุคลากร</p>
+          <p>Role คือสิทธิ์บริหาร หน้าที่ครูประถม/มัธยมอ้างอิงรายวิชา ส่วนปฐมวัยอ้างอิงหน่วยรายสัปดาห์ รวมทั้งครูประจำชั้น · หัวหน้าช่วงชั้น · หัวหน้ากลุ่มสาระ โดย Super Admin เป็นผู้กำหนดหน้าที่บุคลากร</p>
         </div>
         <span class="pill pending">${users.filter(u => u.account_status === "pending").length} รออนุมัติ</span>
       </div>
-      ${incomplete.length?`<div class="teacher-duty-audit-warning"><strong>⚠ หน้าที่ครูยังไม่ครบ ${incomplete.length} คน</strong><span>ครูผู้สอนทุกคนต้องมีห้องประจำชั้น และต้องมีอย่างน้อย 1 รายวิชาที่สอนในปี/ภาคเรียนปัจจุบัน</span><div>${incomplete.map(x=>`<span>${escapeHtml(x.full_name)} · ${x.homeroom_class_label?`ประจำชั้น ${escapeHtml(x.homeroom_class_label)}`:"ยังไม่มีห้องประจำชั้น"} · ${Number(x.teaching_assignment_count)||0} รายวิชา</span>`).join("")}</div></div>`:""}
+      ${incomplete.length?`<div class="teacher-duty-audit-warning"><strong>⚠ หน้าที่ครูยังไม่ครบ ${incomplete.length} คน</strong><span>ทุกคนต้องมีห้องประจำชั้น · ประถม/มัธยมตรวจรายวิชา · อนุบาลตรวจหน่วยการจัดประสบการณ์รายสัปดาห์ร่วม</span><div>${incomplete.map(x=>`<span>${escapeHtml(x.full_name)} · ${x.homeroom_class_label?`ประจำชั้น ${escapeHtml(x.homeroom_class_label)}`:"ยังไม่มีห้องประจำชั้น"} · ${escapeHtml(staffDutyTeachingDisplay(x).summary)}</span>`).join("")}</div></div>`:""}
       ${users.length ? `
       <div class="table-wrap">
         <table class="table admin-user-table">
@@ -1985,7 +1986,7 @@ function usersView() {
               <td><strong>${escapeHtml(u.full_name || "ยังไม่ระบุชื่อ")}</strong><br><span style="color:#64748b">${escapeHtml(u.email || "")}</span></td>
               <td><span class="pill ${u.account_status}">${STATUS_LABEL[u.account_status] || u.account_status}</span></td>
               <td>${escapeHtml(ROLE_LABEL[u.role] || u.role)}${u.role==="department_head"?`<br><small class="table-muted">+ ครูผู้สอน</small>`:""}</td>
-              <td>${u.account_status==="active"&&isTeacherCapableProfile(u)?(duty?`<span class="pill ${duty.duty_complete?"active":"pending"}">${duty.duty_complete?"ครบ":"ยังไม่ครบ"}</span><br><small class="table-muted">${duty.homeroom_class_label?`ประจำชั้น ${escapeHtml(duty.homeroom_class_label)}`:"ยังไม่กำหนดห้อง"} · ${Number(duty.teaching_assignment_count)||0} วิชา</small>${stageHeadMap[u.id]?.length?`<br><small class="table-muted">หัวหน้าช่วงชั้น: ${escapeHtml(stageHeadMap[u.id].join(", "))}</small>`:""}${subjectHeadMap[u.id]?.length?`<br><small class="table-muted">หัวหน้ากลุ่มสาระ: ${escapeHtml(subjectHeadMap[u.id].join(", "))}</small>`:""}`:`<span class="pill pending">ยังไม่ตรวจ</span>`):"—"}</td>
+              <td>${u.account_status==="active"&&isTeacherCapableProfile(u)?(duty?`<span class="pill ${duty.duty_complete?"active":"pending"}">${duty.duty_complete?"ครบ":"ยังไม่ครบ"}</span><br><small class="table-muted">${duty.homeroom_class_label?`ประจำชั้น ${escapeHtml(duty.homeroom_class_label)}`:"ยังไม่กำหนดห้อง"} · ${escapeHtml(staffDutyTeachingDisplay(duty).summary)}</small>${stageHeadMap[u.id]?.length?`<br><small class="table-muted">หัวหน้าช่วงชั้น: ${escapeHtml(stageHeadMap[u.id].join(", "))}</small>`:""}${subjectHeadMap[u.id]?.length?`<br><small class="table-muted">หัวหน้ากลุ่มสาระ: ${escapeHtml(subjectHeadMap[u.id].join(", "))}</small>`:""}`:`<span class="pill pending">ยังไม่ตรวจ</span>`):"—"}</td>
               <td>${escapeHtml(depMap[u.requested_department_id] || depMap[u.department_id] || "—")}</td>
               <td>${escapeHtml(subjectMap[u.subject_group_id] || "—")}</td>
               <td>${formatDate(u.created_at)}</td>
@@ -6517,6 +6518,8 @@ async function timetableTeacherCapabilityModal(user) {
   const subjectMap=Object.fromEntries((subjectsRes.data||[]).map(x=>[x.id,x]));
   const classMap=Object.fromEntries(classes.map(x=>[x.id,x]));
   const currentHome=homerooms.find(h=>classes.some(c=>c.id===h.class_id));
+  const isPreschoolHome=classMap[currentHome?.class_id]?.stage_code==="early_childhood";
+  const preschoolUnitCount=Number((state.teacherDutyAudit||[]).find(x=>x.user_id===user.id)?.preschool_weekly_unit_count)||0;
   const currentStage=stageRows.find(s=>s.teacher_id===user.id);
   const currentSubjectHeadIds=new Set(subjectHeadRows.filter(x=>x.head_user_id===user.id).map(x=>x.subject_group_id));
   const userNameMap=Object.fromEntries((state.pendingUsers||[]).map(x=>[x.id,x.full_name||x.email||"ผู้ใช้งาน"]));
@@ -6537,12 +6540,12 @@ async function timetableTeacherCapabilityModal(user) {
   modal.innerHTML=`<div class="modal modal-wide"><div class="modal-head"><div><h3>หน้าที่สอน / ประจำชั้น</h3><p>${escapeHtml(user.full_name||user.email)} · ปีการศึกษา ${period.academicYear} ภาคเรียน ${period.semester}</p></div><button class="modal-close">×</button></div><div class="form-grid">
     ${roleHint}
     <div class="teacher-duty-summary-grid">
-      <div class="teacher-duty-stat"><span>รายวิชาที่สอน</span><strong>${assignments.length}</strong><small>เชื่อมกับตารางสอน แผนการสอน บันทึกหลังแผน และสอนแทน</small></div>
+      <div class="teacher-duty-stat"><span>${isPreschoolHome?"หน่วยจัดประสบการณ์รายสัปดาห์":"รายวิชาที่สอน"}</span><strong>${isPreschoolHome?preschoolUnitCount:assignments.length}</strong><small>${isPreschoolHome?"ใช้หน่วยกลางชุดเดียวกันทุกห้องอนุบาล โดยไม่ต้องสร้างคาบวิชา":"เชื่อมกับตารางสอน แผนการสอน บันทึกหลังแผน และสอนแทน"}</small></div>
       <div class="teacher-duty-stat"><span>ครูประจำชั้น</span><strong>${currentHome?escapeHtml(schoolClassLabel(classMap[currentHome.class_id])):"ยังไม่กำหนด"}</strong><small>เชื่อมกับนักเรียน เยี่ยมบ้าน คำร้องย้าย และงานประจำชั้น</small></div>
       <div class="teacher-duty-stat"><span>หัวหน้าช่วงชั้น</span><strong>${currentStage?escapeHtml(TIMETABLE_STAGE_LABEL[currentStage.stage_code]||currentStage.stage_code):"ไม่ได้รับมอบหมาย"}</strong><small>ใช้กับขอบเขตการจัดตาราง/นิเทศที่เกี่ยวข้อง</small></div>
       <div class="teacher-duty-stat"><span>หัวหน้ากลุ่มสาระ</span><strong>${currentSubjectHeadLabels.length?escapeHtml(currentSubjectHeadLabels.join(", ")):"ไม่ได้รับมอบหมาย"}</strong><small>ใช้เป็นผู้ตรวจขั้นแรกของรายงานผลการใช้แผน</small></div>
     </div>
-    <section class="teacher-duty-list-box"><div><strong>รายวิชาที่สอนในภาคเรียนนี้</strong><span>กำหนดหรือแก้ไขรายวิชา/ห้องที่สอนในเมนูตารางสอน</span></div>${teachingRows||`<div class="empty compact-empty"><strong>ยังไม่มีรายวิชาที่ได้รับมอบหมาย</strong><span>เมื่อกำหนดในระบบตารางสอน ระบบแผนการสอนและบันทึกหลังแผนจะเชื่อมให้อัตโนมัติ</span></div>`}</section>
+    <section class="teacher-duty-list-box"><div><strong>${isPreschoolHome?"หน่วยการจัดประสบการณ์ระดับปฐมวัย":"รายวิชาที่สอนในภาคเรียนนี้"}</strong><span>${isPreschoolHome?"1 หน่วยใช้ร่วมกันทุกห้องอนุบาลต่อ 1 สัปดาห์ · ไม่ต้องมีรายวิชารายคาบ":"กำหนดหรือแก้ไขรายวิชา/ห้องที่สอนในเมนูตารางสอน"}</span></div>${isPreschoolHome?`<div class="teacher-duty-row"><div><strong>ใช้หน่วยร่วมระดับอนุบาล ${preschoolUnitCount} สัปดาห์</strong><span>อ้างอิงแผนหน่วยการเรียนรู้ปีการศึกษา ${period.academicYear} ภาคเรียน ${period.semester}</span></div></div>`:teachingRows||`<div class="empty compact-empty"><strong>ยังไม่มีรายวิชาที่ได้รับมอบหมาย</strong><span>เมื่อกำหนดในระบบตารางสอน ระบบแผนการสอนและบันทึกหลังแผนจะเชื่อมให้อัตโนมัติ</span></div>`}</section>
     <section class="teacher-duty-list-box"><div><strong>หัวหน้ากลุ่มสาระการเรียนรู้</strong><span>Super Admin เป็นผู้กำหนดหน้าที่นี้ และระบบรายงานผลการใช้แผนจะดึงไปใช้เป็นผู้ตรวจขั้นแรกอัตโนมัติ</span></div><div class="teacher-duty-choice-grid">${subjectHeadChoices}</div></section>
     <label class="settings-check"><input type="checkbox" id="teacher-stage-head" ${currentStage?"checked":""}> เป็นหัวหน้าช่วงชั้น</label>
     <div class="field"><label>ช่วงชั้นที่รับผิดชอบ</label><select class="select" id="teacher-stage-code">${Object.entries(TIMETABLE_STAGE_LABEL).map(([v,l])=>`<option value="${v}" ${currentStage?.stage_code===v?"selected":""}>${escapeHtml(l)}</option>`).join("")}</select></div>
