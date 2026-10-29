@@ -86,5 +86,38 @@ export async function showSchoolDocumentSignatureModal({client,kind,docId,date=n
   m.querySelector("#ds-clear").onclick=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);ink=false;};
   const refresh=()=>{for(const name of ["stored","drawn","upload","paper"])m.querySelector("#ds-"+name).classList.toggle("hidden",method.value!==name);};
   method.onchange=refresh;refresh();
-  // SAVE_HANDLER_PLACEHOLDER
+  m.querySelector("#ds-save").onclick=async e=>{
+    const btn=e.currentTarget,mode=method.value,slot=m.querySelector("#ds-slot").value;
+    let signatureId=null,created=null;
+    btn.disabled=true;btn.textContent="กำลังบันทึก...";
+    try{
+      if(mode==="stored"){
+        signatureId=m.querySelector("#ds-signature").value;
+        if(!signatureId)throw Error("กรุณาเลือกลายเซ็นจากบัญชีของคุณ");
+      }else if(mode==="drawn"){
+        if(!ink)throw Error("กรุณาวาดลายเซ็นก่อนบันทึก");
+        const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png",1));
+        created=await preparePersonalSignature(client,userId,"drawn",blob);
+        signatureId=created.id;
+      }else if(mode==="upload"){
+        const file=m.querySelector("#ds-file").files?.[0];
+        if(!file)throw Error("กรุณาเลือกรูปภาพลายเซ็น");
+        created=await preparePersonalSignature(client,userId,"upload",file);
+        signatureId=created.id;
+      }
+      const {error:saveError}=await client.rpc("set_school_document_signature",{
+        p_kind:kind,p_doc:docId,p_day:date,p_slot:slot,p_method:mode,p_signature:signatureId
+      });
+      if(saveError)throw saveError;
+      created=null;
+      close();
+      notify("บันทึกลายเซ็นแล้ว","เปิดดูหรือพิมพ์เอกสารใหม่เพื่อแสดงลายเซ็นล่าสุด","success");
+      if(onSaved)await onSaved();
+    }catch(err){
+      if(created)await rollbackPersonalSignature(client,created);
+      notify("ลงลายเซ็นไม่สำเร็จ",err?.message||String(err),"error");
+    }finally{
+      btn.disabled=false;btn.textContent="บันทึกวิธีลงนาม";
+    }
+  };
 }
