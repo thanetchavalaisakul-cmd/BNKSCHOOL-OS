@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
-import { schoolDocumentSignatureImages, showSchoolDocumentSignatureModal } from "./document-signatures.js";
+import { schoolDocumentSignatureImages, showSchoolDocumentSignatureModal } from "./document-signatures.js?v=5.12.9.34";
 import { createBehaviorFeature } from "./behavior.js?v=2";
 import { createEducationFeeFeature } from "./education-fees.js?v=2";
 import { createTimetableConstraintFeature } from "./timetable-constraints.js?v=4";
