@@ -6,6 +6,10 @@ const toImageDataUrl = blob => new Promise((resolve,reject)=>{
 });
 export async function schoolDocumentSignatureImages(client,kind,docId,date=null){
   const images={};
+  // Automatically attach the already-consented default signatures to eligible document slots.
+  // The server checks each signer, the completed workflow step, and existing signature preferences.
+  const sync=await client.rpc("refresh_school_document_auto_signatures",{p_kind:kind,p_doc:docId,p_day:date});
+  if(sync.error)console.warn("automatic document signature sync",sync.error);
   const {data,error}=await client.from("school_document_signatures")
     .select("slot_code,signature_id,method").eq("document_kind",kind)
     .eq("document_id",docId).eq("document_date",date||SCHOOL_SIGNATURE_DAY);
