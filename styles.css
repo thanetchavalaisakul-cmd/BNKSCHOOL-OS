@@ -6080,3 +6080,11 @@ body.procurement-master-open{overflow:hidden!important}
 .tt-demo-grid-cell.is-break span{display:block;padding:18px 4px}
 .tt-demo-grid-cell:not(.has-lesson)>button:hover{background:#ccebdc}
 @media(max-width:750px){.tt-demo-summary>div{min-width:125px}.tt-demo-item-actions{justify-content:flex-end}}
+
+/* Performance: instant, accessible feedback while a module fetches its data. */
+.bnk-module-loading{display:flex;align-items:center;gap:16px;min-height:140px;padding:26px;max-width:680px;background:var(--card-bg,#fff);border:1px solid rgba(100,116,139,.18);border-radius:14px;margin:8px auto}
+.bnk-module-loading strong{display:block;font-size:1.07rem}
+.bnk-module-loading p{margin:6px 0 0;color:#64748b}
+.bnk-loading-spinner{width:32px;height:32px;flex:none;border-radius:50%;border:3px solid #e2e8f0;border-top-color:#0e7490;animation:bnk-module-spin .75s linear infinite}
+@keyframes bnk-module-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.bnk-loading-spinner{animation:none;border-top-color:#0e7490}}

@@ -1322,7 +1322,17 @@ function sidebarHtml() {
 const behaviorFeature=createBehaviorFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont});
 const educationFeeFeature=createEducationFeeFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont});
 const timetableConstraintFeature=createTimetableConstraintFeature({supabase,state,escapeHtml,toast,redraw:renderTimetableNavigation,reload:renderDashboard,scopeClasses:()=>timetableFilteredClasses({visibleOnly:true}),currentPeriod:currentTimetablePeriod});
+let dashboardRenderSequence=0;
+const TIMETABLE_REENTRY_CACHE_MS=20000;
+function showModuleLoadingScreen(){
+ const surface=app.querySelector(".dashboard .content");
+ if(!surface)return;
+ surface.setAttribute("aria-busy","true");
+ surface.innerHTML='<section class="bnk-module-loading" role="status" aria-live="polite"><div class="bnk-loading-spinner" aria-hidden="true"></div><div><strong>'+escapeHtml(pageTitle())+'</strong><p>กำลังโหลดข้อมูลที่จำเป็น…</p></div></section>';
+}
 async function renderDashboard() {
+ const renderSequence=++dashboardRenderSequence;
+ const requestedView=state.currentView;
   if (state.currentView === "data_center" && state.profile?.role === "super_admin" && !state.dataCenterOverview && !state.dataCenterError) await loadDataCenterWorkspace();
   if (state.currentView === "approval_center") {
     await loadApprovalControlCenter();
@@ -1382,7 +1392,8 @@ async function renderDashboard() {
   if (state.currentView === "module:timetable_management") {
     // Switching tabs/class filters must not refetch the same 13 datasets.
     if (state.timetableSkipNextLoad && state.timetableClasses?.length) state.timetableSkipNextLoad = false;
-    else { state.timetableSkipNextLoad = false; await loadTimetableWorkspace(); if(canManageTimetable()){await timetableConstraintFeature.load();} }
+    else { state.timetableSkipNextLoad = false; await loadTimetableWorkspace(); state.timetableLastLoadedAt=Date.now(); state.timetableLastLoadedUserId=state.user.id; }
+    if(canManageTimetable() && ["conditions","generate"].includes(state.timetableView)) await timetableConstraintFeature.load();
   }
   if (state.currentView === "module:substitute_teaching") {
     await loadSubstituteWorkspace();
@@ -1399,6 +1410,7 @@ async function renderDashboard() {
   if (state.currentView === "module:student_cards") {
     await loadStudentCardWorkspace();
   }
+  if(renderSequence!==dashboardRenderSequence || requestedView!==state.currentView)return;
   const metrics = await dashboardMetrics();
   const unread = state.notifications.filter(n => !n.read_at).length;
   const activePeriod = currentAcademicPeriod();
@@ -5247,7 +5259,7 @@ async function loadTimetableWorkspace() {
   const canLoadRoster = isAcademicHead() || hasStageHeadCapability || ["director","super_admin"].includes(state.profile.role);
   const canLoadPeriodMaster = isAcademicHead() || hasStageHeadCapability || ["director","super_admin"].includes(state.profile.role);
 
-  const [classesRes, profilesRes, periodsRes, periodTemplatesRes, periodTemplateItemsRes, subjectsRes, assignmentsRes, entriesRes, homeroomsRes, stageHeadsRes, teachersRes, offeringsRes, sharedUnitsRes, jointActivitiesRes, jointTeachersRes] = await Promise.all([
+  const [classesRes, profilesRes, periodsRes, periodTemplatesRes, periodTemplateItemsRes, subjectsRes, assignmentsRes, entriesRes, homeroomsRes, stageHeadsRes, teachersRes, offeringsRes, sharedUnitsRes, jointActivitiesRes, jointTeachersRes, preschoolRes, preschoolRosterRes] = await Promise.all([
     supabase.from("school_classes").select("*").eq("is_active",true).order("academic_year",{ascending:false}).order("semester").order("sort_order").order("level_name").order("room_name"),
     supabase.from("timetable_profiles").select("*").order("created_at"),
     supabase.from("timetable_periods").select("*").order("sort_order"),
@@ -5271,6 +5283,8 @@ async function loadTimetableWorkspace() {
     supabase.from("preschool_shared_weekly_units").select("*").order("week_start"),
     supabase.from("timetable_joint_activities").select("*"),
     supabase.from("timetable_joint_activity_teachers").select("*"),
+    supabase.from("preschool_weekly_units").select("*").order("week_start"),
+    supabase.from("preschool_staff_roster").select("*").order("academic_year",{ascending:false})
   ]);
 
   state.timetableClasses = classesRes.error ? [] : (classesRes.data || []);
@@ -5321,11 +5335,7 @@ async function loadTimetableWorkspace() {
       : state.user.id;
   }
 
-  const [preschoolRes,preschoolRosterRes]=await Promise.all([
-    supabase.from("preschool_weekly_units").select("*").order("week_start"),
-    supabase.from("preschool_staff_roster").select("*").order("academic_year",{ascending:false})
-  ]);
-  state.preschoolRoster=preschoolRosterRes.error?[]:(preschoolRosterRes.data||[]);
+   state.preschoolRoster=preschoolRosterRes.error?[]:(preschoolRosterRes.data||[]);
   state.preschoolUnits=preschoolRes.error?[]:(preschoolRes.data||[]);
   state.preschoolUnitsError=preschoolRes.error ? preschoolRes.error.message : "";
   if (canManageTimetable() && !["setup","periods","planner","export","mine","conditions","generate"].includes(state.timetableView)) {
@@ -5734,7 +5744,7 @@ function timetableHeroHtml() {
     : `จัดตารางได้เฉพาะ ${timetableManagerScopeLabel()} ตามสิทธิ์หัวหน้าช่วงชั้น พร้อมระบบตรวจคาบชน`;
   return `<section class="lesson-hero timetable-hero">
     <div><span class="eyebrow dark">Academic Scheduling</span><h2>ระบบจัดตารางสอน</h2><p>${canManageTimetable() ? escapeHtml(managerCopy) : "ดูตารางที่เผยแพร่ตามสิทธิ์ของคุณ และ Export ตารางสอน/ตารางเรียนที่รับผิดชอบ"}</p></div>
-    ${canManageTimetable() ? `<div class="lesson-hero-actions"><button class="btn btn-primary" id="new-timetable-class">＋ เพิ่มชั้น/ห้อง</button>${canManageTimetableSubjectForClass(timetableSubjectMasterScopeClass())?`<button class="btn btn-secondary" id="new-timetable-subject">＋ เพิ่มรายวิชา</button>`:""}<button class="btn btn-secondary" id="new-teaching-assignment">＋ กำหนดวิชา/ครู</button></div>` : ""}
+    ${canManageTimetable() ? `<div class="lesson-hero-actions"><button class="btn btn-secondary" id="timetable-refresh-workspace" title="ดึงข้อมูลตารางสอนใหม่จากระบบ">↻ รีเฟรชข้อมูล</button><button class="btn btn-primary" id="new-timetable-class">＋ เพิ่มชั้น/ห้อง</button>${canManageTimetableSubjectForClass(timetableSubjectMasterScopeClass())?`<button class="btn btn-secondary" id="new-timetable-subject">＋ เพิ่มรายวิชา</button>`:""}<button class="btn btn-secondary" id="new-teaching-assignment">＋ กำหนดวิชา/ครู</button></div>` : ""}
   </section>`;
 }
 
@@ -14820,6 +14830,9 @@ function bindDashboardEvents() {
         state.officialAttendanceReportSemester=currentAcademicPeriod().semester;
       }
       if (nextView === "module:timetable_management" && state.currentView !== "module:timetable_management") {
+        state.timetableSkipNextLoad=!!state.timetableClasses?.length
+          && state.timetableLastLoadedUserId===state.user?.id
+          && Date.now()-Number(state.timetableLastLoadedAt||0)<TIMETABLE_REENTRY_CACHE_MS;
         state.timetableSelectedClassId = null;
         state.timetableView = ["director","super_admin"].includes(state.profile.role) ? "overview" : "planner";
         state.timetableAcademicYear = currentAcademicPeriod().academicYear;
@@ -14850,8 +14863,10 @@ function bindDashboardEvents() {
         state.studentCardAcademicYear=currentAcademicPeriod().academicYear; state.studentCardSemester=currentAcademicPeriod().semester;
         state.studentCardStageCode="all"; state.studentCardLevelName="all"; state.studentCardRoomName="all"; state.studentCardSearch=""; state.studentCardOwnClassId=null; state.studentCardScopeInitialized=false;
       }
+      const isNewView=state.currentView!==nextView;
       state.currentView = nextView;
       setMobileSidebar(false);
+      if(isNewView)showModuleLoadingScreen();
       renderDashboard();
     });
   });
@@ -15344,6 +15359,12 @@ function bindDashboardEvents() {
     state.timetableView=btn.dataset.timetableView;
     renderTimetableNavigation();
   }));
+  document.querySelector("#timetable-refresh-workspace")?.addEventListener("click",()=>{
+    state.timetableSkipNextLoad=false;
+    state.timetableLastLoadedAt=0;
+    showModuleLoadingScreen();
+    renderDashboard();
+  });
   document.querySelector("#timetable-year")?.addEventListener("change",e=>{state.timetableAcademicYear=Number(e.currentTarget.value);state.timetableSelectedClassId=null;state.timetableSubjectMasterScope=null;state.timetableExportClassId=null;state.timetableSkipNextLoad=false;renderDashboard();});
   document.querySelector("#timetable-semester")?.addEventListener("change",e=>{state.timetableSemester=Number(e.currentTarget.value);state.timetableSelectedClassId=null;state.timetableSubjectMasterScope=null;state.timetableExportClassId=null;state.timetableSkipNextLoad=false;renderDashboard();});
   document.querySelector("#timetable-sync-p33-staff")?.addEventListener("click",async()=>{
