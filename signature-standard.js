@@ -43,3 +43,14 @@ export function signatureOptionsHtml(selected="stored"){
   return [...SIGNATURE_METHODS].sort((a,b)=>["stored","drawn","upload","paper"].indexOf(a.id)-["stored","drawn","upload","paper"].indexOf(b.id))
     .map(method=>`<option value="${method.id}"${method.id===selected?" selected":""}>${method.label}</option>`).join("");
 }
+
+/** Central four-method button picker for document-specific approval modals. */
+export function signatureMethodButtonsHtml(attribute){
+  if(!/^data-[a-z][a-z-]*$/.test(attribute))throw new Error("Invalid signature method attribute");
+  const order=["stored","drawn","upload","paper"];
+  const hints={stored:"ใช้ลายเซ็นของบัญชีคุณ",drawn:"เมาส์ / นิ้ว / ปากกา",upload:"PNG / JPG / WebP",paper:"อนุมัติได้ · PDF เว้นช่องเซ็นจริง"};
+  return order.map(id=>{
+    const method=SIGNATURE_METHODS.find(m=>m.id===id);
+    return `<button type="button" class="signature-mode-option" ${attribute}="${method.id}"><strong>${method.label}</strong><span>${hints[method.id]}</span></button>`;
+  }).join("");
+}
