@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
-import { schoolDocumentSignatureImages, showSchoolDocumentSignatureModal } from "./document-signatures.js?v=5.12.9.34";
+import { schoolDocumentSignatureImages, showSchoolDocumentSignatureModal } from "./document-signatures.js?v=5.12.9.35";
+import { withWorkflowSignature } from "./workflow-signing.js?v=5.12.9.35";
 import { createBehaviorFeature } from "./behavior.js?v=2";
 import { createEducationFeeFeature } from "./education-fees.js?v=2";
 import { createTimetableConstraintFeature } from "./timetable-constraints.js?v=4";
@@ -4800,36 +4801,52 @@ async function saveLeaveRequest(modal,existing,submitAfter,button) {
     affects_teaching_schedule: Boolean(fd.get("affects_teaching_schedule")),
   };
 
-  buttonLoading(button,true,submitAfter?"กำลังบันทึกและส่ง...":"กำลังบันทึก...");
-  try {
-    const result = existing
-      ? await supabase.from("leave_requests").update(payload).eq("id",existing.id).select().single()
-      : await supabase.from("leave_requests").insert(payload).select().single();
-    if (result.error) throw result.error;
-    const saved = result.data;
-
-    if (submitAfter) {
-      const { error } = await supabase.rpc("submit_leave_request",{p_leave_request_id:saved.id});
-      if (error) throw error;
-    }
-    modal.remove();
-    state.selectedLeaveRequestId = saved.id;
-    toast(submitAfter?"ส่งคำขอลาแล้ว":"บันทึกฉบับร่างแล้ว",submitAfter?"หากมีคาบสอน ระบบจะแจ้งให้คุณจัดครูสอนแทนได้ทันที โดยไม่ต้องรอผลอนุมัติ":"คุณสามารถกลับมาแก้ไขก่อนส่งได้","success");
-    await renderDashboard();
-  } catch(error) {
-    toast("ดำเนินการไม่สำเร็จ",friendlyLeaveError(error),"error");
-  } finally {
-    buttonLoading(button,false);
+  const saveAction=async(signChoice=null)=>{
+    buttonLoading(button,true,submitAfter?"กำลังบันทึกและส่ง...":"กำลังบันทึก...");
+    try {
+      const result=existing
+        ? await supabase.from("leave_requests").update(payload).eq("id",existing.id).select().single()
+        : await supabase.from("leave_requests").insert(payload).select().single();
+      if(result.error)throw result.error;
+      const saved=result.data;
+      if(submitAfter){
+        if(!signChoice)throw new Error("กรุณาเลือกวิธีลงลายเซ็นก่อนส่งคำขอ");
+        const {error}=await supabase.rpc("submit_leave_request_signed",{
+          p_leave_request_id:saved.id,p_method:signChoice.method,p_signature:signChoice.signatureId
+        });
+        if(error)throw error;
+      }
+      modal.remove();
+      state.selectedLeaveRequestId=saved.id;
+      toast(submitAfter?"ส่งคำขอลาพร้อมลายเซ็นแล้ว":"บันทึกฉบับร่างแล้ว",
+        submitAfter?"ระบบส่งคำขอพร้อมบันทึกวิธีลงลายเซ็นแล้ว":"กลับมาแก้ไขและเลือกวิธีลงลายเซ็นก่อนส่งได้","success");
+      await renderDashboard();
+    } finally {buttonLoading(button,false);}
+  };
+  if(submitAfter){
+    return withWorkflowSignature({
+      client:supabase,userId:state.user.id,title:"เลือกวิธีลงลายเซ็นก่อนส่งใบลา",notify:toast,
+      onConfirm:saveAction
+    });
   }
+  try{await saveAction();}
+  catch(error){toast("บันทึกไม่สำเร็จ",friendlyLeaveError(error),"error");}
 }
 
 async function submitSelectedLeaveRequest() {
-  const r = selectedLeaveRequest();
-  if (!r || r.status !== "draft") return;
-  const { error } = await supabase.rpc("submit_leave_request",{p_leave_request_id:r.id});
-  if (error) return toast("ส่งคำขอไม่สำเร็จ",friendlyLeaveError(error),"error");
-  toast("ส่งคำขอลาแล้ว","ระบบแจ้งผู้ตรวจแล้ว และหากมีคาบสอนจะสร้างรายการให้คุณจัดครูสอนแทนทันที","success");
-  await renderDashboard();
+  const r=selectedLeaveRequest();
+  if(!r||r.status!=="draft")return;
+  await withWorkflowSignature({
+    client:supabase,userId:state.user.id,title:"เลือกวิธีลงลายเซ็นก่อนส่งใบลา",notify:toast,
+    onConfirm:async({method,signatureId})=>{
+      const {error}=await supabase.rpc("submit_leave_request_signed",{
+        p_leave_request_id:r.id,p_method:method,p_signature:signatureId
+      });
+      if(error)throw error;
+      toast("ส่งคำขอพร้อมลายเซ็นแล้ว","ระบบส่งคำขอให้ผู้ตรวจเรียบร้อย","success");
+      await renderDashboard();
+    }
+  });
 }
 
 async function deleteLeaveDraft() {
@@ -4881,14 +4898,26 @@ function leaveReviewModal(stage) {
   modal.querySelector("#confirm-leave-review").addEventListener("click",async e=>{
     const comment=modal.querySelector("#leave-review-comment").value.trim();
     if(decision==="reject"&&!comment) return toast("กรุณาระบุเหตุผล","การไม่อนุมัติต้องมีหมายเหตุ","error");
-    buttonLoading(e.currentTarget,true,"กำลังบันทึก...");
-    const rpc=isPersonnel?"personnel_review_leave_request":"director_review_leave_request";
-    const {error}=await supabase.rpc(rpc,{p_leave_request_id:r.id,p_decision:decision,p_comment:comment||null});
-    buttonLoading(e.currentTarget,false);
-    if(error) return toast("ดำเนินการไม่สำเร็จ",friendlyLeaveError(error),"error");
-    close();
-    toast(decision==="approve"?"อนุมัติแล้ว":"บันทึกการไม่อนุมัติแล้ว",isPersonnel&&decision==="approve"?"ส่งต่อผู้บริหารเรียบร้อย":"ระบบส่งการแจ้งเตือนแล้ว","success");
-    await renderDashboard();
+    await withWorkflowSignature({
+      client:supabase,userId:state.user.id,
+      title:isPersonnel?"เลือกลายเซ็นก่อนตรวจคำขอ":"เลือกลายเซ็นก่อนอนุมัติคำขอ",
+      notify:toast,
+      onConfirm:async({method,signatureId})=>{
+        buttonLoading(e.currentTarget,true,"กำลังบันทึก...");
+        try{
+          const rpc=isPersonnel?"personnel_review_leave_request_signed":"director_review_leave_request_signed";
+          const {error}=await supabase.rpc(rpc,{
+            p_leave_request_id:r.id,p_decision:decision,p_comment:comment||null,
+            p_method:method,p_signature:signatureId
+          });
+          if(error)throw error;
+          close();
+          toast(decision==="approve"?"บันทึกผลและลายเซ็นแล้ว":"บันทึกผลและวิธีลงนามแล้ว",
+            isPersonnel&&decision==="approve"?"ส่งต่อให้ผู้บริหารแล้ว":"ระบบแจ้งผลเรียบร้อย","success");
+          await renderDashboard();
+        }finally{buttonLoading(e.currentTarget,false);}
+      }
+    });
   });
 }
 
@@ -15267,7 +15296,22 @@ function bindDashboardEvents() {
   document.querySelectorAll("[data-substitute-open]").forEach(btn=>btn.addEventListener("click",()=>{
     state.selectedSubstituteLessonId=btn.dataset.substituteOpen; state.selectedSubstituteLeaveId=null; state.selectedSubstituteDate=null; renderDashboard();
   }));
-  document.querySelectorAll("[data-substitute-sign]").forEach(btn=>btn.addEventListener("click",()=>{const row=state.substituteLessons.find(x=>x.id===btn.dataset.substituteSign);if(row)showSchoolDocumentSignatureModal({client:supabase,kind:"substitute",docId:row.leave_request_id,date:row.leave_date,userId:state.user.id,notify:toast,onSaved:async()=>{await renderDashboard();}});}));
+  document.querySelectorAll("[data-substitute-sign]").forEach(btn=>btn.addEventListener("click",async()=>{
+    const row=state.substituteLessons.find(x=>x.id===btn.dataset.substituteSign);
+    if(!row||row.status!=="assigned"||row.substitute_teacher_id!==state.user.id)return;
+    await withWorkflowSignature({
+      client:supabase,userId:state.user.id,
+      title:"เลือกลายเซ็นก่อนยืนยันรับสอนแทน คาบ "+row.period_no,notify:toast,
+      onConfirm:async({method,signatureId})=>{
+        const {error}=await supabase.rpc("confirm_substitute_teacher_signed",{
+          p_substitute_lesson_id:row.id,p_method:method,p_signature:signatureId
+        });
+        if(error)throw error;
+        toast("ยืนยันรับงานสอนแทนพร้อมลายเซ็นแล้ว","ลายเซ็นจะปรากฏในเอกสารสอนแทน","success");
+        await renderDashboard();
+      }
+    });
+  }));
   document.querySelector("#sign-substitute-day")?.addEventListener("click",()=>{if(state.selectedSubstituteLeaveId&&state.selectedSubstituteDate)showSchoolDocumentSignatureModal({client:supabase,kind:"substitute",docId:state.selectedSubstituteLeaveId,date:state.selectedSubstituteDate,userId:state.user.id,notify:toast,onSaved:async()=>{await renderDashboard();}});});
   document.querySelectorAll("[data-substitute-assign]").forEach(btn=>btn.addEventListener("click",()=>substituteAssignModal(btn.dataset.substituteAssign)));
   document.querySelectorAll("[data-open-substitute-day]").forEach(btn=>btn.addEventListener("click",async()=>{
