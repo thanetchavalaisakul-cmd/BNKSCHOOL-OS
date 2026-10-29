@@ -19,3 +19,31 @@ export async function schoolDocumentSignatureImages(client,kind,docId,date=null)
   }));
   return images;
 }
+
+async function preparePersonalSignature(client,userId,method,blob){
+  if(!blob)throw Error("ยังไม่มีลายเซ็น");
+  let mime,ext;
+  if(method==="drawn"){mime="image/png";ext="png";}
+  else{
+    mime=blob.type;
+    if(!["image/png","image/jpeg","image/webp"].includes(mime))throw Error("รองรับไฟล์ PNG, JPG, WebP");
+    ext=mime==="image/png"?"png":mime==="image/webp"?"webp":"jpg";
+  }
+  if(blob.size>5*1024*1024)throw Error("ลายเซ็นต้องไม่เกิน 5 MB");
+  const path=userId+"/"+crypto.randomUUID()+"."+ext;
+  const up=await client.storage.from("signatures").upload(path,blob,{contentType:mime,upsert:false});
+  if(up.error)throw up.error;
+  const ins=await client.from("signatures").insert({
+    user_id:userId,label:"ลายเซ็นเอกสาร",bucket_id:"signatures",
+    storage_path:path,source:method,is_default:false
+  }).select("id").single();
+  if(ins.error){
+    await client.storage.from("signatures").remove([path]);throw ins.error;
+  }
+  return {id:ins.data.id,path};
+}
+async function rollbackPersonalSignature(client,created){
+  if(!created)return;
+  await client.from("signatures").delete().eq("id",created.id);
+  await client.storage.from("signatures").remove([created.path]);
+}
