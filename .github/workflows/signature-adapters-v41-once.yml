@@ -1,0 +1,44 @@
+name: Apply verified shared signature adapters v41
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/signature-adapters-v41-once.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: "github.event.head_commit.message == 'ci: apply verified shared signature adapters v41'"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact approved source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 8
+          persist-credentials: true
+      - name: Verify source and apply tested update
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD~7)" = "633545bd5cbb80bb68bd1a985e2befd37cc5bdac"
+          cat .tmp/bnk-signature-v41.part-*.b64 | base64 --decode | gzip --decompress > /tmp/bnk-signature-v41.patch
+          echo "d3dbd8e2ecae61698ff10d86fb03d632bde3c2865901e70e22e90bbb7e5a5426  /tmp/bnk-signature-v41.patch" | sha256sum --check
+          git apply --check /tmp/bnk-signature-v41.patch
+          git apply /tmp/bnk-signature-v41.patch
+      - name: Build and run all regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run verify
+          git diff --check
+      - name: Publish verified changes and remove one-time files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/signature-adapters-v41-once.yml .tmp/bnk-signature-v41.part-*.b64
+          git add app.js app.min.js document-signatures.js workflow-signing.js signature-standard.js index.html
+          git add tests/signature-adapters.test.mjs tests/budget-parallel-signing.test.mjs tests/leave-substitute-signature-before-action.test.mjs tests/school-document-signatures.test.mjs
+          git add -u .github/workflows/signature-adapters-v41-once.yml .tmp
+          git diff --cached --check
+          git -c user.name="BNK School OS CI" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "feat: share signature-method validation across legacy workflows"
+          git push origin HEAD:main
