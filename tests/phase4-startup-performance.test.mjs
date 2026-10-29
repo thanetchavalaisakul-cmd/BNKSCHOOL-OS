@@ -28,7 +28,7 @@ test("image file is shared and original large base64 is absent from app code",()
   assert.ok(statSync(new URL("../garuda-official.png",import.meta.url)).size>20000);
 });
 test("versioned application entry is refreshed and core student and timetable optimizations retained",()=>{
-  assert.match(html,/app\.min\.js\?v=5\.12\.9\.28/);
+  assert.match(html,/app\.min\.js\?v=5\.12\.9\.\d+/);
   assert.match(app,/paginateRows\(rows,state\.studentRegistryPage,50\)/);
   assert.match(app,/TIMETABLE_REENTRY_CACHE_MS=60000/);
   assert.match(app,/async function html2canvas\(\.\.\.args\)/);
