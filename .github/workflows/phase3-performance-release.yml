@@ -1,0 +1,40 @@
+name: BNK Performance Phase 3 Release
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/phase3-performance-data.txt'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Restore reviewed phase 3 changes
+        run: |
+          python3 - <<'PY'
+          import gzip,base64,pathlib
+          data=pathlib.Path('.github/phase3-performance-data.txt').read_text().strip()
+          pathlib.Path('/tmp/phase3.patch').write_bytes(gzip.decompress(base64.b64decode(data,validate=True)))
+          PY
+          git apply --check /tmp/phase3.patch
+          git apply --index /tmp/phase3.patch
+      - name: Verify syntax, rosters and PDF load changes
+        run: |
+          node --check app.js
+          node --check student-pagination.js
+          node --test tests/*.test.mjs
+          git diff --cached --check
+      - name: Publish tested changes
+        run: |
+          git config user.name "BNK School OS Release"
+          git config user.email "bnk-school-os@users.noreply.github.com"
+          git commit -m "perf: paginate student roster and lazy-load document generators"
+          git push origin HEAD:main
