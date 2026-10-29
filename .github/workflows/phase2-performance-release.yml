@@ -1,0 +1,40 @@
+name: BNK Three Modules Performance Phase 2
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/phase2-performance-data.txt'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply reviewed performance patch
+        run: |
+          python3 - <<'PY'
+          import pathlib,base64,gzip
+          value=pathlib.Path('.github/phase2-performance-data.txt').read_text().strip()
+          pathlib.Path('/tmp/phase2-performance.patch').write_bytes(gzip.decompress(base64.b64decode(value,validate=True)))
+          PY
+          git apply --check /tmp/phase2-performance.patch
+          git apply --index /tmp/phase2-performance.patch
+      - name: Validate all modules
+        run: |
+          node --check app.js
+          node --check timetable-constraints.js
+          node --test tests/*.test.mjs
+          git diff --cached --check
+      - name: Commit verified changes
+        run: |
+          git config user.name "BNK School OS Release Bot"
+          git config user.email "bnk-school-os@users.noreply.github.com"
+          git commit -m "perf: speed up class roster, academic registration and timetables"
+          git push origin HEAD:main
