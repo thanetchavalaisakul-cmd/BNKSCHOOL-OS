@@ -10,8 +10,8 @@ test("leave and substitute documents offer personalized signing in A4 preview",(
   assert.match(app,/id="leave-a4-sign"/);
   assert.match(app,/id="sub-doc-sign"/);
   assert.match(app,/data-substitute-sign/);
-  assert.match(app,/schoolDocumentSignatureImages\(supabase,"leave",request\.id\)/);
-  assert.match(app,/schoolDocumentSignatureImages\(supabase,"substitute",leaveRequestId,leaveDate\)/);
+  assert.match(app,/schoolDocumentSignatureImages\(supabase,"leave",request\.id(?:,null,toast)?\)/);
+  assert.match(app,/schoolDocumentSignatureImages\(supabase,"substitute",leaveRequestId,leaveDate(?:,toast)?\)/);
   assert.match(app,/docImages\.personnel_head/);
   assert.match(app,/docImages\["substitute:"\+r\.id\]/);
 });
