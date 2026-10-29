@@ -1,3 +1,4 @@
+// Release v5.12.9.36: signature-before-action flow + signed-image storage authorization fix.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
 import { schoolDocumentSignatureImages, showSchoolDocumentSignatureModal } from "./document-signatures.js?v=5.12.9.36";
 import { withWorkflowSignature } from "./workflow-signing.js?v=5.12.9.36";
