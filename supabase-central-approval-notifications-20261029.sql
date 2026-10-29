@@ -174,7 +174,7 @@ BEGIN
           SELECT 1 FROM public.notifications n
           WHERE n.recipient_id=recipient AND n.entity_id=p_document
             AND n.dismissed_at IS NULL
-            AND n.read_at IS NULL
+            -- Read items are still pending: never create a duplicate simply because one was opened.
             AND n.type=case when p_system='leave_management' then
               case s.slot_code when 'personnel_head' then 'leave_pending_personnel' else 'leave_pending_director' end
               when p_system='lesson_plans' then
