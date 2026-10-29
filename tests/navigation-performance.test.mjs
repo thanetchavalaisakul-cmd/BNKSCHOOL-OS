@@ -9,7 +9,7 @@ test("navigation shows a visible loading panel before asynchronous fetches",()=>
  assert.match(styles,/\.bnk-module-loading/);
 });
 test("timetable reentry cache is short, scoped to the same logged-in user",()=>{
- assert.match(app,/TIMETABLE_REENTRY_CACHE_MS=20000/);
+ assert.match(app,/TIMETABLE_REENTRY_CACHE_MS=60000/);
  assert.match(app,/state\.timetableLastLoadedUserId===state\.user\?\.id/);
  assert.match(app,/id="timetable-refresh-workspace"/);
 });

@@ -1323,7 +1323,7 @@ const behaviorFeature=createBehaviorFeature({supabase,state,escapeHtml,toast,ren
 const educationFeeFeature=createEducationFeeFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont});
 const timetableConstraintFeature=createTimetableConstraintFeature({supabase,state,escapeHtml,toast,redraw:renderTimetableNavigation,reload:renderDashboard,scopeClasses:()=>timetableFilteredClasses({visibleOnly:true}),currentPeriod:currentTimetablePeriod});
 let dashboardRenderSequence=0;
-const TIMETABLE_REENTRY_CACHE_MS=20000;
+const TIMETABLE_REENTRY_CACHE_MS=60000;
 function showModuleLoadingScreen(){
  const surface=app.querySelector(".dashboard .content");
  if(!surface)return;
@@ -7392,6 +7392,9 @@ async function fetchAllSupabaseRows(queryFactory,{pageSize=900}={}){
 
 async function loadStudentRegistryWorkspace(){
   const p=currentAcademicPeriod();if(!state.studentRegistryAcademicYear)state.studentRegistryAcademicYear=p.academicYear;if(!state.studentRegistrySemester)state.studentRegistrySemester=p.semester;
+  const shouldFetchRegistryBase=!state.studentRegistrySkipBaseOnce || !state.studentRegistryBaseLoadedUserId || state.studentRegistryBaseLoadedUserId!==state.user?.id;
+  state.studentRegistrySkipBaseOnce=false;
+  if(shouldFetchRegistryBase){
   const [sr,er,cr,hr,ar]=await Promise.all([
     fetchAllSupabaseRows(()=>supabase.from("students").select("*").order("last_name").order("first_name").order("id")),
     fetchAllSupabaseRows(()=>supabase.from("student_enrollments").select("*").order("academic_year").order("semester").order("student_number").order("id")),
@@ -7404,6 +7407,9 @@ async function loadStudentRegistryWorkspace(){
   const teacherIds=[...new Set(state.studentRegistryHomerooms.map(h=>h.teacher_id).filter(Boolean))];
   if(teacherIds.length){const tr=await supabase.from("profiles").select("id,full_name,account_status,deleted_at").in("id",teacherIds);state.studentRegistryTeacherRoster=tr.error?[]:(tr.data||[]);}else state.studentRegistryTeacherRoster=[];
 
+  state.studentRegistryBaseLoadedUserId=state.user?.id;
+  state.studentRegistryLastLoadedAt=Date.now();
+  }
   const allowed=studentRegistryAllowedViews();
   if(!allowed.includes(state.studentRegistryView))state.studentRegistryView="students";
   studentApplyRoleScope();
@@ -7414,7 +7420,7 @@ async function loadStudentRegistryWorkspace(){
     if(cls){const rr=await supabase.rpc("get_student_class_roster",{p_class_id:cls.id});state.studentRegistryClassRoster=rr.error?[]:(rr.data||[]);}
   }
 
-  if(canManageStudentMasterUi()){
+  if(canManageStudentMasterUi() && state.studentRegistryView==='import_export'){
     const [ir,rr]=await Promise.all([
       supabase.from("student_import_batches").select("*").order("created_at",{ascending:false}).limit(20),
       supabase.from("student_import_reconciliation_sessions").select("*").order("created_at",{ascending:false}).limit(20)
@@ -7425,7 +7431,7 @@ async function loadStudentRegistryWorkspace(){
     if(reviewIds.length){const ri=await fetchAllSupabaseRows(()=>supabase.from("student_import_reconciliation_items").select("*").in("session_id",reviewIds).order("created_at"));state.studentRegistryImportReviewItems=ri.data||[];}else state.studentRegistryImportReviewItems=[];
   }else{state.studentRegistryImportBatches=[];state.studentRegistryImportReviewSessions=[];state.studentRegistryImportReviewItems=[];}
 
-  if(canUseStudentPromotionUi()){
+  if(canUseStudentPromotionUi() && state.studentRegistryView==='promotion'){
     const [br,pr]=await Promise.all([
       supabase.from("student_promotion_batches").select("*").order("created_at",{ascending:false}),
       supabase.from("student_promotion_items").select("*")
@@ -7442,7 +7448,7 @@ function studentRegistryHero(){
   const male=rows.filter(x=>(state.studentRegistryView==="class_list"?x.gender:studentById(x.student_id)?.gender)==="ชาย").length;
   const female=rows.filter(x=>(state.studentRegistryView==="class_list"?x.gender:studentById(x.student_id)?.gender)==="หญิง").length;
   const scope=selectedClass?schoolClassLabel(selectedClass):(state.studentRegistryLevelName!=="all"?state.studentRegistryLevelName:"ทุกระดับชั้น");
-  return `<section class="student-registry-hero-v2"><div class="student-hero-main"><div class="student-hero-kicker"><span>ฝ่ายบริหารงานวิชาการ</span><i></i><span>Student Registry</span></div><h2>ระบบบัญชีรายชื่อนักเรียน</h2><p>ศูนย์กลางข้อมูลนักเรียนของโรงเรียน สำหรับใบรายชื่อ บัญชีเลื่อนชั้น ระบบเยี่ยมบ้าน และบัตรนักเรียน</p><div class="student-hero-context"><span>ปีการศึกษา <strong>${escapeHtml(p.academicYear)}</strong></span><span>ภาคเรียน <strong>${p.semester}</strong></span><span>มุมมอง <strong>${escapeHtml(scope)}</strong></span></div></div><div class="student-hero-side"><div class="student-hero-stats"><article><span>นักเรียนปัจจุบัน</span><strong>${rows.length}</strong><small>คน</small></article><article><span>ห้องเรียน</span><strong>${studentClassOptions().length}</strong><small>ห้อง</small></article><article><span>ชาย</span><strong>${male}</strong><small>คน</small></article><article><span>หญิง</span><strong>${female}</strong><small>คน</small></article></div>${canManageStudentMasterUi()?`<button class="student-hero-import" id="student-import-open"><span>＋</span><div><strong>นำเข้ารายชื่อนักเรียน</strong><small>Excel (.xlsx / .xls)</small></div></button>`:""}</div></section>`;
+  return `<section class="student-registry-hero-v2"><div class="student-hero-main"><div class="student-hero-kicker"><span>ฝ่ายบริหารงานวิชาการ</span><i></i><span>Student Registry</span></div><h2>ระบบบัญชีรายชื่อนักเรียน</h2><p>ศูนย์กลางข้อมูลนักเรียนของโรงเรียน สำหรับใบรายชื่อ บัญชีเลื่อนชั้น ระบบเยี่ยมบ้าน และบัตรนักเรียน</p><div class="student-hero-context"><span>ปีการศึกษา <strong>${escapeHtml(p.academicYear)}</strong></span><span>ภาคเรียน <strong>${p.semester}</strong></span><span>มุมมอง <strong>${escapeHtml(scope)}</strong></span></div></div><div class="student-hero-side"><div class="student-hero-stats"><article><span>นักเรียนปัจจุบัน</span><strong>${rows.length}</strong><small>คน</small></article><article><span>ห้องเรียน</span><strong>${studentClassOptions().length}</strong><small>ห้อง</small></article><article><span>ชาย</span><strong>${male}</strong><small>คน</small></article><article><span>หญิง</span><strong>${female}</strong><small>คน</small></article></div><button class="btn btn-secondary" id="student-registry-refresh" title="ดึงข้อมูลรายชื่อล่าสุด">↻ รีเฟรช</button>${canManageStudentMasterUi()?`<button class="student-hero-import" id="student-import-open"><span>＋</span><div><strong>นำเข้ารายชื่อนักเรียน</strong><small>Excel (.xlsx / .xls)</small></div></button>`:""}</div></section>`;
 }
 
 
@@ -8593,16 +8599,20 @@ async function loadAcademicRegistrationWorkspace(){
   if(!state.academicRegistrationAcademicYear)state.academicRegistrationAcademicYear=p.academicYear;
   if(!state.academicRegistrationSemester)state.academicRegistrationSemester=p.semester;
   const year=String(state.academicRegistrationAcademicYear),sem=Number(state.academicRegistrationSemester);
+  const section=state.academicRegistrationSection||'home';
+  const empty=()=>Promise.resolve({data:[],error:null});
+  // Home page requires no student-option RPCs. Fetch only the selected subsystem.
+  const transfer=section==='transfer',certificate=section==='certificate',documents=section==='document_service';
   const [rr,sigr,sr,cr,csigr,csr,dss,dsr,dssr]=await Promise.all([
-    supabase.from("academic_transfer_requests").select("*").order("updated_at",{ascending:false}),
-    supabase.from("academic_transfer_request_signatures").select("*").order("updated_at",{ascending:false}),
-    supabase.rpc("get_transfer_request_student_options",{p_academic_year:year,p_semester:sem}),
-    supabase.from("academic_certificate_requests").select("*").order("updated_at",{ascending:false}),
-    supabase.from("academic_certificate_request_signatures").select("*").order("updated_at",{ascending:false}),
-    supabase.rpc("get_certificate_request_student_options",{p_academic_year:year,p_semester:sem}),
-    supabase.rpc("get_academic_document_service_student_options",{p_academic_year:year,p_semester:sem}),
-    supabase.from("academic_document_service_requests").select("*").order("updated_at",{ascending:false}),
-    supabase.from("academic_document_service_signatures").select("*").order("updated_at",{ascending:false})
+    transfer?supabase.from("academic_transfer_requests").select("*").order("updated_at",{ascending:false}):empty(),
+    transfer?supabase.from("academic_transfer_request_signatures").select("*").order("updated_at",{ascending:false}):empty(),
+    transfer?supabase.rpc("get_transfer_request_student_options",{p_academic_year:year,p_semester:sem}):empty(),
+    certificate?supabase.from("academic_certificate_requests").select("*").order("updated_at",{ascending:false}):empty(),
+    certificate?supabase.from("academic_certificate_request_signatures").select("*").order("updated_at",{ascending:false}):empty(),
+    certificate?supabase.rpc("get_certificate_request_student_options",{p_academic_year:year,p_semester:sem}):empty(),
+    documents?supabase.rpc("get_academic_document_service_student_options",{p_academic_year:year,p_semester:sem}):empty(),
+    documents?supabase.from("academic_document_service_requests").select("*").order("updated_at",{ascending:false}):empty(),
+    documents?supabase.from("academic_document_service_signatures").select("*").order("updated_at",{ascending:false}):empty()
   ]);
   state.academicTransferRequests=rr.error?[]:(rr.data||[]);
   state.academicTransferFiles=[];
@@ -14856,6 +14866,7 @@ function bindDashboardEvents() {
         state.selectedHomeVisitId=null; state.homeVisitStep=1; state.homeVisitAcademicYear=currentAcademicPeriod().academicYear; state.homeVisitSemester=currentAcademicPeriod().semester; state.homeVisitClassId=null; state.homeVisitScopeInitialized=false;
       }
       if (nextView === "module:student_registry" && state.currentView !== "module:student_registry") {
+        state.studentRegistrySkipBaseOnce=!!state.studentRegistryStudents?.length && state.studentRegistryBaseLoadedUserId===state.user?.id && Date.now()-Number(state.studentRegistryLastLoadedAt||0)<25000;
         state.studentRegistryView="students"; state.studentRegistryAcademicYear=currentAcademicPeriod().academicYear; state.studentRegistrySemester=currentAcademicPeriod().semester;
         state.studentRegistryStageCode="all"; state.studentRegistryLevelName="all"; state.studentRegistryRoomName="all"; state.studentRegistrySearch=""; state.studentRegistryOwnClassId=null; state.studentRegistryScopeInitialized=false;
       }
@@ -15239,17 +15250,18 @@ function bindDashboardEvents() {
     });
   });
 
-  document.querySelectorAll("[data-student-view]").forEach(btn=>btn.addEventListener("click",()=>{state.studentRegistryView=btn.dataset.studentView;renderDashboard();}));
-  document.querySelector("#student-year")?.addEventListener("change",e=>{state.studentRegistryAcademicYear=Number(e.currentTarget.value);state.studentRegistryStageCode="all";state.studentRegistryLevelName="all";state.studentRegistryRoomName="all";state.studentRegistryOwnClassId=null;state.studentRegistryScopeInitialized=false;renderDashboard();});
-  document.querySelector("#student-sem")?.addEventListener("change",e=>{state.studentRegistrySemester=Number(e.currentTarget.value);state.studentRegistryStageCode="all";state.studentRegistryLevelName="all";state.studentRegistryRoomName="all";state.studentRegistryOwnClassId=null;state.studentRegistryScopeInitialized=false;renderDashboard();});
-  document.querySelector("#student-stage")?.addEventListener("change",e=>{state.studentRegistryStageCode=e.currentTarget.value;state.studentRegistryLevelName="all";state.studentRegistryRoomName="all";renderDashboard();});
-  document.querySelector("#student-level")?.addEventListener("change",e=>{state.studentRegistryLevelName=e.currentTarget.value;state.studentRegistryRoomName="all";renderDashboard();});
-  document.querySelector("#student-room")?.addEventListener("change",e=>{state.studentRegistryRoomName=e.currentTarget.value;renderDashboard();});
-  document.querySelector("#student-search")?.addEventListener("change",e=>{state.studentRegistrySearch=e.currentTarget.value;renderDashboard();});
-  document.querySelector("#student-own-class")?.addEventListener("change",e=>{state.studentRegistryOwnClassId=e.currentTarget.value;state.studentRegistryScopeInitialized=false;studentApplyRoleScope();renderDashboard();});
-  document.querySelector("#student-filter-reset")?.addEventListener("click",()=>{state.studentRegistryStageCode="all";state.studentRegistryLevelName="all";state.studentRegistryRoomName="all";state.studentRegistrySearch="";state.studentRegistryScopeInitialized=true;renderDashboard();});
-  document.querySelector("#student-filter-my-homeroom")?.addEventListener("click",()=>{state.studentRegistryScopeInitialized=false;studentApplyRoleScope();renderDashboard();});
-  document.querySelector("#student-filter-all")?.addEventListener("click",()=>{state.studentRegistryStageCode="all";state.studentRegistryLevelName="all";state.studentRegistryRoomName="all";state.studentRegistrySearch="";state.studentRegistryScopeInitialized=true;renderDashboard();});
+  document.querySelector('#student-registry-refresh')?.addEventListener('click',()=>{state.studentRegistrySkipBaseOnce=false;state.studentRegistryLastLoadedAt=0;showModuleLoadingScreen();renderDashboard();});
+  document.querySelectorAll("[data-student-view]").forEach(btn=>btn.addEventListener("click",()=>{state.studentRegistrySkipBaseOnce=true;state.studentRegistryView=btn.dataset.studentView;renderDashboard();}));
+  document.querySelector("#student-year")?.addEventListener("change",e=>{state.studentRegistryAcademicYear=Number(e.currentTarget.value);state.studentRegistryStageCode="all";state.studentRegistryLevelName="all";state.studentRegistryRoomName="all";state.studentRegistryOwnClassId=null;state.studentRegistryScopeInitialized=false;state.studentRegistrySkipBaseOnce=true;renderDashboard();});
+  document.querySelector("#student-sem")?.addEventListener("change",e=>{state.studentRegistrySemester=Number(e.currentTarget.value);state.studentRegistryStageCode="all";state.studentRegistryLevelName="all";state.studentRegistryRoomName="all";state.studentRegistryOwnClassId=null;state.studentRegistryScopeInitialized=false;state.studentRegistrySkipBaseOnce=true;renderDashboard();});
+  document.querySelector("#student-stage")?.addEventListener("change",e=>{state.studentRegistryStageCode=e.currentTarget.value;state.studentRegistryLevelName="all";state.studentRegistryRoomName="all";state.studentRegistrySkipBaseOnce=true;renderDashboard();});
+  document.querySelector("#student-level")?.addEventListener("change",e=>{state.studentRegistryLevelName=e.currentTarget.value;state.studentRegistryRoomName="all";state.studentRegistrySkipBaseOnce=true;renderDashboard();});
+  document.querySelector("#student-room")?.addEventListener("change",e=>{state.studentRegistryRoomName=e.currentTarget.value;state.studentRegistrySkipBaseOnce=true;renderDashboard();});
+  document.querySelector("#student-search")?.addEventListener("change",e=>{state.studentRegistrySearch=e.currentTarget.value;state.studentRegistrySkipBaseOnce=true;renderDashboard();});
+  document.querySelector("#student-own-class")?.addEventListener("change",e=>{state.studentRegistryOwnClassId=e.currentTarget.value;state.studentRegistryScopeInitialized=false;studentApplyRoleScope();state.studentRegistrySkipBaseOnce=true;renderDashboard();});
+  document.querySelector("#student-filter-reset")?.addEventListener("click",()=>{state.studentRegistryStageCode="all";state.studentRegistryLevelName="all";state.studentRegistryRoomName="all";state.studentRegistrySearch="";state.studentRegistryScopeInitialized=true;state.studentRegistrySkipBaseOnce=true;renderDashboard();});
+  document.querySelector("#student-filter-my-homeroom")?.addEventListener("click",()=>{state.studentRegistryScopeInitialized=false;studentApplyRoleScope();state.studentRegistrySkipBaseOnce=true;renderDashboard();});
+  document.querySelector("#student-filter-all")?.addEventListener("click",()=>{state.studentRegistryStageCode="all";state.studentRegistryLevelName="all";state.studentRegistryRoomName="all";state.studentRegistrySearch="";state.studentRegistryScopeInitialized=true;state.studentRegistrySkipBaseOnce=true;renderDashboard();});
   document.querySelectorAll("[data-student-detail]").forEach(btn=>btn.addEventListener("click",()=>studentDetailModal(btn.dataset.studentDetail)));
   document.querySelectorAll("[data-student-exit]").forEach(btn=>btn.addEventListener("click",()=>studentExitEnrollmentModal(btn.dataset.studentExit)));
   document.querySelectorAll("#student-import-open,#student-import-open-2,#student-empty-import").forEach(btn=>btn.addEventListener("click",()=>studentImportModal()));
