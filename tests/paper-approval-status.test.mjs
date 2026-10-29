@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {assertSignatureMethod,verifySignatureAction,canEmbedConfirmedSignature} from "../signature-standard.js";
 const app=readFileSync(new URL("../app.js",import.meta.url),"utf8");
+const schoolSignatures=readFileSync(new URL("../document-signatures.js",import.meta.url),"utf8");
 const sql=readFileSync(new URL("../supabase-budget-paper-approval-20261030.sql",import.meta.url),"utf8");
 
 test("paper is a valid authenticated document decision, with physical signature still pending",()=>{
@@ -40,4 +41,10 @@ test("paper completion notification is distinct from having physical signatures"
  assert.match(sql,/ผู้ที่เลือกกระดาษยังต้องลงลายเซ็นจริงในเอกสาร/);
  assert.match(app,/ดำเนินการรับรองแล้ว/);
  assert.match(app,/เลือกกระดาษแล้ว · ยังไม่รับรอง/);
+});
+
+test("explicit paper selection suppresses legacy or auto-executive PDF fallback in leave and substitute",()=>{
+ assert.match(schoolSignatures,/Object\.defineProperty\(images,"_paperSlots"/);
+ assert.match(app,/docImages\._paperSlots\?\.has\("director"\)\?null:assets\.directorSignature/);
+ assert.match(app,/docImages\._paperSlots\?\.has\("director"\)\?null:directorSignature\?\.image/);
 });

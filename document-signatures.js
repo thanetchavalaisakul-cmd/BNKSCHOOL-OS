@@ -18,6 +18,9 @@ export async function schoolDocumentSignatureImages(client,kind,docId,date=null,
     if(notify)notify("อ่านลายเซ็นในเอกสารไม่ได้",error.message||"กรุณาเปิดเอกสารใหม่อีกครั้ง","error");
     return images;
   }
+  // An explicitly chosen paper signature overrides legacy/automatic PDF image fallbacks.
+  // This is non-enumerable metadata; it is not itself a signature or an approval.
+  Object.defineProperty(images,"_paperSlots",{value:new Set((data||[]).filter(row=>row.method==="paper").map(row=>row.slot_code)),enumerable:false});
   let failed=0;let firstError=null;
   await Promise.all((data||[]).filter(s=>s.signature_id&&s.method!=="paper").map(async s=>{
     try{
