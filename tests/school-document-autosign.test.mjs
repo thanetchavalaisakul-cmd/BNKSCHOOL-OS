@@ -9,8 +9,8 @@ const autosign=readFileSync(new URL("../supabase-school-document-autosign-202610
 test("auto-sign preferences are consumed before each existing leave/substitute PDF preview",()=>{
  assert.match(client,/rpc\("refresh_school_document_auto_signatures"/);
  assert.match(client,/p_kind:kind,p_doc:docId,p_day:date/);
- assert.match(app,/schoolDocumentSignatureImages\(supabase,"leave",request\.id\)/);
- assert.match(app,/schoolDocumentSignatureImages\(supabase,"substitute",leaveRequestId,leaveDate\)/);
+ assert.match(app,/schoolDocumentSignatureImages\(supabase,"leave",request\.id(?:,null,toast)?\)/);
+ assert.match(app,/schoolDocumentSignatureImages\(supabase,"substitute",leaveRequestId,leaveDate(?:,toast)?\)/);
 });
 test("auto-bind uses only explicit personal opted-in profile and server-controlled signature",()=>{
  assert.match(autosign,/private\.personal_auto_sign_for_system\(c\.uid,v_system\)/);
