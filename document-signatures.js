@@ -4,26 +4,36 @@ export const SCHOOL_SIGNATURE_DAY = '1900-01-01';
 const toImageDataUrl = blob => new Promise((resolve,reject)=>{
   const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(blob);
 });
-export async function schoolDocumentSignatureImages(client,kind,docId,date=null){
+export async function schoolDocumentSignatureImages(client,kind,docId,date=null,notify=null){
   const images={};
-  // Automatically attach the already-consented default signatures to eligible document slots.
-  // The server checks each signer, the completed workflow step, and existing signature preferences.
+  // Existing opted-in signatures are attached only to eligible slots and never approve the record.
   const sync=await client.rpc("refresh_school_document_auto_signatures",{p_kind:kind,p_doc:docId,p_day:date});
   if(sync.error)console.warn("automatic document signature sync",sync.error);
   const {data,error}=await client.from("school_document_signatures")
     .select("slot_code,signature_id,method").eq("document_kind",kind)
     .eq("document_id",docId).eq("document_date",date||SCHOOL_SIGNATURE_DAY);
-  if(error){console.warn("document signatures",error);return images;}
+  if(error){
+    console.warn("document signatures",error);
+    if(notify)notify("อ่านลายเซ็นในเอกสารไม่ได้",error.message||"กรุณาเปิดเอกสารใหม่อีกครั้ง","error");
+    return images;
+  }
+  let failed=0;let firstError=null;
   await Promise.all((data||[]).filter(s=>s.signature_id&&s.method!=="paper").map(async s=>{
-    const {data:signature}=await client.from("signatures")
-      .select("bucket_id,storage_path").eq("id",s.signature_id).maybeSingle();
-    if(!signature?.storage_path)return;
-    const dl=await client.storage.from(signature.bucket_id||"signatures").download(signature.storage_path);
-    if(!dl.error&&dl.data) images[s.slot_code]=await toImageDataUrl(dl.data);
+    try{
+      const lookup=await client.from("signatures")
+        .select("bucket_id,storage_path").eq("id",s.signature_id).maybeSingle();
+      if(lookup.error)throw lookup.error;
+      const signature=lookup.data;
+      if(!signature?.storage_path)throw new Error("ไม่พบภาพลายเซ็น");
+      const dl=await client.storage.from(signature.bucket_id||"signatures").download(signature.storage_path);
+      if(dl.error)throw dl.error;
+      if(!dl.data)throw new Error("ไม่พบไฟล์ลายเซ็น");
+      images[s.slot_code]=await toImageDataUrl(dl.data);
+    }catch(err){failed++;firstError ||= err.message||String(err);console.warn("signed document asset",err);}
   }));
+  if(failed&&notify)notify("โหลดภาพลายเซ็นไม่ได้",String(failed)+" รายการ: "+(firstError||"ตรวจสอบสิทธิ์เปิดไฟล์"),"error");
   return images;
 }
-
 async function preparePersonalSignature(client,userId,method,blob){
   if(!blob)throw Error("ยังไม่มีลายเซ็น");
   let mime,ext;
