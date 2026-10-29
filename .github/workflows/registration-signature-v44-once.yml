@@ -1,0 +1,43 @@
+name: Apply verified registration signature integration v44
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/registration-signature-v44-once.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: "github.event.head_commit.message == 'ci: apply atomic registration signatures v44'"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact approved revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 5
+          persist-credentials: true
+      - name: Verify source and patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD~4)" = "508707999630e910556c35c5e9b12d8d0b7d0093"
+          cat .tmp/bnk-v44.part-*.b64 | base64 --decode | gzip --decompress > /tmp/bnk-v44.patch
+          echo "7c68fdf89db38866a183079d75861aac95e977538c397efeeedc23e311c95994  /tmp/bnk-v44.patch" | sha256sum --check
+          git apply --check /tmp/bnk-v44.patch
+          git apply /tmp/bnk-v44.patch
+      - name: Verify build and full regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run verify
+          git diff --check
+      - name: Publish verified source and remove staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/registration-signature-v44-once.yml .tmp/bnk-v44.part-*.b64
+          git add app.js app.min.js signature-standard.js index.html tests/registration-signature-atomic.test.mjs supabase-academic-registration-signature-atomic-20261030.sql
+          git add -u .github/workflows/registration-signature-v44-once.yml .tmp
+          git diff --cached --check
+          git -c user.name="BNK School OS CI" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "feat: atomic four-method signing for three registration workflows"
+          git push origin HEAD:main
