@@ -20,7 +20,7 @@ test("student roster renders only the selected 50 rows while keeping totals",()=
  assert.match(students,/\$\{rows\.length\} รายการ/);
  assert.match(students,/data-student-page=/);
  assert.match(app,/state\.studentRegistrySkipBaseOnce=true;\s*renderDashboard\(\)/);
- assert.match(index,/app\.js\?v=5\.12\.9\.26/);
+ assert.match(index,/app\.js\?v=5\.12\.9\.27/);
 });
 test("previous/export logic still uses full filtered student roster",()=>{
  assert.match(app,/function studentVisibleEnrollments\(\)/);
