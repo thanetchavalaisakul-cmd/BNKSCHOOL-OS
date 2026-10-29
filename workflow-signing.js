@@ -1,6 +1,7 @@
+import {assertSignatureMethod,signatureOptionsHtml} from "./signature-standard.js?v=1";
 // Choose and bind a personal signature BEFORE a workflow transition occurs.
 // The database RPC atomically commits the action and its signature.
-export async function withWorkflowSignature({client,userId,title,notify,onConfirm}) {
+export async function withWorkflowSignature({client,userId,title,notify,onConfirm,requireOnlineApproval=false}) {
   const {data:signatures,error:loadError}=await client.from("signatures")
     .select("id,label,is_default,storage_path,source").eq("user_id",userId)
     .order("created_at",{ascending:false});
@@ -14,10 +15,7 @@ export async function withWorkflowSignature({client,userId,title,notify,onConfir
   modal.innerHTML=`<div class="modal modal-signature" style="max-width:670px">
     <div class="modal-head"><div><h3>${h(title||"ยืนยันการลงนาม")}</h3><p>กรุณาเลือกวิธีลงลายเซ็นก่อนยืนยัน ระบบจะบันทึกพร้อมกับการดำเนินการ</p></div><button class="modal-close" type="button">×</button></div>
     <div class="field"><label>วิธีลงลายเซ็น</label><select class="select" id="workflow-sign-method">
-      <option value="stored">ใช้ลายเซ็นที่บันทึกไว้ในบัญชี</option>
-      <option value="drawn">เซ็นสดบนหน้าจอ</option>
-      <option value="upload">อัปโหลดรูปลายเซ็น</option>
-      <option value="paper">เว้นช่องให้เซ็นบนกระดาษ</option>
+      ${signatureOptionsHtml()}
     </select></div>
     <div class="field" id="wf-stored"><label>เลือกลายเซ็นของฉัน</label><select class="select" id="wf-signature">
       <option value="">เลือกลายเซ็น</option>
@@ -53,6 +51,7 @@ export async function withWorkflowSignature({client,userId,title,notify,onConfir
     let signatureId=null,createdPath=null,createdId=null;
     button.disabled=true;button.textContent="กำลังดำเนินการ...";
     try{
+      assertSignatureMethod(selectedMethod,{requireOnline:requireOnlineApproval});
       if(selectedMethod==="stored"){
         signatureId=modal.querySelector("#wf-signature").value;
         if(!signatureId)throw Error("กรุณาเลือกลายเซ็น หรือเลือกเซ็นสด/อัปโหลด/กระดาษ");

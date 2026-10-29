@@ -17,7 +17,7 @@ test("leave and substitute documents offer personalized signing in A4 preview",(
 });
 test("four signature methods never grant approval rights",()=>{
   for(const method of ["stored","drawn","upload","paper"]){
-    assert.ok(ui.includes('value="'+method+'"'),method);
+    assert.ok(ui.includes("signatureOptionsHtml()"),"must use centralized signature method options");
     assert.ok(sql.includes("'"+method+"'"),method);
   }
   assert.match(ui,/rpc\("my_school_document_signing_slots"/);

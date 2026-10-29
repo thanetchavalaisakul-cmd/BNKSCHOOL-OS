@@ -30,3 +30,16 @@ export function verifySignatureAction({actorId,assignedUserId,method,documentId,
  if(method!=="paper"&&!confirmedAt)throw new Error("ต้องกดยืนยันก่อนใช้ลายเซ็นออนไลน์");
  return {method,onlineApproved:method!=="paper"&&Boolean(confirmedAt)};
 }
+
+/** Shared guard used by each legacy adapter and future signature-enabled system. */
+export function assertSignatureMethod(method,{requireOnline=false}={}){
+  const choice=SIGNATURE_METHODS.find(m=>m.id===method);
+  if(!choice)throw new Error("วิธีลงลายเซ็นไม่ถูกต้อง");
+  if(requireOnline&&!choice.online)throw new Error("การเซ็นบนกระดาษยังไม่ใช่การรับรองออนไลน์ กรุณาเลือกลายเซ็นอิเล็กทรอนิกส์หรือรอดำเนินการบนกระดาษจริง");
+  return choice;
+}
+/** Four options from the central registry, rather than independently authored per form. */
+export function signatureOptionsHtml(selected="stored"){
+  return [...SIGNATURE_METHODS].sort((a,b)=>["stored","drawn","upload","paper"].indexOf(a.id)-["stored","drawn","upload","paper"].indexOf(b.id))
+    .map(method=>`<option value="${method.id}"${method.id===selected?" selected":""}>${method.label}</option>`).join("");
+}

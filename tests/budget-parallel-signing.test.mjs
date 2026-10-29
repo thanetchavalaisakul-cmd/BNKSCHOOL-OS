@@ -23,7 +23,7 @@ test("signature options require own explicit acknowledgement and protect inspect
  assert.match(modal,/confirm_budget_signer/);
  assert.match(modal,/ensureInspected/);
  assert.match(modal,/budget-inspection-confirmed/);
- assert.match(modal,/await confirmSigner\(\)/);
+ assert.match(modal,/await confirmSigner\("stored"\)/);
  assert.match(modal,/ยืนยันรับรองด้วยลายเซ็นเดิม/);
  assert.match(sql,/p_inspection_confirmed IS DISTINCT FROM TRUE/);
  assert.match(sql,/v_signer\.method NOT IN \('drawn','upload','stored'\)/);

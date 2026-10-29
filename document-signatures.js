@@ -1,3 +1,4 @@
+import {assertSignatureMethod,signatureOptionsHtml} from "./signature-standard.js?v=1";
 // Shared leave and substitute document signature support.
 export const SCHOOL_SIGNATURE_DAY = '1900-01-01';
 
@@ -75,10 +76,7 @@ export async function showSchoolDocumentSignatureModal({client,kind,docId,date=n
     <div class="modal-head"><div><h3>ลงลายเซ็นในเอกสาร</h3><p>ระบบตรวจสอบผู้ลงนามตามบัญชีที่เข้าสู่ระบบ</p></div><button type="button" class="modal-close">×</button></div>
     <div class="field"><label>ช่องลงนามของคุณ</label><select class="select" id="ds-slot">${choices.data.map(x=>`<option value="${escapeDocText(x.slot_code)}">${escapeDocText(x.slot_label)}</option>`).join("")}</select></div>
     <div class="field"><label>รูปแบบการลงนาม</label><select class="select" id="ds-method">
-      <option value="stored">ใช้ลายเซ็นที่บันทึกไว้</option>
-      <option value="drawn">เซ็นสดบนหน้าจอ</option>
-      <option value="upload">อัปโหลดภาพลายเซ็น</option>
-      <option value="paper">เว้นช่องสำหรับเซ็นบนกระดาษ</option>
+      ${signatureOptionsHtml()}
     </select></div>
     <div class="field" id="ds-stored"><label>ลายเซ็นที่บันทึกไว้</label><select class="select" id="ds-signature"><option value="">เลือกลายเซ็น</option>${mine.map(x=>`<option value="${escapeDocText(x.id)}" ${x.id===first?"selected":""}>${escapeDocText(x.label||"ลายเซ็น")}</option>`).join("")}</select></div>
     <div class="field hidden" id="ds-drawn"><label>ใช้เมาส์ นิ้ว หรือปากกาเซ็นได้</label><div class="signature-canvas-wrap"><canvas id="ds-canvas" width="900" height="300" style="width:100%;touch-action:none"></canvas></div><button type="button" class="btn btn-ghost" id="ds-clear">ล้างลายเซ็น</button></div>
@@ -105,6 +103,7 @@ export async function showSchoolDocumentSignatureModal({client,kind,docId,date=n
     let signatureId=null,created=null;
     btn.disabled=true;btn.textContent="กำลังบันทึก...";
     try{
+      assertSignatureMethod(mode);
       if(mode==="stored"){
         signatureId=m.querySelector("#ds-signature").value;
         if(!signatureId)throw Error("กรุณาเลือกลายเซ็นจากบัญชีของคุณ");

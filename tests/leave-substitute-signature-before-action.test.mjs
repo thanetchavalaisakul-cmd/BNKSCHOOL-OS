@@ -17,7 +17,7 @@ test("all leave transitions require selecting a signature before backend action"
   assert.doesNotMatch(app,/supabase\.rpc\("director_review_leave_request",/);
 });
 test("signature choice has all four methods and personal signature verification",()=>{
-  for(const m of ["stored","drawn","upload","paper"])assert.ok(ui.includes('value="'+m+'"'));
+  for(const m of ["stored","drawn","upload","paper"])assert.ok(ui.includes("signatureOptionsHtml()")&&ui.includes("assertSignatureMethod(selectedMethod"),m);
   assert.match(ui,/get_my_signature_preferences/);
   assert.match(ui,/default_signature_id/);
   assert.match(ui,/onConfirm\(\{method:selectedMethod,signatureId\}\)/);
