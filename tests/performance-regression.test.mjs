@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import "./behavior-hard-delete.test.mjs";
 
 const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 
