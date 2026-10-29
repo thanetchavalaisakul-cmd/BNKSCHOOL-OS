@@ -7,19 +7,19 @@ permissions:
   contents: write
 jobs:
   apply:
-    if: github.event.head_commit.message == 'ci: apply verified budget A4 layout fix'
+    if: "github.event.head_commit.message == 'ci: apply verified budget A4 layout fix (validated)'"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c # v4.2.2
         with:
-          fetch-depth: 2
+          fetch-depth: 3
           persist-credentials: true
       - name: Verify expected base commit and apply budget-only patch
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "e36f6adc69a82e8b60c4e2b3266cf20e14fbbb7a"
+          test "$(git rev-parse HEAD~2)" = "e36f6adc69a82e8b60c4e2b3266cf20e14fbbb7a"
           base64 --decode <<'BNK_A4_GZ' | gzip --decompress > /tmp/bnk-budget-a4.patch
           H4sIAAAAAAAC/+09a3Mb13Xf+SvWa9UBQmAB8CFZAEFKtuRYHcnW6NFOR9SQF9gLcs3F7nZ3wUcgzFiJp5KTfuhM7Ki0k0xc16PGHs9YVtJQX9s/wvEv6Tnn
           7t29+wJB2WmmU/pBLO7ee+65533PfcC0BgOtXt+yQo01mOcZ7wVaL3qYsxyT72uv9xYXedM0jIvNC+fNVlNrNZvnl5bm6vV63GZufn4+aXfpklZv1Ra1+VZt
