@@ -2004,8 +2004,8 @@ function notificationList(limit = 20, category = "all") {
   const items = state.notifications.filter(n=>category==="all"||notificationCategory(n)===category).slice(0,limit);
   if (!items.length) return `<div class="empty"><strong>ไม่มีการแจ้งเตือน</strong><span>รายการใหม่จะแสดงตรงนี้</span></div>`;
   return `<div class="list">${items.map(n => `
-    <div class="list-item ${(["lesson_plan","personnel_profile","signature_profile","leave_request","substitute_batch","substitute_lesson","budget_disbursement"].includes(n.entity_type)||n.type==="central_approval_action") ? "notification-clickable" : ""}"
-      ${n.type === "central_approval_action" ? `data-notification-central="${escapeHtml(n.id)}"` : ""}
+    <div class="list-item ${(["lesson_plan","personnel_profile","signature_profile","leave_request","substitute_batch","substitute_lesson","budget_disbursement"].includes(n.entity_type)||["central_approval_action","central_approval_result"].includes(n.type)) ? "notification-clickable" : ""}"
+      ${["central_approval_action","central_approval_result"].includes(n.type) ? `data-notification-central="${escapeHtml(n.id)}"` : ""}
       ${n.entity_type === "lesson_plan" && n.entity_id ? `data-notification-plan="${n.entity_id}"` : ""}
       ${n.entity_type === "personnel_profile" ? `data-notification-personnel="1"` : ""}
       ${n.entity_type === "signature_profile" ? `data-notification-signature="1"` : ""}
@@ -2019,7 +2019,7 @@ function notificationList(limit = 20, category = "all") {
 }
 
 async function openCentralApprovalNotification(notificationId, modal=null) {
-  const notice=state.notifications.find(n=>n.id===notificationId && n.type==="central_approval_action"
+  const notice=state.notifications.find(n=>n.id===notificationId && ["central_approval_action","central_approval_result"].includes(n.type)
     && n.recipient_id===state.user?.id);
   if(!notice)return;
   const system=String(notice.workflow_key||"").split(":")[1]||"";
