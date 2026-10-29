@@ -47,3 +47,44 @@ async function rollbackPersonalSignature(client,created){
   await client.from("signatures").delete().eq("id",created.id);
   await client.storage.from("signatures").remove([created.path]);
 }
+
+const escapeDocText = v => String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+export async function showSchoolDocumentSignatureModal({client,kind,docId,date=null,userId,notify,onSaved}){
+  const choices=await client.rpc("my_school_document_signing_slots",{p_kind:kind,p_doc:docId,p_day:date});
+  if(choices.error){notify("เปิดการลงนามไม่สำเร็จ",choices.error.message,"error");return;}
+  if(!choices.data?.length){notify("ยังไม่สามารถลงนามได้","ไม่มีสิทธิ์หรือยังไม่ถึงขั้นตอนลงนาม","error");return;}
+  const signatures=await client.from("signatures").select("id,label,is_default").eq("user_id",userId).order("created_at",{ascending:false});
+  if(signatures.error){notify("โหลดลายเซ็นไม่สำเร็จ",signatures.error.message,"error");return;}
+  const mine=signatures.data||[],first=mine.find(x=>x.is_default)?.id||mine[0]?.id||"";
+  const m=document.createElement("div");m.className="modal-backdrop";
+  m.innerHTML=`<div class="modal modal-signature" style="max-width:660px">
+    <div class="modal-head"><div><h3>ลงลายเซ็นในเอกสาร</h3><p>ระบบตรวจสอบผู้ลงนามตามบัญชีที่เข้าสู่ระบบ</p></div><button type="button" class="modal-close">×</button></div>
+    <div class="field"><label>ช่องลงนามของคุณ</label><select class="select" id="ds-slot">${choices.data.map(x=>`<option value="${escapeDocText(x.slot_code)}">${escapeDocText(x.slot_label)}</option>`).join("")}</select></div>
+    <div class="field"><label>รูปแบบการลงนาม</label><select class="select" id="ds-method">
+      <option value="stored">ใช้ลายเซ็นที่บันทึกไว้</option>
+      <option value="drawn">เซ็นสดบนหน้าจอ</option>
+      <option value="upload">อัปโหลดภาพลายเซ็น</option>
+      <option value="paper">เว้นช่องสำหรับเซ็นบนกระดาษ</option>
+    </select></div>
+    <div class="field" id="ds-stored"><label>ลายเซ็นที่บันทึกไว้</label><select class="select" id="ds-signature"><option value="">เลือกลายเซ็น</option>${mine.map(x=>`<option value="${escapeDocText(x.id)}" ${x.id===first?"selected":""}>${escapeDocText(x.label||"ลายเซ็น")}</option>`).join("")}</select></div>
+    <div class="field hidden" id="ds-drawn"><label>ใช้เมาส์ นิ้ว หรือปากกาเซ็นได้</label><div class="signature-canvas-wrap"><canvas id="ds-canvas" width="900" height="300" style="width:100%;touch-action:none"></canvas></div><button type="button" class="btn btn-ghost" id="ds-clear">ล้างลายเซ็น</button></div>
+    <div class="field hidden" id="ds-upload"><label>ภาพ PNG, JPG หรือ WebP (ไม่เกิน 5 MB)</label><input class="input" type="file" id="ds-file" accept="image/png,image/jpeg,image/webp"></div>
+    <div class="field hidden" id="ds-paper"><small>เว้นช่องลงนามบนเอกสารกระดาษ โดยไม่ถือว่าอนุมัติเอกสารอัตโนมัติ</small></div>
+    <div class="modal-actions"><button class="btn btn-ghost modal-cancel" type="button">ยกเลิก</button><button class="btn btn-primary" id="ds-save" type="button">บันทึกวิธีลงนาม</button></div>
+  </div>`;
+  document.body.appendChild(m);
+  const close=()=>m.remove();
+  m.querySelector(".modal-close").onclick=close;
+  m.querySelector(".modal-cancel").onclick=close;
+  const method=m.querySelector("#ds-method"),canvas=m.querySelector("#ds-canvas"),ctx=canvas.getContext("2d");
+  ctx.lineWidth=5;ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle="#0f172a";
+  let drawing=false,ink=false;
+  const point=e=>{const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height};};
+  canvas.onpointerdown=e=>{drawing=true;ink=true;canvas.setPointerCapture(e.pointerId);const p=point(e);ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x+0.05,p.y+0.05);ctx.stroke();};
+  canvas.onpointermove=e=>{if(drawing){const p=point(e);ctx.lineTo(p.x,p.y);ctx.stroke();}};
+  canvas.onpointerup=canvas.onpointercancel=()=>{drawing=false;};
+  m.querySelector("#ds-clear").onclick=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);ink=false;};
+  const refresh=()=>{for(const name of ["stored","drawn","upload","paper"])m.querySelector("#ds-"+name).classList.toggle("hidden",method.value!==name);};
+  method.onchange=refresh;refresh();
+  // SAVE_HANDLER_PLACEHOLDER
+}
