@@ -1028,7 +1028,7 @@ async function loadActiveUserData() {
   const [departmentsRes, modulesRes, notificationsRes, personnelOwnRes, academicTermsRes, academicCalendarSettingsRes, academicSupervisionSettingsRes, academicRegistrationSettingsRes, academicCertificateSettingsRes, academicDocumentServiceSettingsRes, procurementAccessRes] = await Promise.all([
     supabase.from("departments").select("*").eq("is_active", true).order("sort_order"),
     supabase.from("modules").select("*, departments(code,name_th,name_en)").eq("is_active", true).order("sort_order"),
-    supabase.from("notifications").select("*").is("dismissed_at", null).order("created_at", { ascending: false }).limit(20),
+    supabase.from("notifications").select("*").is("dismissed_at", null).order("created_at", { ascending: false }).limit(60),
     supabase.from("personnel_records").select("*").eq("user_id", state.user.id).maybeSingle(),
     supabase.from("academic_terms").select("*").order("academic_year", { ascending: false }).order("semester"),
     supabase.from("academic_calendar_settings").select("*").eq("id",1).maybeSingle(),
@@ -1995,8 +1995,13 @@ function homeView(metrics) {
   </div>`;
 }
 
-function notificationList(limit = 20) {
-  const items = state.notifications.slice(0, limit);
+function notificationCategory(n) {
+  if(n.notification_kind==="action"||/(_pending_|_pending$|_required$|_assigned$|_arrangement_required$)/.test(n.type||""))return "action";
+  if(n.notification_kind==="result"||/(approve|approved|revision|rejected|paid|covered|cancelled)/.test(n.type||""))return "result";
+  return "info";
+}
+function notificationList(limit = 20, category = "all") {
+  const items = state.notifications.filter(n=>category==="all"||notificationCategory(n)===category).slice(0,limit);
   if (!items.length) return `<div class="empty"><strong>ไม่มีการแจ้งเตือน</strong><span>รายการใหม่จะแสดงตรงนี้</span></div>`;
   return `<div class="list">${items.map(n => `
     <div class="list-item ${(["lesson_plan","personnel_profile","signature_profile","leave_request","substitute_batch","substitute_lesson","budget_disbursement"].includes(n.entity_type)||n.type==="central_approval_action") ? "notification-clickable" : ""}"
@@ -15668,8 +15673,13 @@ function bindDashboardEvents() {
   document.querySelectorAll(".timeline-signature-preview").forEach(btn => btn.addEventListener("click", () => previewSignature(btn.dataset.sigId)));
 }
 
-function showNotificationModal() {
+function showNotificationModal(category="all") {
   const modal = document.createElement("div");
+  const tabs=[["all","ทั้งหมด"],["action","รอดำเนินการ"],["result","แจ้งผล"],["info","เพื่อทราบ"]];
+  const categoryTabs='<div class="notification-category-tabs" style="display:flex;flex-wrap:wrap;gap:7px;margin:10px 0">'+
+    tabs.map(([value,label])=>'<button type="button" class="btn '+(category===value?'btn-primary':'btn-ghost')+
+    '" data-notification-filter="'+value+'">'+label+' ('+
+    state.notifications.filter(n=>value==="all"||notificationCategory(n)===value).length+')</button>').join("")+'</div>';
   modal.className = "modal-backdrop";
   modal.innerHTML = `
     <div class="modal">
@@ -15677,13 +15687,15 @@ function showNotificationModal() {
         <div><h3>การแจ้งเตือน</h3><p>${state.notifications.filter(n => !n.read_at).length} รายการที่ยังไม่ได้อ่าน</p></div>
         <button class="modal-close">×</button>
       </div>
-      ${notificationList(20)}
+      ${categoryTabs}
+      ${notificationList(60,category)}
       <div class="modal-actions notification-actions">
         <button class="btn btn-secondary" id="mark-all-read">ทำเครื่องหมายว่าอ่านแล้ว</button>
         <button class="btn btn-danger" id="clear-all-notifications">ล้างการแจ้งเตือนทั้งหมด</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
+  modal.querySelectorAll("[data-notification-filter]").forEach(el=>el.addEventListener("click",()=>{modal.remove();showNotificationModal(el.dataset.notificationFilter);}));
   modal.querySelectorAll("[data-notification-central]").forEach(el=>el.addEventListener("click",()=>openCentralApprovalNotification(el.dataset.notificationCentral,modal)));
   modal.querySelectorAll("[data-notification-plan]").forEach(el => el.addEventListener("click", async () => {
     const id = el.dataset.notificationPlan;
