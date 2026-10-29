@@ -23,5 +23,5 @@ test("registration home launches no student-option RPC and each tab has isolated
 test("timetable reentry cached for one minute, with explicit fresh reload",()=>{
  assert.match(code,/TIMETABLE_REENTRY_CACHE_MS=60000/);
  assert.match(code,/id="timetable-refresh-workspace"/);
- assert.match(html,/app\.min\.js\?v=5\.12\.9\.28/);
+ assert.match(html,/app\.min\.js\?v=5\.12\.9\.\d+/);
 });
