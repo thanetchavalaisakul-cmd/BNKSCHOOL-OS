@@ -1,0 +1,43 @@
+name: Apply tested home visit signature integration v45
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/homevisit-signature-v45-once.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: "github.event.head_commit.message == 'ci: apply verified home visit signatures v45'"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout approved base revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 4
+          persist-credentials: true
+      - name: Verify and apply source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD~3)" = "f0ae1f534e3a4522fe9281d2005e905639155435"
+          cat .tmp/bnk-v45.part-*.b64 | base64 --decode | gzip --decompress > /tmp/bnk-v45.patch
+          echo "6b9ae5bc17ae9c26c78b625add17d8e9098b080dc574aa7218f5757d723a1294  /tmp/bnk-v45.patch" | sha256sum --check
+          git apply --check /tmp/bnk-v45.patch
+          git apply /tmp/bnk-v45.patch
+      - name: Verify complete test suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run verify
+          git diff --check
+      - name: Commit tested changes and clean temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/homevisit-signature-v45-once.yml .tmp/bnk-v45.part-*.b64
+          git add app.js app.min.js index.html tests/home-visit-paper-signature.test.mjs supabase-home-visit-paper-signature-20261030.sql
+          git add -u .github/workflows/homevisit-signature-v45-once.yml .tmp
+          git diff --cached --check
+          git -c user.name="BNK School OS CI" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "feat: home visit paper method and saved-signature identity"
+          git push origin HEAD:main
