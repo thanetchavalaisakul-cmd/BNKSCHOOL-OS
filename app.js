@@ -1,3 +1,4 @@
+// v5.12.9.48 — signed action gates across nine modules and personal timetable Auto Sign.
 // v5.12.9.47 — PA2 evaluator signature choice, including paper and saved account signature.
 // v5.12.9.46 — four-method lesson plan approvals with paper/online distinction.
 // v5.12.9.45 — home visit paper method, explicit confirmation, signer ownership and preserved records.
@@ -1621,6 +1622,24 @@ function bindApprovalCenterEvents(){
   document.querySelectorAll("[data-admin-exec-signature]").forEach(inp=>inp.addEventListener("change",async()=>{const file=inp.files?.[0];if(!file)return;try{await uploadExecutiveSignatureAsAdmin(inp.dataset.adminExecSignature,file);toast("เพิ่มลายเซ็นผู้บริหารแล้ว","สามารถเลือกลายเซ็นนี้ใน Auto Sign ได้","success");await loadApprovalControlCenter();await renderDashboard();}catch(e){toast("อัปโหลดลายเซ็นไม่สำเร็จ",e.message||String(e),"error");}finally{inp.value='';}}));
   document.querySelectorAll("[data-set-exec-active]").forEach(btn=>btn.addEventListener("click",async()=>{const execId=btn.dataset.execId,kind=btn.dataset.execKind,active=btn.dataset.setExecActive==="true",note=document.querySelector(`[data-approval-admin-note="${execId}"]`)?.value.trim()||null;if(execId!==state.user?.id&&!note)return toast("กรุณาระบุคำสั่ง/เหตุผล","ต้องบันทึกเหตุผลเมื่อ Super Admin เปิดหรือปิดสิทธิ์แทนผู้บริหาร","error");if(!window.confirm(`${active?"เปิด":"ปิด"}สิทธิ์ผู้บริหารกลางของบุคคลนี้หรือไม่?`))return;buttonLoading(btn,true,"กำลังบันทึก...");const {error}=await supabase.rpc("set_approval_executive",{p_user_id:execId,p_executive_kind:kind,p_active:active,p_authorization_note:note});if(error){buttonLoading(btn,false);return toast("เปลี่ยนสถานะไม่สำเร็จ",error.message,"error");}toast("บันทึกสถานะผู้บริหารแล้ว",active?"เปิดใช้งานแล้ว":"ปิดสิทธิ์กลางแล้ว","success");await loadApprovalControlCenter();await renderDashboard();}));
   document.querySelector("#approval-add-executive")?.addEventListener("click",async e=>{const user=document.querySelector("#approval-exec-candidate")?.value,kind=document.querySelector("#approval-exec-kind")?.value,note=document.querySelector("#approval-exec-note")?.value.trim();if(!user)return toast("กรุณาเลือกบุคลากร","","error");if(!note)return toast("กรุณาระบุคำสั่ง/เหตุผล","ต้องบันทึกเหตุผลเมื่อ Super Admin กำหนดผู้บริหารกลาง","error");buttonLoading(e.currentTarget,true,"กำลังบันทึก...");const {error}=await supabase.rpc("set_approval_executive",{p_user_id:user,p_executive_kind:kind,p_active:true,p_authorization_note:note||null});if(error){buttonLoading(e.currentTarget,false);return toast("กำหนดผู้บริหารไม่สำเร็จ",error.message,"error");}toast("กำหนดผู้บริหารแล้ว","","success");await loadApprovalControlCenter();await renderDashboard();});
+}
+// BNK action signature contract: every protected transition uses the signed-in actor.
+function bnkSignatureBeforeAction(title,onConfirm){
+ return withWorkflowSignature({client:supabase,userId:state.user.id,title,notify:toast,onConfirm});
+}
+async function bnkRecordActionSignature(systemCode,documentId,actionCode,choice){
+ if(!choice?.method)throw new Error("กรุณาเลือกวิธีลงลายเซ็นก่อนดำเนินการ");
+ const {error}=await supabase.rpc("record_bnk_action_signature",{
+  p_system_code:systemCode,p_document_id:documentId,p_action_code:actionCode,
+  p_method:choice.method,p_signature_id:choice.signatureId||null
+ });
+ if(error)throw error;
+}
+async function bnkCompleteSignedDraft(table,record,actionCode,choice){
+ await bnkRecordActionSignature("personnel_pa",record.id,actionCode,choice);
+ const result=await supabase.from(table).update({status:"submitted"}).eq("id",record.id).select().single();
+ if(result.error)throw result.error;
+ return result.data;
 }
 function approvalSystemConfig(code){return approvalSystems().find(x=>x.system_code===code)||(state.approvalSystemRegistry||[]).find(x=>x.system_code===code)||null;}
 function approvalIsParallel(code){return (approvalSystemConfig(code)?.routing_mode||"parallel")==="parallel";}
@@ -3486,16 +3505,29 @@ function personnelPaReportModal(){
     </form><div class="modal-actions pa-editor-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button>${report.status!=="submitted"?`<button class="btn btn-secondary" id="pa-report-draft">บันทึกฉบับร่าง</button>`:""}<button class="btn btn-primary" id="pa-report-submit">${report.status==="submitted"?"บันทึกและส่งอีกครั้ง":"บันทึกและส่งรายงาน"}</button></div></div>`;
   document.body.appendChild(modal);document.body.classList.add("pa-editor-open");const close=()=>{modal.remove();document.body.classList.remove("pa-editor-open");};modal.querySelector(".modal-close").onclick=close;modal.querySelector(".modal-cancel").onclick=close;modal.querySelector("#pa-report-modal-open-source").onclick=()=>personnelPaOpenSourceAgreement(source);
   const fileBox=modal.querySelector("#pa-report-existing-files");const renderFiles=()=>{fileBox.innerHTML=workingFiles.length?workingFiles.map((f,i)=>`<div class="pa-existing-file"><strong>หลักฐาน ${i+1}</strong><span>${escapeHtml(f.name||"ไฟล์หลักฐาน")}</span><button class="mini-link" type="button" data-pa-report-open-existing="${i}">เปิด</button><button class="mini-link danger" type="button" data-pa-report-remove-existing="${i}">นำออก</button></div>`).join(""):`<div class="empty compact"><span>ยังไม่มีไฟล์หลักฐานที่บันทึกไว้</span></div>`;fileBox.querySelectorAll("[data-pa-report-open-existing]").forEach(b=>b.onclick=()=>personnelPaOpenEvidenceFile(workingFiles[Number(b.dataset.paReportOpenExisting)]));fileBox.querySelectorAll("[data-pa-report-remove-existing]").forEach(b=>b.onclick=()=>{workingFiles.splice(Number(b.dataset.paReportRemoveExisting),1);renderFiles();});};renderFiles();
-  const save=async(status,btn)=>{const form=modal.querySelector("#pa-report-form");if(status==="submitted"&&!form.reportValidity())return;const data=Object.fromEntries(new FormData(form).entries()),newFiles=[...(modal.querySelector("#pa-report-files").files||[])];if(workingFiles.length+newFiles.length>10)return toast("แนบไฟล์มากเกินไป","หลักฐานรวมได้สูงสุด 10 ไฟล์","error");buttonLoading(btn,true,status==="submitted"?"กำลังอัปโหลดและส่ง...":"กำลังบันทึก...");try{await personnelPaSaveReport(data,newFiles,workingFiles,status);close();toast(status==="submitted"?"ส่งรายงานผล PA แล้ว":"บันทึกฉบับร่างแล้ว",status==="submitted"?"ระบบบันทึกรายงานปลายปีเรียบร้อย":"ฉบับร่างยังไม่ถือว่าส่ง","success");await loadPersonnelPaWorkspace();await renderDashboard();}catch(err){toast("บันทึกรายงาน PA ไม่สำเร็จ",err.message||String(err),"error");}finally{buttonLoading(btn,false);}};
-  modal.querySelector("#pa-report-draft")?.addEventListener("click",e=>save("draft",e.currentTarget));modal.querySelector("#pa-report-submit").addEventListener("click",e=>save("submitted",e.currentTarget));
+  const save=async(status,btn,choice=null)=>{const form=modal.querySelector("#pa-report-form");if(status==="submitted"&&!form.reportValidity())return;const data=Object.fromEntries(new FormData(form).entries()),newFiles=[...(modal.querySelector("#pa-report-files").files||[])];if(workingFiles.length+newFiles.length>10)return toast("แนบไฟล์มากเกินไป","หลักฐานรวมได้สูงสุด 10 ไฟล์","error");buttonLoading(btn,true,status==="submitted"?"กำลังอัปโหลดและส่ง...":"กำลังบันทึก...");try{await personnelPaSaveReport(data,newFiles,workingFiles,status,choice);close();toast(status==="submitted"?"ส่งรายงานผล PA แล้ว":"บันทึกฉบับร่างแล้ว",status==="submitted"?"ระบบบันทึกรายงานปลายปีเรียบร้อย":"ฉบับร่างยังไม่ถือว่าส่ง","success");await loadPersonnelPaWorkspace();await renderDashboard();}catch(err){toast("บันทึกรายงาน PA ไม่สำเร็จ",err.message||String(err),"error");}finally{buttonLoading(btn,false);}};
+  modal.querySelector("#pa-report-draft")?.addEventListener("click",e=>save("draft",e.currentTarget));modal.querySelector("#pa-report-submit").addEventListener("click",e=>{const btn=e.currentTarget;if(!form.reportValidity())return;return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนส่งรายงาน PA ปลายปี",choice=>save("submitted",btn,choice));});
 }
 
-async function personnelPaSaveReport(data,newFiles,keptFiles,status){
+async function personnelPaSaveReport(data,newFiles,keptFiles,status,choice=null){
   const period=personnelPaSelectedPeriod(),source=state.personnelPaSubmission,old=state.personnelPaReport;if(!period||source?.status!=="submitted")throw new Error("ไม่พบ PA ต้นปีที่ส่งแล้ว");
   const oldFiles=personnelPaEvidenceFiles(old),uploaded=[];const mimeMap={"application/pdf":"pdf","image/png":"png","image/jpeg":"jpg","image/webp":"webp"};
   try{
     for(const file of newFiles){let mime=file.type||"";if(!mimeMap[mime]){const ext=(file.name.split(".").pop()||"").toLowerCase();mime=ext==="pdf"?"application/pdf":ext==="png"?"image/png":["jpg","jpeg"].includes(ext)?"image/jpeg":ext==="webp"?"image/webp":"";}if(!mimeMap[mime])throw new Error(`ไฟล์ ${file.name} ไม่ใช่ชนิดที่รองรับ`);if(file.size>25*1024*1024)throw new Error(`ไฟล์ ${file.name} มีขนาดเกิน 25 MB`);const path=`${state.user.id}/${period.id}/report-evidence/${crypto.randomUUID()}.${mimeMap[mime]}`;const up=await supabase.storage.from("personnel-pa").upload(path,file,{contentType:mime,upsert:false,cacheControl:"3600"});if(up.error)throw up.error;uploaded.push({bucket:"personnel-pa",path,name:file.name,size:file.size,mime});}
-    const evidence=[...keptFiles,...uploaded];const payload={period_id:period.id,pa_submission_id:source.id,user_id:state.user.id,status,result_summary:String(data.result_summary||"").trim(),quantitative_result:String(data.quantitative_result||"").trim(),qualitative_result:String(data.qualitative_result||"").trim(),development_result:String(data.development_result||"").trim(),indicators_result:String(data.indicators_result||"").trim(),evidence_summary:String(data.evidence_summary||"").trim(),problems_obstacles:String(data.problems_obstacles||"").trim()||null,next_development:String(data.next_development||"").trim()||null,evidence_files:evidence,updated_by:state.user.id};let res;if(old?.id)res=await supabase.from("personnel_pa_reports").update(payload).eq("id",old.id).select().single();else res=await supabase.from("personnel_pa_reports").insert({...payload,created_by:state.user.id}).select().single();if(res.error)throw res.error;
+    const evidence=[...keptFiles,...uploaded];const payload={period_id:period.id,pa_submission_id:source.id,user_id:state.user.id,status,result_summary:String(data.result_summary||"").trim(),quantitative_result:String(data.quantitative_result||"").trim(),qualitative_result:String(data.qualitative_result||"").trim(),development_result:String(data.development_result||"").trim(),indicators_result:String(data.indicators_result||"").trim(),evidence_summary:String(data.evidence_summary||"").trim(),problems_obstacles:String(data.problems_obstacles||"").trim()||null,next_development:String(data.next_development||"").trim()||null,evidence_files:evidence,updated_by:state.user.id};let res;
+    if(status==="submitted"){
+      if(old?.id){
+        await bnkRecordActionSignature("personnel_pa",old.id,"pa_end",choice);
+        res=await supabase.from("personnel_pa_reports").update(payload).eq("id",old.id).select().single();
+      }else{
+        res=await supabase.from("personnel_pa_reports").insert({...payload,status:"draft",created_by:state.user.id}).select().single();
+        if(!res.error)res={data:await bnkCompleteSignedDraft("personnel_pa_reports",res.data,"pa_end",choice),error:null};
+      }
+    }else{
+      res=old?.id?await supabase.from("personnel_pa_reports").update(payload).eq("id",old.id).select().single():
+        await supabase.from("personnel_pa_reports").insert({...payload,created_by:state.user.id}).select().single();
+    }
+    if(res.error)throw res.error;
     const kept=new Set(evidence.map(x=>x.path));const removed=oldFiles.filter(x=>x.path&&!kept.has(x.path));if(removed.length){const rm=await supabase.storage.from("personnel-pa").remove(removed.map(x=>x.path));if(rm.error)console.warn("PA report evidence cleanup",rm.error);}return res.data;
   }catch(err){if(uploaded.length)await supabase.storage.from("personnel-pa").remove(uploaded.map(x=>x.path));throw err;}
 }
@@ -3560,7 +3592,7 @@ function personnelPa2TeacherStatus(row){
   if(n>0)return {label:`ประเมินแล้ว ${n}/3`,className:"pending"};
   return {label:"พร้อมประเมิน",className:"active"};
 }
-function personnelPa2EvaluatorProfileComplete(profile=state.personnelPaEvaluatorProfile){return !!(profile?.profile_completed_at&&profile?.full_name&&profile?.position_title&&profile?.organization&&profile?.signature_path);}
+function personnelPa2EvaluatorProfileComplete(profile=state.personnelPaEvaluatorProfile){return !!(profile?.profile_completed_at&&profile?.full_name&&profile?.position_title&&profile?.organization&&(profile?.signature_path||profile?.signature_method==="paper"));}
 
 function personnelPaEvaluatorProfilePanelHtml(){
   const p=state.personnelPaEvaluatorProfile;
@@ -3765,8 +3797,18 @@ async function personnelPa2AssessmentModal(memberId,options={}){
   modal.querySelector("#pa2-open-source").onclick=()=>personnelPaOpenSourceAgreement(source);modal.querySelector("#pa2-open-report").onclick=()=>personnelPaOpenReportPdf(report);modal.querySelectorAll("[data-pa2-evidence]").forEach(b=>b.onclick=()=>personnelPaOpenEvidenceFile(evidence[Number(b.dataset.pa2Evidence)]));
   const readLevels=()=>{const one={},two={};PERSONNEL_PA2_SECTION1.forEach(i=>{const el=modal.querySelector(`[data-pa2-rubric="${i.key}"]:checked`);if(el)one[i.key]=Number(el.value);});PERSONNEL_PA2_SECTION2.forEach(i=>{const el=modal.querySelector(`[data-pa2-rubric="s2-${i.key}"]:checked`);if(el)two[i.key]=Number(el.value);});return {one,two};};
   const refresh=()=>{modal.querySelectorAll(".pa2-rubric-choice").forEach(l=>l.classList.toggle("selected",!!l.querySelector("input:checked")));const {one,two}=readLevels(),score=personnelPa2LiveScore(one,two),work=modal.querySelector('input[name="workload"]:checked');modal.querySelector("#pa2-score-60").textContent=`${personnelPa2Number(score.section1,1)} / 60`;modal.querySelector("#pa2-score-40").textContent=`${personnelPa2Number(score.section2,1)} / 40`;modal.querySelector("#pa2-score-100").textContent=`${personnelPa2Number(score.total,1)} / 100`;const complete=Object.keys(one).length===15&&Object.keys(two).length===3&&!!work,pass=complete&&work.value==="true"&&score.total>=70,el=modal.querySelector("#pa2-pass-live");el.textContent=complete?(pass?"ผ่านเกณฑ์":"ไม่ผ่านเกณฑ์"):`ยังขาด ${18-Object.keys(one).length-Object.keys(two).length+(work?0:1)} จุด`;el.className=complete?(pass?"pass":"fail"):"";};modal.querySelectorAll('input[type="radio"]').forEach(x=>x.addEventListener("change",refresh));refresh();
-  const save=async(status,btn)=>{const {one,two}=readLevels(),work=modal.querySelector('input[name="workload"]:checked');if(status==="submitted"&&(Object.keys(one).length!==15||Object.keys(two).length!==3||!work))return toast("ประเมินยังไม่ครบ","กรุณาเลือก Rubric ครบ 15 ตัวชี้วัด + 3 เกณฑ์ประเด็นท้าทาย และระบุภาระงาน","error");if(status==="submitted"&&!window.confirm("ยืนยันส่งผลประเมิน PA2 หรือไม่?\n\nเมื่อส่ง ระบบจะบันทึกคะแนนและลงนามด้วยลายเซ็นกรรมการที่บันทึกไว้ในระบบทันที"))return;const payload={committee_member_id:member.id,workload_compliant:work?work.value==="true":null,section1_levels:one,section2_levels:two,evaluator_comment:modal.querySelector('[name="evaluator_comment"]').value.trim()||null,status,updated_by:state.user.id};buttonLoading(btn,true,status==="submitted"?"กำลังส่งและลงนาม...":"กำลังบันทึก...");let res;if(assessment?.id)res=await supabase.from("personnel_pa_assessments").update(payload).eq("id",assessment.id).select().single();else res=await supabase.from("personnel_pa_assessments").insert({...payload,period_id:member.period_id,evaluatee_user_id:person.user_id||report.user_id,pa_report_id:report.id,created_by:state.user.id}).select().single();buttonLoading(btn,false);if(res.error)return toast("บันทึก PA2 ไม่สำเร็จ",res.error.message,"error");close();toast(status==="submitted"?"ส่งผลและลงนาม PA2 แล้ว":"บันทึกฉบับร่างแล้ว",status==="submitted"?`คะแนนรวม ${personnelPa2Number(res.data.total_score,1)} / 100`:`สามารถกลับมาประเมินต่อได้ภายในช่วงเวลาที่กำหนด`,"success");await loadPersonnelPaWorkspace();await renderDashboard();};
-  modal.querySelector("#pa2-save-draft")?.addEventListener("click",e=>save("draft",e.currentTarget));modal.querySelector("#pa2-submit")?.addEventListener("click",e=>save("submitted",e.currentTarget));modal.querySelector("#pa2-assessment-pdf")?.addEventListener("click",()=>personnelPa2OpenAssessmentPdf(ctx));modal.querySelector("#pa2-reset-current")?.addEventListener("click",async()=>{const id=assessment?.id,name=person.full_name||report.person_name_snapshot||"ผู้รับการประเมิน";close();await personnelPa2ResetAssessment(id,name);});
+  const save=async(status,btn,choice=null)=>{const {one,two}=readLevels(),work=modal.querySelector('input[name="workload"]:checked');if(status==="submitted"&&(Object.keys(one).length!==15||Object.keys(two).length!==3||!work))return toast("ประเมินยังไม่ครบ","กรุณาเลือก Rubric ครบ 15 ตัวชี้วัด + 3 เกณฑ์ประเด็นท้าทาย และระบุภาระงาน","error");if(status==="submitted"&&!window.confirm("ยืนยันส่งผลประเมิน PA2 หรือไม่?\n\nเมื่อส่ง ระบบจะบันทึกคะแนนและลงนามด้วยลายเซ็นกรรมการที่บันทึกไว้ในระบบทันที"))return;const payload={committee_member_id:member.id,workload_compliant:work?work.value==="true":null,section1_levels:one,section2_levels:two,evaluator_comment:modal.querySelector('[name="evaluator_comment"]').value.trim()||null,status:status==="submitted"?"draft":status,updated_by:state.user.id};buttonLoading(btn,true,status==="submitted"?"กำลังส่งและลงนาม...":"กำลังบันทึก...");let res;
+    if(assessment?.id)res=await supabase.from("personnel_pa_assessments").update(payload).eq("id",assessment.id).select().single();
+    else res=await supabase.from("personnel_pa_assessments").insert({...payload,period_id:member.period_id,evaluatee_user_id:person.user_id||report.user_id,pa_report_id:report.id,created_by:state.user.id}).select().single();
+    if(!res.error&&status==="submitted"){
+      try{res={data:await (async()=>{
+        await bnkRecordActionSignature("personnel_pa",res.data.id,"pa_assess",choice);
+        const saved=await supabase.from("personnel_pa_assessments").update({status:"submitted"}).eq("id",res.data.id).select().single();
+        if(saved.error)throw saved.error;return saved.data;
+      })(),error:null};}catch(err){res={error:err};}
+    }
+    buttonLoading(btn,false);if(res.error)return toast("บันทึก PA2 ไม่สำเร็จ",res.error.message,"error");close();toast(status==="submitted"?"ส่งผลและลงนาม PA2 แล้ว":"บันทึกฉบับร่างแล้ว",status==="submitted"?`คะแนนรวม ${personnelPa2Number(res.data.total_score,1)} / 100`:`สามารถกลับมาประเมินต่อได้ภายในช่วงเวลาที่กำหนด`,"success");await loadPersonnelPaWorkspace();await renderDashboard();};
+  modal.querySelector("#pa2-save-draft")?.addEventListener("click",e=>save("draft",e.currentTarget));modal.querySelector("#pa2-submit")?.addEventListener("click",e=>{const btn=e.currentTarget;return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนส่งผลประเมิน PA2",choice=>save("submitted",btn,choice));});modal.querySelector("#pa2-assessment-pdf")?.addEventListener("click",()=>personnelPa2OpenAssessmentPdf(ctx));modal.querySelector("#pa2-reset-current")?.addEventListener("click",async()=>{const id=assessment?.id,name=person.full_name||report.person_name_snapshot||"ผู้รับการประเมิน";close();await personnelPa2ResetAssessment(id,name);});
 }
 
 function personnelPa2PdfStyles(){return `${officialPdfFontFaceCss()}@page{size:A4 portrait;margin:16mm 15mm 15mm}*{box-sizing:border-box}html,body{margin:0;padding:0;font-family:"TH SarabunIT๙","THSarabunIT๙",serif;color:#111}.pa2-pdf{font-size:16pt;line-height:1.22}.pa2-pdf-head{text-align:center;border-bottom:1.2px solid #111;padding-bottom:3mm;margin-bottom:4mm}.pa2-pdf-head h1{font-size:21pt;margin:0}.pa2-pdf-head h2{font-size:18pt;margin:1mm 0}.pa2-pdf-meta{display:grid;grid-template-columns:1fr 1fr;border:1px solid #777;margin-bottom:4mm}.pa2-pdf-meta div{padding:1.5mm 2mm;border-bottom:1px solid #aaa}.pa2-pdf-meta div:nth-child(odd){border-right:1px solid #aaa}.pa2-pdf-meta .wide{grid-column:1/-1;border-right:0}.pa2-pdf h3{font-size:17pt;margin:4mm 0 1.5mm;border-bottom:1px solid #555;padding-bottom:1mm}.pa2-pdf-table{width:100%;border-collapse:collapse;font-size:14.5pt;line-height:1.15}.pa2-pdf-table th,.pa2-pdf-table td{border:1px solid #555;padding:1.4mm 1.5mm;vertical-align:top}.pa2-pdf-table th{background:#f1f1f1}.pa2-pdf-table .score{text-align:center;width:20mm}.pa2-pdf-table tr{break-inside:avoid}.pa2-pdf-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:2mm;margin:4mm 0}.pa2-pdf-summary div{border:1px solid #555;padding:2mm;text-align:center}.pa2-pdf-summary strong{display:block;font-size:19pt}.pa2-pdf-result{border:1.4px solid #111;padding:2.5mm;margin-top:3mm}.pa2-pdf-comment{margin-top:4mm;border-top:1px solid #777;padding-top:2mm}.pa2-pdf-sign{width:88mm;margin:9mm 0 0 auto;text-align:center;break-inside:avoid}.pa2-pdf-sign .sign-label{margin-bottom:1mm}.pa2-pdf-signature-img{display:block;max-width:42mm;max-height:17mm;object-fit:contain;margin:0 auto 1mm}.pa2-pdf-signature-space{height:14mm}.pa2-pdf-sign .role{font-weight:700}.pa2-pdf-sign .signed-at{display:block;font-size:12.5pt;color:#555;margin-top:1mm}.pa2-pdf-foot{margin-top:8mm;padding-top:2mm;border-top:1px solid #bbb;font-size:12.5pt;color:#555;display:flex;justify-content:space-between}@media print{body{background:#fff}}`;}
@@ -3999,17 +4041,17 @@ function personnelPaOnePageModal(){
     if(submitBtn)submitBtn.disabled=stats.issues.length>0;
   };
   form.querySelectorAll("[data-pa-word-field]").forEach(el=>el.addEventListener("input",refreshWordCounts));refreshWordCounts();
-  const save=async(status,btn)=>{
+  const save=async(status,btn,choice=null)=>{
     if(status==="submitted"&&!form.reportValidity())return;
     const data=Object.fromEntries(new FormData(form).entries()),stats=personnelPaOnePageWordStats(data);
     if(status==="submitted"&&stats.issues.length)return toast("จำนวนคำเกินกำหนด",personnelPaOnePageWordError(data),"error");
     buttonLoading(btn,true,status==="submitted"?"กำลังตรวจและส่ง...":"กำลังบันทึก...");
-    try{await personnelPaSaveOnePage(data,status);close();toast(status==="submitted"?"ส่ง PA แล้ว":"บันทึกฉบับร่างแล้ว",status==="submitted"?"ระบบตรวจจำนวนคำและพื้นที่ A4 แล้วบันทึก PA 1 หน้าเรียบร้อย":"ฉบับร่างยังไม่ถือว่าส่ง","success");await loadPersonnelPaWorkspace();await renderDashboard();}catch(err){toast("บันทึก PA ไม่สำเร็จ",err.message||String(err),"error");}finally{buttonLoading(btn,false);refreshWordCounts();}
+    try{await personnelPaSaveOnePage(data,status,choice);close();toast(status==="submitted"?"ส่ง PA แล้ว":"บันทึกฉบับร่างแล้ว",status==="submitted"?"ระบบตรวจจำนวนคำและพื้นที่ A4 แล้วบันทึก PA 1 หน้าเรียบร้อย":"ฉบับร่างยังไม่ถือว่าส่ง","success");await loadPersonnelPaWorkspace();await renderDashboard();}catch(err){toast("บันทึก PA ไม่สำเร็จ",err.message||String(err),"error");}finally{buttonLoading(btn,false);refreshWordCounts();}
   };
-  modal.querySelector("#pa-one-page-draft")?.addEventListener("click",e=>save("draft",e.currentTarget));submitBtn.addEventListener("click",e=>save("submitted",e.currentTarget));
+  modal.querySelector("#pa-one-page-draft")?.addEventListener("click",e=>save("draft",e.currentTarget));submitBtn.addEventListener("click",e=>{const btn=e.currentTarget;if(!form.reportValidity())return;return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนส่ง PA ต้นปี",choice=>save("submitted",btn,choice));});
 }
 
-async function personnelPaSaveOnePage(data,status){
+async function personnelPaSaveOnePage(data,status,choice=null){
   const period=personnelPaSelectedPeriod();if(!period)throw new Error("ไม่พบรอบ PA");
   const old=state.personnelPaSubmission,oldFile=old?.full_file_path||null;
   const payload={period_id:period.id,user_id:state.user.id,submission_mode:"one_page",status,pa_title:String(data.pa_title||"").trim(),workload_summary:String(data.workload_summary||"").trim(),challenge_title:String(data.challenge_title||"").trim(),challenge_context:String(data.challenge_context||"").trim(),quantitative_target:String(data.quantitative_target||"").trim(),qualitative_target:String(data.qualitative_target||"").trim(),development_methods:String(data.development_methods||"").trim(),success_indicators:String(data.success_indicators||"").trim(),evidence_plan:String(data.evidence_plan||"").trim(),full_file_bucket:null,full_file_path:null,full_file_name:null,full_file_size:null,full_file_mime_type:null,updated_by:state.user.id};
@@ -4018,7 +4060,20 @@ async function personnelPaSaveOnePage(data,status){
     const measured=await personnelPaMeasureOnePage({...old,...payload},period);
     if(!measured.fits)throw new Error("แม้จำนวนคำไม่เกินกำหนด แต่เนื้อหายังล้นพื้นที่ A4 1 หน้า กรุณาลดการขึ้นบรรทัดหรือย่อข้อความบางส่วน");
   }
-  let res;if(old?.id)res=await supabase.from("personnel_pa_submissions").update(payload).eq("id",old.id).select().single();else res=await supabase.from("personnel_pa_submissions").insert({...payload,created_by:state.user.id}).select().single();if(res.error)throw res.error;
+  let res;
+  if(status==="submitted"){
+    if(old?.id){
+      await bnkRecordActionSignature("personnel_pa",old.id,"pa_start",choice);
+      res=await supabase.from("personnel_pa_submissions").update(payload).eq("id",old.id).select().single();
+    }else{
+      res=await supabase.from("personnel_pa_submissions").insert({...payload,status:"draft",created_by:state.user.id}).select().single();
+      if(!res.error)res={data:await bnkCompleteSignedDraft("personnel_pa_submissions",res.data,"pa_start",choice),error:null};
+    }
+  }else{
+    res=old?.id?await supabase.from("personnel_pa_submissions").update(payload).eq("id",old.id).select().single():
+      await supabase.from("personnel_pa_submissions").insert({...payload,created_by:state.user.id}).select().single();
+  }
+  if(res.error)throw res.error;
   if(oldFile&&old?.submission_mode==="full_file"){const rm=await supabase.storage.from(old.full_file_bucket||"personnel-pa").remove([oldFile]);if(rm.error)console.warn("PA old file cleanup",rm.error);}
   return res.data;
 }
@@ -4029,15 +4084,29 @@ function personnelPaFullFileModal(){
   const s=current.submission_mode==="full_file"?current:{challenge_title:current.challenge_title||""};
   const modal=document.createElement("div");modal.className="modal-backdrop";modal.innerHTML=`<div class="modal modal-wide"><div class="modal-head"><div><span class="form-type-badge">PA ฉบับเต็ม · ปีงบประมาณ ${period.fiscal_year}</span><h3>แนบไฟล์บันทึกข้อตกลง PA</h3><p>กรอกข้อมูลสรุปเพียงเล็กน้อย แล้วแนบไฟล์ PDF รูปเล่มฉบับเต็ม</p></div><button class="modal-close">×</button></div><form id="pa-full-file-form" class="form-grid"><div class="field"><label>ชื่อ / เรื่องของ PA</label><input class="input" name="pa_title" maxlength="250" required value="${escapeHtml(s.pa_title||"")}" placeholder="เช่น ข้อตกลงในการพัฒนางานของ... ปีงบประมาณ..."></div><div class="field"><label>ชื่อประเด็นท้าทาย</label><textarea class="input textarea" name="challenge_title" maxlength="350" required>${escapeHtml(s.challenge_title||"")}</textarea></div><div class="field"><label>ไฟล์ PA ฉบับเต็ม (PDF)</label>${s.full_file_path?`<div class="pa-existing-file"><strong>ไฟล์ปัจจุบัน</strong><span>${escapeHtml(s.full_file_name||"PA.pdf")}</span><button class="mini-link" type="button" id="pa-full-current-file">เปิดไฟล์</button></div>`:""}<label class="upload-zone"><input id="pa-full-file-input" type="file" accept="application/pdf,.pdf"><strong>${s.full_file_path?"เลือก PDF ใหม่เพื่อแทนที่":"เลือกไฟล์ PA PDF"}</strong><span>PDF เท่านั้น · ไม่เกิน 25 MB</span></label></div></form><div class="modal-actions"><button class="btn btn-ghost modal-cancel">ยกเลิก</button>${state.personnelPaSubmission?.status!=="submitted"?`<button class="btn btn-secondary" id="pa-full-draft">บันทึกฉบับร่าง</button>`:""}<button class="btn btn-primary" id="pa-full-submit">${state.personnelPaSubmission?.status==="submitted"?"บันทึกและส่งอีกครั้ง":"บันทึกและส่ง PA"}</button></div></div>`;
   document.body.appendChild(modal);const close=()=>modal.remove();modal.querySelector(".modal-close").onclick=close;modal.querySelector(".modal-cancel").onclick=close;modal.querySelector("#pa-full-current-file")?.addEventListener("click",()=>personnelPaOpenFullFile(s));
-  const save=async(status,btn)=>{const form=modal.querySelector("#pa-full-file-form");if(status==="submitted"&&!form.reportValidity())return;const data=Object.fromEntries(new FormData(form).entries()),file=modal.querySelector("#pa-full-file-input").files?.[0]||null;if(status==="submitted"&&!file&&!s.full_file_path)return toast("ยังไม่มีไฟล์ PA","กรุณาเลือกไฟล์ PDF ก่อนส่ง","error");buttonLoading(btn,true,status==="submitted"?"กำลังอัปโหลดและส่ง...":"กำลังบันทึก...");try{await personnelPaSaveFullFile(data,file,status);close();toast(status==="submitted"?"ส่ง PA แล้ว":"บันทึกฉบับร่างแล้ว",status==="submitted"?"ระบบบันทึก PA ฉบับเต็มเรียบร้อย":"ฉบับร่างยังไม่ถือว่าส่ง","success");await loadPersonnelPaWorkspace();await renderDashboard();}catch(err){toast("บันทึก PA ไม่สำเร็จ",err.message||String(err),"error");}finally{buttonLoading(btn,false);}};
-  modal.querySelector("#pa-full-draft")?.addEventListener("click",e=>save("draft",e.currentTarget));modal.querySelector("#pa-full-submit").addEventListener("click",e=>save("submitted",e.currentTarget));
+  const save=async(status,btn,choice=null)=>{const form=modal.querySelector("#pa-full-file-form");if(status==="submitted"&&!form.reportValidity())return;const data=Object.fromEntries(new FormData(form).entries()),file=modal.querySelector("#pa-full-file-input").files?.[0]||null;if(status==="submitted"&&!file&&!s.full_file_path)return toast("ยังไม่มีไฟล์ PA","กรุณาเลือกไฟล์ PDF ก่อนส่ง","error");buttonLoading(btn,true,status==="submitted"?"กำลังอัปโหลดและส่ง...":"กำลังบันทึก...");try{await personnelPaSaveFullFile(data,file,status,choice);close();toast(status==="submitted"?"ส่ง PA แล้ว":"บันทึกฉบับร่างแล้ว",status==="submitted"?"ระบบบันทึก PA ฉบับเต็มเรียบร้อย":"ฉบับร่างยังไม่ถือว่าส่ง","success");await loadPersonnelPaWorkspace();await renderDashboard();}catch(err){toast("บันทึก PA ไม่สำเร็จ",err.message||String(err),"error");}finally{buttonLoading(btn,false);}};
+  modal.querySelector("#pa-full-draft")?.addEventListener("click",e=>save("draft",e.currentTarget));modal.querySelector("#pa-full-submit").addEventListener("click",e=>{const btn=e.currentTarget;if(!form.reportValidity())return;return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนส่ง PA ฉบับเต็ม",choice=>save("submitted",btn,choice));});
 }
 
-async function personnelPaSaveFullFile(data,file,status){
+async function personnelPaSaveFullFile(data,file,status,choice=null){
   const period=personnelPaSelectedPeriod();if(!period)throw new Error("ไม่พบรอบ PA");const old=state.personnelPaSubmission;let newPath=null,newMeta={};
   if(file){if(file.type!=="application/pdf"&&!/\.pdf$/i.test(file.name))throw new Error("รองรับเฉพาะไฟล์ PDF");if(file.size>25*1024*1024)throw new Error("ไฟล์ PDF ต้องมีขนาดไม่เกิน 25 MB");newPath=`${state.user.id}/${period.id}/${crypto.randomUUID()}.pdf`;const up=await supabase.storage.from("personnel-pa").upload(newPath,file,{contentType:"application/pdf",upsert:false,cacheControl:"3600"});if(up.error)throw up.error;newMeta={full_file_bucket:"personnel-pa",full_file_path:newPath,full_file_name:file.name,full_file_size:file.size,full_file_mime_type:"application/pdf"};}
   const payload={period_id:period.id,user_id:state.user.id,submission_mode:"full_file",status,pa_title:String(data.pa_title||"").trim(),challenge_title:String(data.challenge_title||"").trim(),updated_by:state.user.id,...(newPath?newMeta:{full_file_bucket:old?.full_file_bucket||null,full_file_path:old?.full_file_path||null,full_file_name:old?.full_file_name||null,full_file_size:old?.full_file_size||null,full_file_mime_type:old?.full_file_mime_type||null})};
-  try{let res;if(old?.id)res=await supabase.from("personnel_pa_submissions").update(payload).eq("id",old.id).select().single();else res=await supabase.from("personnel_pa_submissions").insert({...payload,created_by:state.user.id}).select().single();if(res.error)throw res.error;if(newPath&&old?.full_file_path&&old.full_file_path!==newPath){const rm=await supabase.storage.from(old.full_file_bucket||"personnel-pa").remove([old.full_file_path]);if(rm.error)console.warn("PA old file cleanup",rm.error);}return res.data;}catch(err){if(newPath)await supabase.storage.from("personnel-pa").remove([newPath]);throw err;}
+  try{
+     let res;
+     if(status==="submitted"){
+       if(old?.id){
+         await bnkRecordActionSignature("personnel_pa",old.id,"pa_start",choice);
+         res=await supabase.from("personnel_pa_submissions").update(payload).eq("id",old.id).select().single();
+       }else{
+         res=await supabase.from("personnel_pa_submissions").insert({...payload,status:"draft",created_by:state.user.id}).select().single();
+         if(!res.error)res={data:await bnkCompleteSignedDraft("personnel_pa_submissions",res.data,"pa_start",choice),error:null};
+       }
+     }else{
+       res=old?.id?await supabase.from("personnel_pa_submissions").update(payload).eq("id",old.id).select().single():
+         await supabase.from("personnel_pa_submissions").insert({...payload,created_by:state.user.id}).select().single();
+     }
+     if(res.error)throw res.error;if(newPath&&old?.full_file_path&&old.full_file_path!==newPath){const rm=await supabase.storage.from(old.full_file_bucket||"personnel-pa").remove([old.full_file_path]);if(rm.error)console.warn("PA old file cleanup",rm.error);}return res.data;}catch(err){if(newPath)await supabase.storage.from("personnel-pa").remove([newPath]);throw err;}
 }
 
 async function personnelPaOpenFullFile(submission){
@@ -6558,7 +6627,18 @@ async function clearSelectedTimetable() {
   await renderDashboard();
 }
 
-function timetableLiveSignature(title,name,subtitle="",image=null) {
+async function bnkOwnTimetableSignatureAsset(userId){
+   if(!userId||userId!==state.user?.id)return null;
+   const prefs=await refreshMySignatureProfile();
+   if(!prefs?.auto_sign_enabled||prefs.preferred_method==="paper")return null;
+   const sig=(state.signatures||[]).find(s=>s.id===prefs.default_signature_id)||
+       (state.signatures||[]).find(s=>s.is_default)||null;
+   if(!sig?.storage_path)return null;
+   const {data,error}=await supabase.storage.from(sig.bucket_id||"signatures").download(sig.storage_path);
+   if(error||!data)return null;
+   return {image:await blobToDataUrl(data),signer_user_id:userId};
+ }
+ function timetableLiveSignature(title,name,subtitle="",image=null) {
   return `<div class="timetable-sign">${image?`<img class="timetable-sign-image" src="${image}" alt="ลายเซ็น">`:`<div class="timetable-sign-space"></div>`}<div>ลงชื่อ............................................................</div><span>(${escapeHtml(name||"................................................")})</span><strong>${escapeHtml(title)}</strong>${subtitle?`<small>${escapeHtml(subtitle)}</small>`:""}</div>`;
 }
 
@@ -6631,7 +6711,7 @@ function buildClassTimetableA4(classId,assets={}) {
   return `<article class="a4-document"><div class="a4-document-inner">
     <header class="tt-head">${assets.schoolLogo?`<img class="a4-school-logo" src="${assets.schoolLogo}" alt="ตราโรงเรียน">`:""}<h1>ตารางจัดการเรียนรู้ ${escapeHtml(schoolName())}</h1><h2>ปีการศึกษา ${escapeHtml(data.c.academic_year)} ภาคเรียนที่ ${data.c.semester}</h2></header>
     <div class="tt-owner">${escapeHtml(schoolClassLabel(data.c))}</div>${buildTimetablePdfTable(data)}
-    <div class="tt-signatures">${timetableLiveSignature("ครูประจำชั้น",firstTeacher)}${timetableLiveSignature("หัวหน้ากลุ่มงานบริหารงานวิชาการ",data.tp.academic_head_name)}${timetableLiveSignature("ผู้อำนวยการโรงเรียน",assets.directorSignature?.signer_name||data.tp.director_name,"",assets.directorSignature?.image||null)}</div>
+    <div class="tt-signatures">${timetableLiveSignature("ครูประจำชั้น",firstTeacher,"",homeroomIds.includes(state.user?.id)?assets.teacherSignature?.image:null)}${timetableLiveSignature("หัวหน้ากลุ่มงานบริหารงานวิชาการ",data.tp.academic_head_name,"",isAcademicHead()?assets.teacherSignature?.image:null)}${timetableLiveSignature("ผู้อำนวยการโรงเรียน",assets.directorSignature?.signer_name||data.tp.director_name,"",assets.directorSignature?.image||null)}</div>
   </div></article>`;
 }
 
@@ -6653,7 +6733,7 @@ function buildTeacherTimetableA4(teacherId,assets={}) {
   return `<article class="a4-document"><div class="a4-document-inner">
     <header class="tt-head">${assets.schoolLogo?`<img class="a4-school-logo" src="${assets.schoolLogo}" alt="ตราโรงเรียน">`:""}<h1>ตารางจัดการเรียนรู้ ${escapeHtml(schoolName())}</h1><h2>ปีการศึกษา ${p.academicYear} ภาคเรียนที่ ${p.semester}</h2></header>
     <div class="tt-owner">${escapeHtml(name)}</div>${buildTimetablePdfTable(data)}
-    <div class="tt-signatures">${timetableLiveSignature("ครูผู้สอน",name)}${timetableLiveSignature("หัวหน้ากลุ่มงานบริหารงานวิชาการ",profile?.academic_head_name)}${timetableLiveSignature("ผู้อำนวยการโรงเรียน",assets.directorSignature?.signer_name||profile?.director_name,"",assets.directorSignature?.image||null)}</div>
+    <div class="tt-signatures">${timetableLiveSignature("ครูผู้สอน",name,"",teacherId===state.user?.id?assets.teacherSignature?.image:null)}${timetableLiveSignature("หัวหน้ากลุ่มงานบริหารงานวิชาการ",profile?.academic_head_name,"",isAcademicHead()?assets.teacherSignature?.image:null)}${timetableLiveSignature("ผู้อำนวยการโรงเรียน",assets.directorSignature?.signer_name||profile?.director_name,"",assets.directorSignature?.image||null)}</div>
   </div></article>`;
 }
 
@@ -6663,7 +6743,7 @@ async function timetablePdfPreview(kind,id) {
   const modal=document.createElement("div");modal.className="modal-backdrop a4-preview-backdrop";
   modal.innerHTML=`<div class="a4-preview-shell"><div class="a4-preview-toolbar"><div><strong>${kind==="class"?"ตารางเรียนของนักเรียน":"ตารางสอนของครู"}</strong><span>A4 แนวนอน · TH SarabunIT๙ · รองรับลายเซ็นผู้บริหารอัตโนมัติตามนโยบายกลาง</span></div><div class="a4-preview-actions"><button class="btn btn-ghost" id="tt-a4-close">ปิด</button><button class="btn btn-primary" id="tt-a4-print">พิมพ์ / บันทึก PDF</button></div></div><div class="a4-preview-loading">กำลังเตรียมเอกสาร...</div></div>`;
   document.body.appendChild(modal);modal.querySelector("#tt-a4-close").addEventListener("click",()=>modal.remove());
-  const [schoolLogo,directorSignature]=await Promise.all([schoolLogoDataUrl(),centralAutoSignatureAsset("timetable_management",id)]); const body=kind==="class"?buildClassTimetableA4(id,{schoolLogo,directorSignature}):buildTeacherTimetableA4(id,{schoolLogo,directorSignature});
+  const [schoolLogo,directorSignature,teacherSignature]=await Promise.all([schoolLogoDataUrl(),centralAutoSignatureAsset("timetable_management",id),bnkOwnTimetableSignatureAsset(state.user?.id)]); const body=kind==="class"?buildClassTimetableA4(id,{schoolLogo,directorSignature,teacherSignature}):buildTeacherTimetableA4(id,{schoolLogo,directorSignature,teacherSignature});
   modal.querySelector(".a4-preview-loading").outerHTML=`<div class="a4-preview-scroll"><style>${timetableA4Styles()}</style>${body}</div>`;
   modal.querySelector("#tt-a4-print").addEventListener("click",()=>{
     const w=window.open("","_blank");if(!w)return toast("เปิดหน้าพิมพ์ไม่ได้","กรุณาอนุญาต Pop-up","error");
@@ -6675,9 +6755,9 @@ async function timetablePdfPreview(kind,id) {
 async function timetableBatchPdfPreview(kind, ids) {
   const validIds=(ids||[]).filter(Boolean);
   if(!validIds.length)return toast("ไม่มีข้อมูลสำหรับ Export","ไม่พบรายการที่มีสิทธิ์ส่งออก","error");
-  const schoolLogo=await schoolLogoDataUrl();
+  const [schoolLogo,teacherSignature]=await Promise.all([schoolLogoDataUrl(),bnkOwnTimetableSignatureAsset(state.user?.id)]);
   const directorSignatures=await Promise.all(validIds.map(id=>centralAutoSignatureAsset("timetable_management",id)));
-  const pages=validIds.map((id,i)=>kind==="class"?buildClassTimetableA4(id,{schoolLogo,directorSignature:directorSignatures[i]}):buildTeacherTimetableA4(id,{schoolLogo,directorSignature:directorSignatures[i]})).filter(Boolean);
+  const pages=validIds.map((id,i)=>kind==="class"?buildClassTimetableA4(id,{schoolLogo,directorSignature:directorSignatures[i],teacherSignature}):buildTeacherTimetableA4(id,{schoolLogo,directorSignature:directorSignatures[i],teacherSignature})).filter(Boolean);
   if(!pages.length)return toast("ยังไม่มีข้อมูลตาราง","ต้องมีตารางที่จัดและมองเห็นได้ก่อน","error");
   const body=`<div class="timetable-batch-doc">${pages.join("")}</div>`;
   const title=kind==="class"?`ตารางเรียนรวม ${pages.length} ห้อง`:`ตารางสอนรวม ${pages.length} คน`;
@@ -6986,15 +7066,17 @@ function substituteDayPlannerHtml() {
   }).join("")}</tbody></table></div>${manageable?`<div class="substitute-day-help"><strong>ข้อมูลประกอบการเลือก</strong><span>Dropdown แสดงเฉพาะครูที่ว่างในคาบนั้น ส่วนรายละเอียดจะแสดงคาบที่ว่างทั้งวันและจำนวนภาระสอนของครูที่เลือก</span></div>`:""}</section></section>`;
 }
 
-async function saveSubstituteDayAssignments() {
+async function saveSubstituteDayAssignments(signChoice=null) {
   const leaveId=state.selectedSubstituteLeaveId,date=state.selectedSubstituteDate,rows=substituteRowsForBatch(leaveId,date),selects=[...document.querySelectorAll("[data-substitute-choice]")],button=document.querySelector("#save-substitute-day");
+  const changed=selects.filter(select=>{const row=rows.find(r=>r.id===select.dataset.substituteChoice);return row&&canManageSubstituteLesson(row)&&(select.value||null)!==row.substitute_teacher_id;});
+  if(changed.some(select=>!!select.value)&&!signChoice)return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนมอบหมายครูสอนแทน",choice=>saveSubstituteDayAssignments(choice));
   buttonLoading(button,true,"กำลังบันทึก...");
   try{
     for(const select of selects){
       const row=rows.find(r=>r.id===select.dataset.substituteChoice); if(!row||!canManageSubstituteLesson(row))continue;
       const chosen=select.value||null; if(chosen===row.substitute_teacher_id)continue;
       if(!chosen&&row.status==="assigned"){const {error}=await supabase.rpc("unassign_substitute_teacher",{p_substitute_lesson_id:row.id,p_comment:"แก้ไขจากหน้าจัดสอนแทนรายวัน"}); if(error)throw error;}
-      else if(chosen){const {error}=await supabase.rpc("assign_substitute_teacher",{p_substitute_lesson_id:row.id,p_teacher_id:chosen,p_note:null}); if(error)throw error;}
+      else if(chosen){const {error}=await supabase.rpc("assign_bnk_substitute_signed",{p_substitute_lesson_id:row.id,p_teacher_id:chosen,p_note:null,p_method:signChoice.method,p_signature_id:signChoice.signatureId}); if(error)throw error;}
     }
     toast("บันทึกการจัดสอนแทนแล้ว","ระบบอัปเดตสถานะให้หัวหน้าบุคคลและผู้อำนวยการเห็นได้ทันที","success");
     state.substituteCandidateMap={}; await loadSubstituteWorkspace(); const fresh=substituteRowsForBatch(leaveId,date); if(fresh.some(canManageSubstituteLesson))await loadSubstituteDayCandidates(fresh); renderDashboard();
@@ -7016,7 +7098,11 @@ async function substituteAssignModal(lessonId) {
   const candidates=data||[],modal=document.createElement("div"); modal.className="modal-backdrop";
   modal.innerHTML=`<div class="modal modal-wide substitute-assign-modal"><div class="modal-head"><div><h3>เลือกครูสอนแทน</h3><p>${thaiDateOnly(lesson.leave_date)} · คาบ ${lesson.period_no} · ${escapeHtml(lesson.class_label)} · ${escapeHtml(lesson.subject_name)}</p></div><button class="modal-close">×</button></div><div class="substitute-candidate-list">${candidates.length?candidates.map(c=>`<div class="substitute-candidate ${c.available?"available":"busy"}"><div class="candidate-icon">${escapeHtml(initials(c.teacher_name||"ครู"))}</div><div class="candidate-main"><strong>${escapeHtml(c.teacher_name)}</strong><span>${c.available?`ว่างคาบ ${escapeHtml(c.free_periods||"—")}`:escapeHtml(c.conflict_reason||"ไม่ว่าง")}</span><small>วันนี้มีภาระสอน ${Number(c.workload||0)} คาบ${c.busy_periods?` · ไม่ว่างคาบ ${escapeHtml(c.busy_periods)}`:""}</small></div>${c.available?`<button class="btn btn-primary" data-pick-substitute="${c.teacher_id}">เลือกครูนี้</button>`:`<span class="pill suspended">ติดคาบ</span>`}</div>`).join(""):`<div class="empty"><strong>ไม่พบครูในระบบ</strong></div>`}</div><div class="modal-actions"><button class="btn btn-ghost modal-cancel">ปิด</button></div></div>`;
   document.body.appendChild(modal); const close=()=>modal.remove(); modal.querySelector(".modal-close").addEventListener("click",close); modal.querySelector(".modal-cancel").addEventListener("click",close);
-  modal.querySelectorAll("[data-pick-substitute]").forEach(btn=>btn.addEventListener("click",async()=>{buttonLoading(btn,true,"กำลังมอบหมาย..."); const {error:assignError}=await supabase.rpc("assign_substitute_teacher",{p_substitute_lesson_id:lessonId,p_teacher_id:btn.dataset.pickSubstitute,p_note:null}); buttonLoading(btn,false); if(assignError)return toast("มอบหมายไม่สำเร็จ",friendlySubstituteError(assignError),"error"); close(); toast("มอบหมายครูสอนแทนแล้ว","","success"); await renderDashboard();}));
+  modal.querySelectorAll("[data-pick-substitute]").forEach(btn=>btn.addEventListener("click",async()=>{buttonLoading(btn,true,"กำลังมอบหมาย..."); const teacherId=btn.dataset.pickSubstitute;buttonLoading(btn,false);
+   return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนมอบหมายครูสอนแทน",async choice=>{
+     const {error:assignError}=await supabase.rpc("assign_bnk_substitute_signed",{p_substitute_lesson_id:lessonId,p_teacher_id:teacherId,p_note:null,p_method:choice.method,p_signature_id:choice.signatureId});
+     if(assignError)throw assignError;close();toast("มอบหมายครูสอนแทนพร้อมบันทึกผู้มอบหมายแล้ว","","success");await renderDashboard();
+   });}));
 }
 
 async function unassignSelectedSubstitute() {
@@ -7306,9 +7392,20 @@ function budgetRequestModal(p,a=null){
   const getItems=()=>[...list.querySelectorAll(".budget-line-item")].map(row=>({description:row.querySelector("[data-budget-line-description]").value.trim(),amount:Number(row.querySelector("[data-budget-line-amount]").value||0)}));
   const refresh=()=>{const items=getItems(),total=items.reduce((s,x)=>s+(x.amount>0?x.amount:0),0),remaining=available-total;totalEl.textContent=`${money(total)} บาท`;remainingEl.textContent=remaining>=0?`คงเหลือหลังขอเบิก ${money(remaining)} บาท`:`เกินวงเงิน ${money(Math.abs(remaining))} บาท`;remainingEl.classList.toggle("over",remaining<0);const filled=items.filter(x=>x.description||x.amount>0);summaryEl.innerHTML=filled.length?filled.map((x,i)=>`<span>${i+1}. ${escapeHtml(x.description||"ยังไม่ระบุรายการ")} <b>${money(x.amount)} บาท</b></span>`).join(""):"ยังไม่ได้กรอกรายการ";const rows=[...list.querySelectorAll(".budget-line-item")];rows.forEach(row=>row.querySelector(".budget-line-remove").disabled=rows.length===1);};
   m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;m.querySelector("#add-budget-line").onclick=()=>addLine();list.addEventListener("input",refresh);list.addEventListener("click",e=>{const btn=e.target.closest(".budget-line-remove");if(!btn||btn.disabled)return;btn.closest(".budget-line-item")?.remove();refresh();});addLine();
-  m.querySelectorAll("[data-save-budget]").forEach(btn=>btn.onclick=async()=>{const f=m.querySelector("#budget-form");if(!f.reportValidity())return;const items=getItems();if(!items.length||items.some(x=>!x.description||x.amount<=0))return toast("กรอกรายการใช้เงินให้ครบ","แต่ละรายการต้องมีรายละเอียดและจำนวนเงินมากกว่า 0 บาท","error");const total=items.reduce((s,x)=>s+x.amount,0);if(total>available)return toast("ยอดรวมเกินวงเงิน",`ยอดรวม ${money(total)} บาท แต่วงเงินที่ขอเบิกได้คือ ${money(available)} บาท`,"error");const d=new FormData(f),summary=items.map(x=>`${x.description} - ${money(x.amount)} บาท`).join("\n"),payload={project_id:p.id,activity_id:a?.id||null,request_round:1,request_date:d.get("request_date"),academic_year:Number(d.get("academic_year")),semester:Number(d.get("semester")),description:summary,amount:total,line_items:items,requester_id:state.user.id,requester_name:state.profile.full_name||state.profile.email,department_code:p.department_code,status:btn.dataset.saveBudget,signers:{},notes:String(d.get("notes")||"").trim()||null};buttonLoading(btn,true,"กำลังบันทึก...");const {data,error}=await supabase.from("budget_disbursements").insert(payload).select().single();buttonLoading(btn,false);if(error)return toast("บันทึกคำขอเบิกไม่สำเร็จ",error.message,"error");close();state.selectedProjectId=null;state.selectedProjectActivityId=null;state.selectedDisbursementId=data.id;state.projectView="budget";toast(btn.dataset.saveBudget==="document_ready"?"จัดทำคำขอเบิกแล้ว":"บันทึกฉบับร่างแล้ว",`เลขคุม ${data.control_number||"—"} · ${items.length} รายการ · รวม ${money(total)} บาท`,"success");await renderDashboard();});
+  m.querySelectorAll("[data-save-budget]").forEach(btn=>btn.onclick=async()=>{const ready=btn.dataset.saveBudget==="document_ready";const perform=async(choice=null)=>{const f=m.querySelector("#budget-form");if(!f.reportValidity())return;const items=getItems();if(!items.length||items.some(x=>!x.description||x.amount<=0))return toast("กรอกรายการใช้เงินให้ครบ","แต่ละรายการต้องมีรายละเอียดและจำนวนเงินมากกว่า 0 บาท","error");const total=items.reduce((s,x)=>s+x.amount,0);if(total>available)return toast("ยอดรวมเกินวงเงิน",`ยอดรวม ${money(total)} บาท แต่วงเงินที่ขอเบิกได้คือ ${money(available)} บาท`,"error");const d=new FormData(f),summary=items.map(x=>`${x.description} - ${money(x.amount)} บาท`).join("\n"),payload={project_id:p.id,activity_id:a?.id||null,request_round:1,request_date:d.get("request_date"),academic_year:Number(d.get("academic_year")),semester:Number(d.get("semester")),description:summary,amount:total,line_items:items,requester_id:state.user.id,requester_name:state.profile.full_name||state.profile.email,department_code:p.department_code,status:btn.dataset.saveBudget,signers:{},notes:String(d.get("notes")||"").trim()||null};buttonLoading(btn,true,"กำลังบันทึก...");const {data,error}=await supabase.from("budget_disbursements").insert({...payload,status:"draft"}).select().single();
+    if(error){buttonLoading(btn,false);return toast("บันทึกคำขอเบิกไม่สำเร็จ",error.message,"error");}
+    if(ready){try{
+      await bnkRecordActionSignature("budget_disbursement",data.id,"document_ready",choice);
+      const next=await supabase.from("budget_disbursements").update({status:"document_ready"}).eq("id",data.id);
+      if(next.error)throw next.error;
+    }catch(err){buttonLoading(btn,false);throw err;}}
+    buttonLoading(btn,false);close();state.selectedProjectId=null;state.selectedProjectActivityId=null;state.selectedDisbursementId=data.id;state.projectView="budget";toast(btn.dataset.saveBudget==="document_ready"?"จัดทำคำขอเบิกแล้ว":"บันทึกฉบับร่างแล้ว",`เลขคุม ${data.control_number||"—"} · ${items.length} รายการ · รวม ${money(total)} บาท`,"success");await renderDashboard();};if(ready)return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนจัดทำคำขอเบิก",perform);return perform();});
 }
-async function prepareBudgetRequest(r){const {error}=await supabase.from("budget_disbursements").update({status:"document_ready"}).eq("id",r.id);if(error)return toast("จัดทำเอกสารไม่สำเร็จ",error.message,"error");await renderDashboard();}
+async function prepareBudgetRequest(r){return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนจัดทำคำขอเบิก",async choice=>{
+   await bnkRecordActionSignature("budget_disbursement",r.id,"document_ready",choice);
+   const {error}=await supabase.from("budget_disbursements").update({status:"document_ready"}).eq("id",r.id);
+   if(error)throw error;toast("จัดทำเอกสารพร้อมลายเซ็นแล้ว","","success");await renderDashboard();
+ });}
 function budgetPeopleForSlot(r,slot){
   const people=state.publicPersonnelDirectory||[];
   if(slot==="department_head")return people.filter(x=>x.role==="department_head"&&x.department_code===r.department_code);
@@ -9094,7 +9191,14 @@ function academicDocumentServiceFormModal(existing=null){
     const payload={academic_year:String(existing?.academic_year||state.academicRegistrationAcademicYear),semester:String(existing?.semester||state.academicRegistrationSemester),request_date:fd.get("request_date"),student_id:isManual?null:(existing?.student_id||st?.student_id||null),student_prefix:isManual?String(fd.get("student_prefix")||"").trim():st?.prefix||null,student_first_name:isManual?String(fd.get("student_first_name")||"").trim():st?.first_name||null,student_last_name:isManual?String(fd.get("student_last_name")||"").trim():st?.last_name||null,student_code:isManual?String(fd.get("student_code")||"").trim():st?.student_code||null,class_label:isManual?String(fd.get("class_label")||"").trim():st?.class_label||null,applicant_prefix:fd.get("applicant_prefix")||null,applicant_first_name:String(fd.get("applicant_first_name")||"").trim(),applicant_last_name:String(fd.get("applicant_last_name")||"").trim(),applicant_house_no:String(fd.get("applicant_house_no")||"").trim(),applicant_village_no:String(fd.get("applicant_village_no")||"").trim(),applicant_village_name:String(fd.get("applicant_village_name")||"").trim(),applicant_subdistrict:String(fd.get("applicant_subdistrict")||"").trim(),applicant_district:String(fd.get("applicant_district")||"").trim(),applicant_province:String(fd.get("applicant_province")||"").trim(),applicant_phone:String(fd.get("applicant_phone")||"").trim(),applicant_email:String(fd.get("applicant_email")||"").trim(),graduation_year:String(fd.get("graduation_year")||"").trim(),doc_transcript:e.currentTarget.elements.doc_transcript.checked,doc_transcript_lost:e.currentTarget.elements.doc_transcript_lost.checked,doc_certificate:e.currentTarget.elements.doc_certificate.checked,doc_certificate_with_grade:e.currentTarget.elements.doc_certificate_with_grade.checked,doc_other:e.currentTarget.elements.doc_other.checked,doc_other_note:String(fd.get("doc_other_note")||"").trim(),purpose_text:String(fd.get("purpose_text")||"").trim(),evidence_student_id_count:Number(fd.get("evidence_student_id_count")||0),evidence_father_id_count:Number(fd.get("evidence_father_id_count")||0),evidence_mother_id_count:Number(fd.get("evidence_mother_id_count")||0),evidence_photo_count:Number(fd.get("evidence_photo_count")||0),evidence_police_report:e.currentTarget.elements.evidence_police_report.checked,evidence_other:e.currentTarget.elements.evidence_other.checked,evidence_other_note:String(fd.get("evidence_other_note")||"").trim()};
     if(!payload.applicant_first_name)return toast("กรอกข้อมูลผู้ขอ","กรุณาระบุชื่อผู้ขอรับเอกสาร","error");if(isManual&&!payload.student_first_name)return toast("กรอกข้อมูลนักเรียน","กรุณาระบุชื่อนักเรียน","error");buttonLoading(btn,true,"กำลังบันทึก...");try{const {data,error}=await supabase.rpc("save_academic_document_service_request",{p_request_id:existing?.id||null,p_payload:payload});if(error)throw error;const row=Array.isArray(data)?data[0]:data;if(row)state.academicDocumentServiceRequests=[row,...state.academicDocumentServiceRequests.filter(x=>x.id!==row.id)];state.selectedAcademicDocumentServiceId=null;close();toast("บันทึกคำร้องแล้ว",row?.request_code?`เลขคำร้อง ${academicRegThaiDigits(row.request_code)} · กด “เปิดคำร้อง” เมื่อต้องการดูรายละเอียด`:"","success");await loadAcademicRegistrationWorkspace();await renderDashboard();}catch(err){toast("บันทึกคำร้องไม่สำเร็จ",err.message||String(err),"error");}finally{buttonLoading(btn,false);}}
 }
-async function academicDocumentServiceSubmit(id){if(!confirm("ยืนยันยื่นคำร้องขอรับบริการเอกสารทางการศึกษา?"))return;const {data,error}=await supabase.rpc("submit_academic_document_service_request",{p_request_id:id});if(error)return toast("ยื่นคำร้องไม่สำเร็จ",error.message,"error");const row=Array.isArray(data)?data[0]:data;if(row)state.academicDocumentServiceRequests=[row,...state.academicDocumentServiceRequests.filter(x=>x.id!==row.id)];toast("ยื่นคำร้องแล้ว","ส่งเข้าสู่ขั้นตอนตรวจอนุมัติ","success");await renderDashboard();}
+async function academicDocumentServiceSubmit(id){
+ return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนยื่นคำร้องเอกสารทางการศึกษา",async choice=>{
+  const {error}=await supabase.rpc("submit_bnk_document_signed",{p_system_code:"academic_document_service",p_document_id:id,p_method:choice.method,p_signature_id:choice.signatureId});
+  if(error)throw error;
+  toast("ยื่นคำร้องพร้อมลายเซ็นแล้ว","ส่งเข้าสู่ขั้นตอนตรวจอนุมัติ","success");
+  await loadAcademicRegistrationWorkspace();await renderDashboard();
+ });
+}
 async function academicDocumentServiceDelete(id){const r=academicDocumentServiceRequestById(id);if(!r||!confirm(`ยืนยันลบคำร้อง ${academicRegThaiDigits(r.request_code||"")} ?`))return;try{const sigs=academicDocumentServiceSignaturesFor(id);for(const sig of sigs)if(sig.storage_path)await supabase.storage.from(sig.bucket||"academic-registration").remove([sig.storage_path]);const {error}=await supabase.from("academic_document_service_requests").delete().eq("id",id);if(error)throw error;state.academicDocumentServiceRequests=state.academicDocumentServiceRequests.filter(x=>x.id!==id);state.academicDocumentServiceSignatures=state.academicDocumentServiceSignatures.filter(x=>x.request_id!==id);state.selectedAcademicDocumentServiceId=null;toast("ลบคำร้องแล้ว","ระบบจัดลำดับเลขคำร้องที่เหลือใหม่แล้ว","success");await loadAcademicRegistrationWorkspace();await renderDashboard();}catch(err){toast("ลบคำร้องไม่สำเร็จ",err.message||String(err),"error");}}
 async function academicRegistrationSavedSignaturePicker(work,onSubmit){
   work.innerHTML='<div class="helper">กำลังโหลดลายเซ็นที่บันทึกไว้ในบัญชี...</div>';
@@ -9240,9 +9344,12 @@ function academicCertificateFormModal(existing=null){
   };
 }
 async function academicCertificateSubmit(requestId){
-  if(!confirm("ยืนยันยื่นคำร้องใบรับรองนักเรียน?"))return;
-  const {data,error}=await supabase.rpc("submit_academic_certificate_request",{p_request_id:requestId});if(error)return toast("ยื่นคำร้องไม่สำเร็จ",error.message,"error");
-  const row=Array.isArray(data)?data[0]:data;if(row)state.academicCertificateRequests=[row,...state.academicCertificateRequests.filter(x=>x.id!==row.id)];toast("ยื่นคำร้องแล้ว","เข้าสู่ขั้นตอนตรวจอนุมัติ","success");await renderDashboard();requestAnimationFrame(()=>location.hash=`academic-certificate-detail-${requestId}`);
+ return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนยื่นคำร้องหนังสือรับรองนักเรียน",async choice=>{
+  const {error}=await supabase.rpc("submit_bnk_document_signed",{p_system_code:"academic_certificate",p_document_id:requestId,p_method:choice.method,p_signature_id:choice.signatureId});
+  if(error)throw error;
+  toast("ยื่นคำร้องพร้อมลายเซ็นแล้ว","เข้าสู่ขั้นตอนตรวจอนุมัติ","success");
+  await loadAcademicRegistrationWorkspace();await renderDashboard();
+ });
 }
 async function academicCertificateApproveAll(requestId){
   const r=academicCertificateRequestById(requestId);if(!r)return;
@@ -9749,7 +9856,14 @@ async function academicTransferApproveAll(requestId){
   requestAnimationFrame(()=>{location.hash=`academic-transfer-detail-${requestId}`;});
 }
 
-async function academicTransferSubmit(requestId){if(!confirm("ยืนยันยื่นคำร้อง? หลังยื่นแล้วผู้สร้างจะไม่สามารถแก้ไขแบบร่างได้ เว้นแต่ครูทะเบียน"))return;const {data,error}=await supabase.rpc("submit_academic_transfer_request",{p_request_id:requestId});if(error)return toast("ยื่นคำร้องไม่สำเร็จ",error.message,"error");const row=Array.isArray(data)?data[0]:data;if(row)state.academicTransferRequests=[row,...(state.academicTransferRequests||[]).filter(x=>x.id!==row.id)];toast("ยื่นคำร้องแล้ว","หน้าจออัปเดตสถานะแล้วโดยไม่ต้องรีโหลด","success");await refreshAcademicRegistrationWorkspace({requestId});}
+async function academicTransferSubmit(requestId){
+ return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนยื่นคำร้องย้ายนักเรียน",async choice=>{
+  const {error}=await supabase.rpc("submit_bnk_document_signed",{p_system_code:"academic_transfer",p_document_id:requestId,p_method:choice.method,p_signature_id:choice.signatureId});
+  if(error)throw error;
+  toast("ยื่นคำร้องพร้อมลายเซ็นแล้ว","เข้าสู่ขั้นตอนตรวจอนุมัติ","success");
+  await refreshAcademicRegistrationWorkspace({requestId});
+ });
+}
 async function academicTransferDeleteRequest(requestId){
   const r=academicTransferRequestById(requestId);if(!r)return toast("ไม่พบคำร้อง","","error");
   if(!confirm(`ยืนยันลบคำร้อง ${r.request_code||""} ของ ${r.student_name||"นักเรียน"} ?\nการลบนี้ไม่สามารถย้อนกลับได้`))return;
@@ -14243,8 +14357,14 @@ async function saveLessonPlanFromModal(modal, existing, submitAfter, button) {
     if (driveUrl) await addGoogleDriveAttachment(plan, driveUrl, driveLabel);
 
     if (submitAfter) {
-      const { error } = await supabase.rpc("submit_lesson_plan", { p_lesson_plan_id: plan.id });
-      if (error) throw error;
+      buttonLoading(button,false);
+      return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนส่งแผนการจัดการเรียนรู้",async choice=>{
+        const {error}=await supabase.rpc("submit_bnk_document_signed",{p_system_code:"lesson_plans",p_document_id:plan.id,p_method:choice.method,p_signature_id:choice.signatureId});
+        if(error)throw error;
+        modal.remove();state.selectedLessonPlanId=plan.id;state.lessonPlanMode=type;
+        toast("ส่งแผนพร้อมลายเซ็นแล้ว","ระบบแจ้งผู้ตรวจตามขั้นตอนแล้ว","success");
+        await renderDashboard();
+      });
     }
   } catch (error) {
     buttonLoading(button, false);
@@ -14357,16 +14477,14 @@ async function deleteDraftLessonPlan() {
 }
 
 async function submitSelectedLessonPlan() {
-  const p = state.lessonDetail?.plan;
-  if (!p) return;
-  if (!(state.lessonDetail?.files?.length > 0)) {
-    return toast("ยังส่งแผนไม่ได้", "กรุณาแนบ PDF หรือ Google Drive Link อย่างน้อย 1 รายการก่อนส่ง", "error");
-  }
-  if (!window.confirm("ส่งแผนเข้าสู่ขั้นตอนตรวจสอบหรือไม่? หลังส่งแล้วจะไม่สามารถแก้ไขได้จนกว่าจะถูกส่งกลับ")) return;
-  const { error } = await supabase.rpc("submit_lesson_plan", { p_lesson_plan_id: p.id });
-  if (error) return toast("ส่งแผนไม่สำเร็จ", error.message, "error");
-  toast("ส่งแผนเรียบร้อย", approvalIsParallel("lesson_plans") ? "ผู้ตรวจที่เกี่ยวข้องสามารถตรวจและลงนามได้ทันทีโดยไม่ต้องรอคิว" : "ผู้ตรวจลำดับถัดไปจะได้รับการแจ้งเตือน", "success");
-  await renderDashboard();
+ const p=state.lessonDetail?.plan;
+ if(!p)return;
+ if(!(state.lessonDetail?.files?.length>0))return toast("ยังส่งแผนไม่ได้","กรุณาแนบ PDF หรือ Google Drive Link ก่อนส่ง","error");
+ return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนส่งแผนการจัดการเรียนรู้",async choice=>{
+   const {error}=await supabase.rpc("submit_bnk_document_signed",{p_system_code:"lesson_plans",p_document_id:p.id,p_method:choice.method,p_signature_id:choice.signatureId});
+   if(error)throw error;
+   toast("ส่งแผนพร้อมลายเซ็นแล้ว","ระบบส่งต่อให้ผู้ตรวจตามขั้นตอนแล้ว","success");await renderDashboard();
+ });
 }
 
 function reviewModal(role) {
@@ -15779,7 +15897,16 @@ function bindDashboardEvents() {
   document.querySelectorAll("[data-upload-hv-photo]").forEach(btn=>btn.addEventListener("click",()=>{const r=homeVisitRecord();if(r)uploadHomeVisitPhoto(r,btn.dataset.uploadHvPhoto);}));
   if(state.currentView==="module:home_visit_management"&&state.selectedHomeVisitId)hydrateHomeVisitPhotoPreviews();
   document.querySelectorAll("[data-hv-sign]").forEach(btn=>btn.addEventListener("click",()=>{const r=homeVisitRecord();if(r)homeVisitSignatureModal(r,btn.dataset.hvSign);}));
-  document.querySelector("#toggle-home-visit-complete")?.addEventListener("click",async()=>{const r=homeVisitRecord();if(!r)return;const target=r.status==="complete"?"draft":"complete",{error}=await supabase.from("home_visit_records").update({status:target}).eq("id",r.id);if(error)return toast("เปลี่ยนสถานะไม่สำเร็จ",error.message,"error");await renderDashboard();});
+  document.querySelector("#toggle-home-visit-complete")?.addEventListener("click",async()=>{
+   const r=homeVisitRecord();if(!r)return;
+   if(r.status!=="complete")return bnkSignatureBeforeAction("เลือกลายเซ็นก่อนยืนยันเยี่ยมบ้านเสร็จสมบูรณ์",async choice=>{
+     await bnkRecordActionSignature("home_visit",r.id,"complete",choice);
+     const {error}=await supabase.from("home_visit_records").update({status:"complete"}).eq("id",r.id);
+     if(error)throw error;toast("บันทึกการเยี่ยมบ้านและลายเซ็นแล้ว","","success");await renderDashboard();
+   });
+   const {error}=await supabase.from("home_visit_records").update({status:"draft"}).eq("id",r.id);
+   if(error)return toast("เปลี่ยนสถานะไม่สำเร็จ",error.message,"error");await renderDashboard();
+ });
   document.querySelectorAll("[data-export-home-visit]").forEach(btn=>btn.addEventListener("click",()=>{const r=state.homeVisitRecords.find(x=>x.id===btn.dataset.exportHomeVisit);if(r)homeVisitPdfPreview(r);}));
   document.querySelector("#export-home-visit-class")?.addEventListener("click",()=>homeVisitPdfPreview(homeVisitFilteredRecords()));
   document.querySelector("#export-all-class-timetables")?.addEventListener("click",()=>{const ids=timetableFilteredClasses({visibleOnly:true}).filter(c=>new Set(timetableStudentExportClassIds()).has(c.id)).map(c=>c.id);timetableBatchPdfPreview("class",ids);});
