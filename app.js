@@ -1153,6 +1153,21 @@ async function loadActiveUserData() {
   }
 
   state.notifications = notificationsRes.data || [];
+  // Review tasks are synchronized once per active sign-in, not per page render.
+  if (state.user?.id && state.profile?.role !== "pa_evaluator"
+      && state.centralApprovalSyncUser !== state.user.id) {
+    state.centralApprovalSyncUser=state.user.id;
+    try {
+      const {error:syncError}=await supabase.rpc("refresh_my_approval_notifications");
+      if(syncError)throw syncError;
+      const latest=await supabase.from("notifications").select("*").eq("recipient_id",state.user.id)
+        .is("dismissed_at",null).order("created_at",{ascending:false}).limit(20);
+      if(!latest.error)state.notifications=latest.data||[];
+    }catch(err){
+      console.warn("Central approval bell reconciliation:",err?.message||err);
+      state.centralApprovalSyncUser=null;
+    }
+  }
   state.academicTerms = academicTermsRes.error ? [] : (academicTermsRes.data || []);
   state.academicCalendarSettings = academicCalendarSettingsRes.error ? null : (academicCalendarSettingsRes.data || null);
   state.academicSupervisionSettings = academicSupervisionSettingsRes.error ? null : (academicSupervisionSettingsRes.data || null);
@@ -1984,7 +1999,8 @@ function notificationList(limit = 20) {
   const items = state.notifications.slice(0, limit);
   if (!items.length) return `<div class="empty"><strong>ไม่มีการแจ้งเตือน</strong><span>รายการใหม่จะแสดงตรงนี้</span></div>`;
   return `<div class="list">${items.map(n => `
-    <div class="list-item ${["lesson_plan","personnel_profile","signature_profile","leave_request","substitute_batch","substitute_lesson","budget_disbursement"].includes(n.entity_type) ? "notification-clickable" : ""}"
+    <div class="list-item ${(["lesson_plan","personnel_profile","signature_profile","leave_request","substitute_batch","substitute_lesson","budget_disbursement"].includes(n.entity_type)||n.type==="central_approval_action") ? "notification-clickable" : ""}"
+      ${n.type === "central_approval_action" ? `data-notification-central="${escapeHtml(n.id)}"` : ""}
       ${n.entity_type === "lesson_plan" && n.entity_id ? `data-notification-plan="${n.entity_id}"` : ""}
       ${n.entity_type === "personnel_profile" ? `data-notification-personnel="1"` : ""}
       ${n.entity_type === "signature_profile" ? `data-notification-signature="1"` : ""}
@@ -1992,9 +2008,57 @@ function notificationList(limit = 20) {
       ${["substitute_batch","substitute_lesson"].includes(n.entity_type) ? `data-notification-substitute="${n.entity_id || ""}" data-substitute-entity="${n.entity_type}"` : ""}
       ${n.entity_type === "budget_disbursement" && n.entity_id ? `data-notification-budget="${n.entity_id}"` : ""}>
       <div class="list-icon">${n.read_at ? "✓" : "●"}</div>
-      <div class="list-body"><strong>${escapeHtml(n.title)}</strong><p>${escapeHtml(n.message)}</p></div>
+      <div class="list-body"><strong>${n.notification_kind==="action"?"⏳ ":""}${escapeHtml(n.title)}</strong><p>${escapeHtml(n.message)}</p></div>
       <div class="list-time">${formatDate(n.created_at)}</div>
     </div>`).join("")}</div>`;
+}
+
+async function openCentralApprovalNotification(notificationId, modal=null) {
+  const notice=state.notifications.find(n=>n.id===notificationId && n.type==="central_approval_action"
+    && n.recipient_id===state.user?.id);
+  if(!notice)return;
+  const system=String(notice.workflow_key||"").split(":")[1]||"";
+  const bySystem={
+    academic_certificate:"academic_registration",academic_document_service:"academic_registration",
+    academic_transfer:"academic_registration",budget_disbursement:"project_management",
+    classroom_research:"academic_submissions",club_activity:"academic_submissions",
+    home_visit:"home_visit_management",learner_activities:"academic_submissions",
+    learning_media:"academic_submissions",leave_management:"leave_management",
+    lesson_plan_usage:"academic_submissions",lesson_plans:"lesson_plans",
+    post_lesson:"academic_submissions",substitute_teaching:"substitute_teaching",
+    timetable_management:"timetable_management"
+  };
+  const moduleCode=bySystem[system];
+  if(!moduleCode||!state.modules.some(m=>m.code===moduleCode&&m.is_active!==false)){
+    toast("เปิดงานนี้ไม่ได้","บัญชีนี้ไม่มีสิทธิ์เข้าระบบงานที่เชื่อมกับการแจ้งเตือน","error");return;
+  }
+  const {error}=await supabase.from("notifications").update({read_at:new Date().toISOString()})
+    .eq("id",notice.id).eq("recipient_id",state.user.id);
+  if(error){toast("เปิดแจ้งเตือนไม่สำเร็จ",error.message,"error");return;}
+  if(moduleCode==="academic_registration"){
+    state.academicRegistrationSection={academic_certificate:"certificate",
+      academic_document_service:"document_service",academic_transfer:"transfer"}[system];
+    if(system==="academic_certificate")state.selectedAcademicCertificateId=notice.entity_id;
+    if(system==="academic_document_service")state.selectedAcademicDocumentServiceId=notice.entity_id;
+    if(system==="academic_transfer")state.selectedAcademicTransferId=notice.entity_id;
+  }
+  if(moduleCode==="academic_submissions"){
+    state.academicSubmissionSection=system;
+    const view={post_lesson:"academicPostLessonView",lesson_plan_usage:"academicLessonPlanUsageView",
+      learning_media:"academicLearningMediaView",classroom_research:"academicClassroomResearchView",
+      learner_activities:"academicLearnerActivityView",club_activity:"academicClubActivityView"}[system];
+    if(view)state[view]="review";
+  }
+  if(system==="leave_management")state.selectedLeaveRequestId=notice.entity_id;
+  if(system==="lesson_plans")state.selectedLessonPlanId=notice.entity_id;
+  if(system==="budget_disbursement"){
+    state.projectView="budget";state.selectedDisbursementId=notice.entity_id;
+    state.selectedProjectId=null;state.selectedProjectActivityId=null;
+  }
+  state.currentView="module:"+moduleCode;
+  modal?.remove();
+  await loadActiveUserData();
+  await renderDashboard();
 }
 
 function usersView() {
@@ -15430,6 +15494,7 @@ function bindDashboardEvents() {
   document.querySelector("#mark-budget-paid")?.addEventListener("click",async()=>{const r=selectedBudgetRequest();if(!r||!confirm(`บันทึกว่าเบิกจ่าย ${money(r.amount)} บาท แล้วหรือไม่?`))return;const {error}=await supabase.from("budget_disbursements").update({status:"paid"}).eq("id",r.id);if(error)return toast("บันทึกไม่สำเร็จ",error.message,"error");await renderDashboard();});
   document.querySelector("#project-pdf")?.addEventListener("click",()=>{const p=selectedProject();if(p)projectPdfPreview(p);});
   document.querySelector("#activity-pdf")?.addEventListener("click",()=>{const a=state.projectActivities.find(x=>x.id===state.selectedProjectActivityId),p=state.schoolProjects.find(x=>x.id===a?.project_id);if(p&&a)projectPdfPreview(p,a);});
+  document.querySelectorAll("[data-notification-central]").forEach(el=>el.addEventListener("click",()=>openCentralApprovalNotification(el.dataset.notificationCentral)));
   document.querySelectorAll("[data-notification-budget]").forEach(el=>el.addEventListener("click",async()=>{const id=el.dataset.notificationBudget;await supabase.from("notifications").update({read_at:new Date().toISOString()}).eq("recipient_id",state.user.id).eq("entity_type","budget_disbursement").eq("entity_id",id);state.currentView="module:project_management";state.projectView="budget";state.selectedDisbursementId=id;await loadActiveUserData();await renderDashboard();}));
 
   document.querySelectorAll("[data-user-academic]").forEach(btn => btn.addEventListener("click", () => {
@@ -15619,6 +15684,7 @@ function showNotificationModal() {
       </div>
     </div>`;
   document.body.appendChild(modal);
+  modal.querySelectorAll("[data-notification-central]").forEach(el=>el.addEventListener("click",()=>openCentralApprovalNotification(el.dataset.notificationCentral,modal)));
   modal.querySelectorAll("[data-notification-plan]").forEach(el => el.addEventListener("click", async () => {
     const id = el.dataset.notificationPlan;
     await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("entity_id", id).eq("recipient_id", state.user.id);
