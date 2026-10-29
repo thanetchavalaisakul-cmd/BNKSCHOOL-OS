@@ -1,0 +1,40 @@
+name: Build optimized BNK School OS app
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app.js'
+      - 'package.json'
+      - 'package-lock.json'
+permissions:
+  contents: write
+concurrency:
+  group: bnk-optimized-app-main
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install pinned build tool
+        run: npm ci --no-audit --no-fund
+      - name: Compile and verify application
+        run: |
+          npm run verify
+          git diff --check
+      - name: Synchronize optimized script
+        run: |
+          if ! git diff --quiet -- app.min.js; then
+            git config user.name "BNK School OS Build"
+            git config user.email "bnk-school-os@users.noreply.github.com"
+            git add app.min.js
+            git commit -m "build: refresh optimized BNK application bundle"
+            git push origin HEAD:main
+          fi
