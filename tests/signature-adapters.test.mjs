@@ -25,14 +25,17 @@ test("paper is not accepted as online approval, but can be chosen for physical s
  assert.equal(assertSignatureMethod("drawn",{requireOnline:true}).online,true);
  assert.throws(()=>assertSignatureMethod("bad-method"),/ไม่ถูกต้อง/);
  assert.match(workflow,/requireOnlineApproval=false/);
- assert.match(app,/requireOnlineApproval:decision==="approve"/);
+ assert.doesNotMatch(app,/requireOnlineApproval:decision==="approve"/);
+ assert.match(app,/personnel_review_leave_request_signed/);
+ assert.match(app,/director_review_leave_request_signed/);
 });
 
 test("budget request confirmation validates the freshly selected method",()=>{
  for(const method of ["drawn","upload","stored"])
   assert.match(app,new RegExp('await confirmSigner\\("'+method+'"\\)'));
  assert.match(app,/await confirmSigner\(assignment\.method\)/);
- assert.match(app,/assertSignatureMethod\(mode,\{requireOnline:true\}\)/);
+ assert.match(app,/assertSignatureMethod\(mode\)/);
+ assert.match(app,/await confirmSigner\("paper"\)/);
  assert.match(app,/s\.approved_at&&s\.method!=="paper"/);
 });
 

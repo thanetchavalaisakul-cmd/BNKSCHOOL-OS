@@ -33,10 +33,10 @@ test("signature options require own explicit acknowledgement and protect inspect
 test("parallel inbox and alerts expose pending requests without touching procurement",()=>{
  assert.match(app,/function budgetSignerInboxHtml/);
  assert.match(app,/budgetSignerInboxHtml\(\)\+projectMineHtml\(\)/);
- assert.match(app,/รับรองออนไลน์แล้ว/);
+ assert.match(app,/ดำเนินการรับรองแล้ว/);
  assert.match(sql,/budget_signer_assignment_notice/);
  assert.match(sql,/budget_signer_ready_notice/);
  assert.match(sql,/budget_signatures_complete/);
  assert.doesNotMatch(sql,/UPDATE public\.procurement_document_cases/);
- assert.match(app,/autoDirector&&assignments\.some\(s=>s\.slot==="director"&&s\.approved_at\)/);
+ assert.match(app,/autoDirector&&assignments\.some\(s=>s\.slot==="director"&&s\.approved_at&&s\.method!=="paper"\)/);
 });
