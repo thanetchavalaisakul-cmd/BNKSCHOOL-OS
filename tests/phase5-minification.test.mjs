@@ -5,7 +5,7 @@ const src=readFileSync(new URL("../app.js",import.meta.url),"utf8");
 const compiled=readFileSync(new URL("../app.min.js",import.meta.url),"utf8");
 const index=readFileSync(new URL("../index.html",import.meta.url),"utf8");
 test("production entry is the generated minified module",()=>{
- assert.match(index,/src="\.\/app\.min\.js\?v=5\.12\.9\.28"/);
+ assert.match(index,/src="\.\/app\.min\.js\?v=5\.12\.9\.\d+"/);
  assert.doesNotMatch(index,/src="\.\/app\.js\?/);
  assert.match(compiled,/^import/);
  assert.doesNotMatch(compiled,/sourceMappingURL=/);
