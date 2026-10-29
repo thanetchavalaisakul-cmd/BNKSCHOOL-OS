@@ -1,0 +1,79 @@
+name: Verify and deploy paper PDF signature fallback guard v43
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/paper-pdf-v43-once.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: "github.event.head_commit.message == 'ci: apply paper PDF signature fallback v43'"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout approved version v42
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 2
+          persist-credentials: true
+      - name: Validate patch and apply paper PDF guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "7d52e27188203fe5d43feedd359a9ccd0385a49c"
+          base64 --decode <<'BNK_V43_GZ' | gzip --decompress > /tmp/bnk-v43.patch
+          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
+          BNK_V43_GZ
+          echo "e3f6b78486bd35b7715bcbaf0a3639c3ab03a786a488d918ce579236d513da87  /tmp/bnk-v43.patch" | sha256sum --check
+          git apply --check /tmp/bnk-v43.patch
+          git apply /tmp/bnk-v43.patch
+      - name: Build and test all functionality
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run verify
+          git diff --check
+      - name: Commit and publish verified deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/paper-pdf-v43-once.yml
+          git add app.js app.min.js index.html document-signatures.js tests/paper-approval-status.test.mjs .github/workflows/paper-pdf-v43-once.yml
+          git diff --cached --check
+          git -c user.name="BNK School OS CI" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "fix: explicit paper signature overrides legacy PDF auto-image"
+          git push origin HEAD:main
