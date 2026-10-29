@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
-import { schoolDocumentSignatureImages, showSchoolDocumentSignatureModal } from "./document-signatures.js?v=5.12.9.35";
-import { withWorkflowSignature } from "./workflow-signing.js?v=5.12.9.35";
+import { schoolDocumentSignatureImages, showSchoolDocumentSignatureModal } from "./document-signatures.js?v=5.12.9.36";
+import { withWorkflowSignature } from "./workflow-signing.js?v=5.12.9.36";
 import { createBehaviorFeature } from "./behavior.js?v=2";
 import { createEducationFeeFeature } from "./education-fees.js?v=2";
 import { createTimetableConstraintFeature } from "./timetable-constraints.js?v=4";
@@ -5183,7 +5183,7 @@ async function leaveA4Preview() {
   document.body.appendChild(modal);
   modal.querySelector("#leave-a4-close").addEventListener("click",()=>modal.remove());
   modal.querySelector("#leave-a4-sign").addEventListener("click",()=>showSchoolDocumentSignatureModal({client:supabase,kind:"leave",docId:request.id,userId:state.user.id,notify:toast,onSaved:async()=>{modal.remove();await renderDashboard();}}));
-  const [schoolLogo,directorSignature,documentSignatures]=await Promise.all([schoolLogoDataUrl(),storedSignatureDataUrl(request.director_signature_id),schoolDocumentSignatureImages(supabase,"leave",request.id)]);
+  const [schoolLogo,directorSignature,documentSignatures]=await Promise.all([schoolLogoDataUrl(),storedSignatureDataUrl(request.director_signature_id),schoolDocumentSignatureImages(supabase,"leave",request.id,null,toast)]);
   const assets={schoolLogo,directorSignature,documentSignatures};
   modal.querySelector(".a4-preview-loading").outerHTML=`<div class="a4-preview-scroll"><style>${leaveA4Styles()}</style>${buildLeaveA4Html(request,assets)}</div>`;
   modal.querySelector("#leave-a4-print").addEventListener("click",()=>printLeaveA4(request,assets));
@@ -7120,7 +7120,7 @@ function buildSubstituteDocument(rows,signers,schoolLogo,directorSignature=null,
 async function substitutePdfPreview(leaveRequestId,leaveDate) {
   const rows=substituteRowsForBatch(leaveRequestId,leaveDate),progress=substituteBatchProgress(leaveRequestId,leaveDate);
   if(!rows.length)return toast("ไม่มีข้อมูลสำหรับ Export","","error"); if(!progress.complete)return toast("ยังจัดครูไม่ครบ","กรุณาเลือกครูสอนแทนให้ครบทุกคาบก่อน Export PDF","error");
-  const [signersRes,schoolLogo,directorSignature,docImages]=await Promise.all([supabase.rpc("get_substitute_document_signers",{p_leave_request_id:leaveRequestId}),schoolLogoDataUrl(),centralAutoSignatureAsset("substitute_teaching",leaveRequestId),schoolDocumentSignatureImages(supabase,"substitute",leaveRequestId,leaveDate)]); if(signersRes.error)return toast("เตรียมชื่อผู้ลงนามไม่ได้",signersRes.error.message,"error");
+  const [signersRes,schoolLogo,directorSignature,docImages]=await Promise.all([supabase.rpc("get_substitute_document_signers",{p_leave_request_id:leaveRequestId}),schoolLogoDataUrl(),centralAutoSignatureAsset("substitute_teaching",leaveRequestId),schoolDocumentSignatureImages(supabase,"substitute",leaveRequestId,leaveDate,toast)]); if(signersRes.error)return toast("เตรียมชื่อผู้ลงนามไม่ได้",signersRes.error.message,"error");
   const signers=signersRes.data?.[0]||{},body=buildSubstituteDocument(rows,signers,schoolLogo,directorSignature,docImages),modal=document.createElement("div"); modal.className="modal-backdrop a4-preview-backdrop";
   modal.innerHTML=`<div class="a4-preview-shell"><div class="a4-preview-toolbar"><div><strong>บันทึกการจัดครูสอนแทน</strong><span>A4 แนวนอน · 1 หน้า · รองรับลายเซ็นผู้บริหารอัตโนมัติตามนโยบายกลาง</span></div><div class="a4-preview-actions"><button class="btn btn-ghost" id="sub-doc-close">ปิด</button><button class="btn btn-secondary" id="sub-doc-sign">✍ ลงลายเซ็น</button><button class="btn btn-primary" id="sub-doc-print">พิมพ์ / บันทึก PDF</button></div></div><div class="a4-preview-scroll"><style>${substituteDocumentStyles()}</style>${body}</div></div>`;
   document.body.appendChild(modal); modal.querySelector("#sub-doc-close").addEventListener("click",()=>modal.remove()); modal.querySelector("#sub-doc-sign").addEventListener("click",()=>showSchoolDocumentSignatureModal({client:supabase,kind:"substitute",docId:leaveRequestId,date:leaveDate,userId:state.user.id,notify:toast,onSaved:async()=>{modal.remove();await renderDashboard();}})); modal.querySelector("#sub-doc-print").addEventListener("click",()=>{const w=window.open("","_blank"); if(!w)return toast("เปิดหน้าพิมพ์ไม่ได้","กรุณาอนุญาต Pop-up","error"); w.document.write(`<!doctype html><html lang="th"><head><meta charset="UTF-8"><title>บันทึกการจัดครูสอนแทน</title><style>${substituteDocumentStyles()}</style></head><body class="a4-print-body">${body}<script>window.addEventListener('load',()=>{(document.fonts?document.fonts.ready:Promise.resolve()).finally(()=>setTimeout(()=>window.print(),250));});<\/script></body></html>`); w.document.close();});
