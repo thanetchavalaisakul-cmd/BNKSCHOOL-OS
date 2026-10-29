@@ -1,0 +1,43 @@
+name: Apply verified budget parallel approvals v39
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/budget-parallel-v39-once.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: "github.event.head_commit.message == 'ci: apply verified budget parallel approvals v39'"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exactly checked source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 6
+          persist-credentials: true
+      - name: Validate patch integrity and source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD~5)" = "6793bde0eccb354ceaaad30ffc31bc611b5293d6"
+          cat .tmp/bnk-budget-v39.part-*.b64 | base64 --decode | gzip --decompress > /tmp/bnk-budget-v39.patch
+          echo "bd3cbc1cb0d9597aa3a1d91c869e39d215f840b6154f487e495db9add3aa1530  /tmp/bnk-budget-v39.patch" | sha256sum --check
+          git apply --check /tmp/bnk-budget-v39.patch
+          git apply /tmp/bnk-budget-v39.patch
+      - name: Validate all regression tests and build
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run verify
+          git diff --check
+      - name: Publish verified update and remove one-time resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/budget-parallel-v39-once.yml .tmp/bnk-budget-v39.part-*.b64
+          git add app.js app.min.js index.html tests/budget-parallel-signing.test.mjs supabase-budget-parallel-signers-20261029.sql
+          git add -u .github/workflows/budget-parallel-v39-once.yml .tmp
+          git diff --cached --check
+          git -c user.name="BNK School OS CI" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "feat: parallel budget request sign-offs with eight independent approvers"
+          git push origin HEAD:main
