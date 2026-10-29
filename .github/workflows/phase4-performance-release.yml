@@ -33,6 +33,7 @@ jobs:
           payload=Path('.github/phase4-performance-payload.txt').read_text().strip()
           Path('/tmp/phase4-performance.patch').write_bytes(gzip.decompress(base64.b64decode(payload,validate=True)))
           PY
+          git add app.js
           git apply --check /tmp/phase4-performance.patch
           git apply --index /tmp/phase4-performance.patch
           git add app.js
