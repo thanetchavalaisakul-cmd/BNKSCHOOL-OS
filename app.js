@@ -1,9 +1,11 @@
+// v5.12.9.40 — central signature compliance review & onboarding.
 // Release v5.12.9.39: parallel budget document acknowledgements with four signature methods.
 // v5.12.9.37: compact budget-request A4 and dedicated plan-budget signer selection.
 // Release v5.12.9.36: signature-before-action flow + signed-image storage authorization fix.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
 import { schoolDocumentSignatureImages, showSchoolDocumentSignatureModal } from "./document-signatures.js?v=5.12.9.36";
 import { withWorkflowSignature } from "./workflow-signing.js?v=5.12.9.36";
+import { createSignatureComplianceFeature } from "./signature-compliance.js?v=1";
 import { createBehaviorFeature } from "./behavior.js?v=2";
 import { createEducationFeeFeature } from "./education-fees.js?v=2";
 import { createTimetableConstraintFeature } from "./timetable-constraints.js?v=4";
@@ -1523,10 +1525,12 @@ function pageTitle() {
 
 
 // ===== Central Approval Routing + Executive Auto Approval (Build 11.0.17) =====
+const signatureComplianceFeature=createSignatureComplianceFeature({client:supabase,toast,render:renderDashboard,escapeHtml,buttonLoading});
 async function loadApprovalControlCenter(){
   const {data,error}=await supabase.rpc("get_approval_control_center");
   if(error){console.error("approval center",error);state.approvalControlCenter=null;return null;}
   state.approvalControlCenter=data||null;
+  if(data?.is_super_admin)await signatureComplianceFeature.load();
   if(Array.isArray(data?.systems))state.approvalSystemRegistry=data.systems;
   return state.approvalControlCenter;
 }
@@ -1556,7 +1560,7 @@ function approvalCenterView(){
   const executiveSetup=admin?`<section class="panel approval-executive-setup"><div class="panel-head"><div class="panel-title-wrap"><h3>กำหนดผู้บริหารในระบบกลาง</h3><p>เพิ่ม ผอ. / รอง ผอ. เพื่อให้ใช้ Auto Sign และ Auto Approve ได้ทั้งระบบ</p></div></div><div class="approval-setup-grid"><select class="select" id="approval-exec-candidate"><option value="">— เลือกบุคลากร —</option>${(c.candidates||[]).map(u=>`<option value="${u.id}">${escapeHtml(u.full_name||u.email)} · ${escapeHtml(ROLE_LABEL[u.role]||u.role)}</option>`).join("")}</select><select class="select" id="approval-exec-kind"><option value="director">ผู้อำนวยการ</option><option value="deputy_director">รองผู้อำนวยการ</option><option value="acting_director">รักษาการผู้อำนวยการ</option></select><input class="input" id="approval-exec-note" placeholder="คำสั่ง/เหตุผลในการตั้งค่าแทนผู้บริหาร"><button class="btn btn-primary" id="approval-add-executive">บันทึกผู้บริหาร</button></div></section>`:"";
   const cards=executives.length?executives.map(e=>approvalExecutiveCard(e,systems,admin)).join(""):`<div class="empty"><strong>ยังไม่ได้กำหนดผู้บริหารกลาง</strong><span>${admin?"เพิ่มผู้บริหารเพื่อเริ่มตั้งค่า Auto Sign / Auto Approve":"ติดต่อ Super Admin เพื่อกำหนดสิทธิ์ผู้บริหาร"}</span></div>`;
   const audit=(c.audit||[]).length?`<section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ประวัติการตั้งค่าล่าสุด</h3><p>ตรวจสอบว่าใครเปิด/ปิดนโยบายให้ใครและเมื่อใด</p></div></div><div class="approval-audit-list">${(c.audit||[]).slice(0,12).map(a=>`<div class="approval-audit-row"><div><strong>${escapeHtml(a.actor_name||"ระบบ")}</strong><span>${escapeHtml(a.action||"")} ${a.target_name?`→ ${escapeHtml(a.target_name)}`:""}</span></div><time>${formatDate(a.created_at)}</time></div>`).join("")}</div></section>`:"";
-  return `<section class="approval-center"><section class="approval-center-hero"><div><span class="eyebrow dark">BNK School OS · Central Engine</span><h2>ศูนย์อนุมัติและลายเซ็นอัตโนมัติ</h2><p>ควบคุมเส้นทางการอนุมัติทั้งระบบ และตั้ง Auto Sign / Auto Approve เป็นรายผู้บริหารและรายระบบ · Auto Approve จะเปิด Auto Sign ร่วมกันเสมอ</p></div><div class="approval-center-summary"><strong>${activePolicies}</strong><span>นโยบายอัตโนมัติที่เปิดใช้งาน</span><small>Build ${APP_BUILD}</small></div></section><div class="approval-safety-note"><strong>หลักการทำงาน</strong><span>โหมดขนาน: ผู้มีหน้าที่แต่ละช่องตรวจ/ลงนามได้โดยไม่ต้องรอคิว · เอกสารสมบูรณ์เมื่อช่องที่กำหนดครบทั้งหมด · ระบบวันลายังคงบังคับลำดับ “หัวหน้าบุคคล → ผู้บริหาร” เสมอ<br>รองผู้อำนวยการใช้ Auto Sign/Auto Approve ได้เฉพาะระบบที่มีช่อง “รอง ผอ.” โดยตรง; หากได้รับมอบหมายให้อนุมัติแทน ผอ. ให้กำหนดเป็น “รักษาการผู้อำนวยการ” เพื่อใช้ช่องผู้บริหารแทนอย่างถูกต้อง</span></div>${routing}${executiveSetup}<section class="approval-executive-list">${cards}</section>${audit}</section>`;
+  return `<section class="approval-center"><section class="approval-center-hero"><div><span class="eyebrow dark">BNK School OS · Central Engine</span><h2>ศูนย์อนุมัติและลายเซ็นอัตโนมัติ</h2><p>ควบคุมเส้นทางการอนุมัติทั้งระบบ และตั้ง Auto Sign / Auto Approve เป็นรายผู้บริหารและรายระบบ · Auto Approve จะเปิด Auto Sign ร่วมกันเสมอ</p></div><div class="approval-center-summary"><strong>${activePolicies}</strong><span>นโยบายอัตโนมัติที่เปิดใช้งาน</span><small>Build ${APP_BUILD}</small></div></section><div class="approval-safety-note"><strong>หลักการทำงาน</strong><span>โหมดขนาน: ผู้มีหน้าที่แต่ละช่องตรวจ/ลงนามได้โดยไม่ต้องรอคิว · เอกสารสมบูรณ์เมื่อช่องที่กำหนดครบทั้งหมด · ระบบวันลายังคงบังคับลำดับ “หัวหน้าบุคคล → ผู้บริหาร” เสมอ<br>รองผู้อำนวยการใช้ Auto Sign/Auto Approve ได้เฉพาะระบบที่มีช่อง “รอง ผอ.” โดยตรง; หากได้รับมอบหมายให้อนุมัติแทน ผอ. ให้กำหนดเป็น “รักษาการผู้อำนวยการ” เพื่อใช้ช่องผู้บริหารแทนอย่างถูกต้อง</span></div>${routing}${executiveSetup}${admin?signatureComplianceFeature.html():""}<section class="approval-executive-list">${cards}</section>${audit}</section>`;
 }
 function approvalSystemAllowsExecutive(sys,executiveKind){
   const kinds=Array.isArray(sys?.executive_kinds)?sys.executive_kinds:["director","acting_director"];
@@ -1598,6 +1602,7 @@ async function uploadExecutiveSignatureAsAdmin(execId,file){
   if(error){await supabase.storage.from("signatures").remove([path]);throw error;}
 }
 function bindApprovalCenterEvents(){
+  signatureComplianceFeature.bind();
   document.querySelectorAll("[data-policy-approve]").forEach(ap=>ap.addEventListener("change",()=>{if(ap.checked){const sg=ap.closest("[data-policy-row]")?.querySelector("[data-policy-sign]");if(sg&&!sg.disabled)sg.checked=true;}}));
   document.querySelectorAll("[data-policy-sign]").forEach(sg=>sg.addEventListener("change",()=>{if(!sg.checked){const ap=sg.closest("[data-policy-row]")?.querySelector("[data-policy-approve]");if(ap&&!ap.disabled)ap.checked=false;}}));
   document.querySelectorAll("[data-approval-routing]").forEach(btn=>btn.addEventListener("click",async()=>{buttonLoading(btn,true,"กำลังบันทึก...");const {error}=await supabase.rpc("set_approval_routing_mode",{p_system_code:btn.dataset.approvalSystem,p_routing_mode:btn.dataset.approvalRouting});if(error){buttonLoading(btn,false);return toast("เปลี่ยนรูปแบบไม่สำเร็จ",error.message,"error");}toast("บันทึกรูปแบบการอนุมัติแล้ว",approvalRoutingLabel(btn.dataset.approvalRouting),"success");await loadApprovalControlCenter();await renderDashboard();}));
