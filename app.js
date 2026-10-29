@@ -1161,7 +1161,7 @@ async function loadActiveUserData() {
       const {error:syncError}=await supabase.rpc("refresh_my_approval_notifications");
       if(syncError)throw syncError;
       const latest=await supabase.from("notifications").select("*").eq("recipient_id",state.user.id)
-        .is("dismissed_at",null).order("created_at",{ascending:false}).limit(20);
+        .is("dismissed_at",null).order("created_at",{ascending:false}).limit(60);
       if(!latest.error)state.notifications=latest.data||[];
     }catch(err){
       console.warn("Central approval bell reconciliation:",err?.message||err);
@@ -15917,7 +15917,7 @@ function refreshOwnNotifications() {
   notificationRefreshInFlight = (async () => {
     const { data, error } = await supabase.from("notifications")
       .select("*").eq("recipient_id", recipientId)
-      .is("dismissed_at", null).order("created_at", { ascending: false }).limit(20);
+      .is("dismissed_at", null).order("created_at", { ascending: false }).limit(60);
     if (!error && state.user?.id === recipientId) {
       state.notifications = data || [];
       if (state.currentView === "module:timetable_management") state.timetableSkipNextLoad = true;
