@@ -7154,19 +7154,43 @@ async function deleteSelectedBudgetRequest(){
 async function deleteSelectedProject(){
   const p=state.schoolProjects.find(x=>x.id===state.selectedProjectId);if(!p)return;
   if(p.owner_id!==state.user.id&&!isSuperAdminUser())return;
-  const linked=projectDisbursementsFor(p.id);
-  if(linked.length)return toast("ยังลบโครงการไม่ได้",`มีเอกสารขอเบิกเชื่อมอยู่ ${linked.length} รายการ กรุณาจัดการเอกสารเหล่านั้นก่อน`,"error");
+  // The server counts both active and soft-deleted procurement documents.
+  // Only archived documents may be safely detached; live procurement or budget
+  // documents always block deletion.
+  const {data:impact,error:impactError}=await supabase.rpc("school_project_delete_impact",{p_project_id:p.id});
+  if(impactError)return toast("ตรวจสอบโครงการก่อนลบไม่สำเร็จ",impactError.message,"error");
+  const budget=Number(impact?.budget_disbursements||0);
+  const live=Number(impact?.active_procurement||0);
+  const archived=Number(impact?.archived_procurement||0);
+  if(budget||live){
+    const reasons=[];
+    if(budget)reasons.push("เอกสารเบิกจ่าย "+budget+" รายการ");
+    if(live)reasons.push("เอกสารจัดซื้อจัดจ้างที่ยังใช้งาน "+live+" รายการ");
+    return toast("ยังไม่สามารถลบโครงการได้",
+      "โครงการนี้ยังมี"+reasons.join(" และ ")+" กรุณาจัดการเอกสารที่ยังใช้งานอยู่ก่อน หรือเปลี่ยนสถานะโครงการเป็นยกเลิกเพื่อเก็บประวัติ","error");
+  }
   secureDeleteModal({
     title:"ลบโครงการ",
     description:`${p.project_no} ${p.project_name}`,
-    warning:"กิจกรรมย่อยภายใต้โครงการนี้จะถูกลบตามไปด้วย หากไม่มีเอกสารงบประมาณที่อ้างอิงอยู่",
+    warning:"กิจกรรมย่อยภายใต้โครงการจะถูกลบถาวร "+
+      (archived?"พบเอกสารจัดซื้อจัดจ้างที่ถูกลบแล้ว "+archived+" รายการ ระบบจะเก็บประวัติเอกสารเหล่านี้ไว้ และตัดการเชื่อมโยงกับโครงการก่อนลบ":"ไม่พบเอกสารจัดซื้อจัดจ้างหรือเอกสารเบิกจ่ายที่ยังอ้างอิงอยู่"),
     action:async client=>{
-      const {error}=await client.from("school_projects").delete().eq("id",p.id);
-      if(error)throw error;
+      // Atomic, server-authorized deletion; never cascade-delete procurement cases.
+      const {error}=await client.rpc("delete_school_project_safely",{p_project_id:p.id});
+      if(error){
+        if(error.message.includes("PROJECT_HAS_ACTIVE_PROCUREMENT"))
+          throw new Error("มีเอกสารจัดซื้อจัดจ้างที่ยังใช้งานอยู่ จึงไม่สามารถลบโครงการได้");
+        if(error.message.includes("PROJECT_HAS_BUDGET_DOCUMENTS"))
+          throw new Error("มีเอกสารเบิกจ่ายเชื่อมอยู่ จึงไม่สามารถลบโครงการได้");
+        if(error.message.includes("PROJECT_DELETE_REQUIRES_RECENT_PASSWORD"))
+          throw new Error("ไม่มีสิทธิ์ลบโครงการหรือการยืนยันรหัสผ่านหมดอายุ กรุณาลองใหม่");
+        throw error;
+      }
     },
     afterDelete:async()=>{
       state.selectedProjectId=null;state.selectedProjectActivityId=null;
-      toast("ลบโครงการแล้ว","","success");await renderDashboard();
+      toast("ลบโครงการแล้ว",archived?"เก็บประวัติเอกสารจัดซื้อจัดจ้างที่ลบแล้ว "+archived+" รายการไว้ครบถ้วน":"ลบโครงการและกิจกรรมย่อยสำเร็จ","success");
+      await renderDashboard();
     }
   });
 }
