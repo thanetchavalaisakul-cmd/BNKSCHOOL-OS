@@ -25,8 +25,8 @@ jobs:
           payload=Path('.github/phase5-optimized-release-data.txt').read_text().strip()
           Path('/tmp/phase5-optimized-source.patch').write_bytes(gzip.decompress(base64.b64decode(payload,validate=True)))
           PY
-          git apply --check /tmp/phase5-optimized-source.patch
-          git apply --index /tmp/phase5-optimized-source.patch
+          git apply --check --exclude='.github/workflows/build-optimized-app.yml' /tmp/phase5-optimized-source.patch
+          git apply --index --exclude='.github/workflows/build-optimized-app.yml' /tmp/phase5-optimized-source.patch
       - name: Install reproducible pinned compiler
         run: npm ci --no-audit --no-fund
       - name: Build and run all regression checks
