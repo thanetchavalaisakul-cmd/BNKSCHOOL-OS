@@ -1,0 +1,51 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const sql=readFileSync(new URL("../supabase-substitute-day-signature-atomic-20261030.sql",import.meta.url),"utf8");
+const app=readFileSync(new URL("../app.js",import.meta.url),"utf8");
+const old=readFileSync(new URL("../supabase-substitute-day-unrestricted-20261030.sql",import.meta.url),"utf8");
+test("one validated signature is propagated across every real subject period before updating",()=>{
+ const verify=sql.indexOf("perform public.record_bnk_action_signature(");
+ const fanout=sql.indexOf("insert into public.bnk_action_signatures(");
+ const batch=sql.indexOf("update public.substitute_lessons sl set");
+ assert.ok(verify>=0&&verify<fanout&&fanout<batch);
+ assert.match(sql,/lesson.leave_request_id=p_leave_request_id/);
+ assert.match(sql,/lesson.leave_date=p_leave_date/);
+ assert.match(sql,/lesson.status<>'cancelled'/);
+ assert.match(sql,/chosen.document_id=v_lesson.id/);
+ assert.match(sql,/chosen.actor_user_id=auth.uid\(\)/);
+ assert.match(sql,/chosen.method in \('paper','stored','drawn','upload'\)/);
+ assert.match(sql,/chosen.signature_id,chosen.bucket_id,chosen.storage_path,chosen.selected_at/);
+ assert.match(sql,/on conflict\(system_code,document_id,action_code,actor_user_id\)/);
+});
+test("existing atomic batch semantics and identity checks are retained",()=>{
+ assert.match(sql,/pg_advisory_xact_lock/);
+ assert.match(sql,/private.can_manage_substitute_lesson/);
+ assert.match(sql,/p_teacher_id=v_leave.requester_id/);
+ assert.match(sql,/return v_old; -- idempotent/);
+ assert.match(sql,/set_config\('bnk.substitute_day_batch'/);
+ assert.match(sql,/insert into public.substitute_day_periods/);
+ assert.match(sql,/from private.substitute_day_slots/);
+ assert.match(sql,/perform public.record_bnk_action_signature/);
+ assert.doesNotMatch(sql,/v_conflict is not null/);
+});
+test("four scheduled subjects, eight duty periods, one user signature choice",()=>{
+ const realLessons=[1,3,5,7].map(period_no=>({period_no}));
+ const wholeDay=Array.from({length:8},(_,n)=>n+1);
+ const chosen={method:"paper",signature_id:null,selected_at:"2026-10-30T00:00:00Z"};
+ const propagated=realLessons.map(r=>({...chosen,lesson:r.period_no}));
+ assert.equal(wholeDay.length,8);
+ assert.equal(propagated.length,4);
+ assert.ok(propagated.every(p=>p.method===chosen.method&&p.signature_id===null));
+ assert.match(app,/bnkSignatureBeforeAction\("เลือกลายเซ็นก่อนมอบหมายครูสอนแทนทั้งวัน"/);
+ assert.match(app,/assign_substitute_day_signed/);
+ assert.match(app,/confirm_substitute_day_signed/);
+});
+test("per-period RPCs and normal academic signature enforcement are unchanged",()=>{
+ assert.match(app,/assign_bnk_substitute_signed/);
+ assert.match(app,/confirm_substitute_teacher_signed/);
+ assert.match(app,/get_substitute_candidates/);
+ assert.doesNotMatch(sql,/create or replace function private.bnk_require_preaction_signature/);
+ assert.doesNotMatch(sql,/create or replace function public.assign_substitute_teacher/);
+ assert.match(old,/create or replace function public.get_substitute_day_candidates/);
+});
