@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-const app=readFileSync(new URL("../app.js",import.meta.url),"utf8");
+const app=readFileSync(new URL("../app.js",import.meta.url),"utf8")+"\n"+readFileSync(new URL("../modules/personnel-dialogs.js",import.meta.url),"utf8");
 const foundation=readFileSync(new URL("../supabase-bnk-signed-action-foundation-20261030.sql",import.meta.url),"utf8");
 const guard=readFileSync(new URL("../supabase-bnk-signed-action-enforcement-20261030.sql",import.meta.url),"utf8");
 test("four-method explicit signatures precede lesson plan and all registration submissions",()=>{

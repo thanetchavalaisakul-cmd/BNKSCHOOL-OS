@@ -2,11 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {SIGNATURE_METHODS,signatureMethodButtonsHtml,assertSignatureMethod} from "../signature-standard.js";
-const app=readFileSync(new URL("../app.js",import.meta.url),"utf8");
+const app=readFileSync(new URL("../app.js",import.meta.url),"utf8")+"\n"+readFileSync(new URL("../modules/academic-dialogs.js",import.meta.url),"utf8");
 const sql=readFileSync(new URL("../supabase-academic-registration-signature-atomic-20261030.sql",import.meta.url),"utf8");
+const academicDialogSource=readFileSync(new URL("../modules/academic-dialogs.js",import.meta.url),"utf8");
 const parts=Object.fromEntries(["academicDocumentServiceReviewModal","academicCertificateReviewModal","academicTransferReviewModal"].map(name=>{
- const a=app.indexOf("function "+name+"("),b=app.indexOf("\nfunction ",a+10);
- return [name,app.slice(a,b)];
+ const a=academicDialogSource.indexOf("async function "+name+"(");
+ assert.ok(a>=0,"missing modal "+name);
+ const rest=academicDialogSource.slice(a);
+ const match=/\nasync function [A-Za-z_$]/.exec(rest.slice(10));
+ const end=match?10+match.index:rest.length;
+ return [name,rest.slice(0,end)];
 }));
 
 test("three registration documents use one four-method UI including stored signatures",()=>{

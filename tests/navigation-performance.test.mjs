@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import test from "node:test";
-const app=readFileSync(new URL("../app.js",import.meta.url),"utf8");
+const app=readFileSync(new URL("../app.js",import.meta.url),"utf8")+"\n"+readFileSync(new URL("../modules/dashboard-events.js",import.meta.url),"utf8");
 const styles=readFileSync(new URL("../styles.css",import.meta.url),"utf8");
 test("navigation shows a visible loading panel before asynchronous fetches",()=>{
  assert.match(app,/if\(isNewView\)showModuleLoadingScreen\(\)/);

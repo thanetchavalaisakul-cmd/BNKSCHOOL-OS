@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-const code=readFileSync(new URL("../app.js",import.meta.url),"utf8");
+const code=readFileSync(new URL("../app.js",import.meta.url),"utf8")+"\n"+readFileSync(new URL("../modules/dashboard-events.js",import.meta.url),"utf8");
 const html=readFileSync(new URL("../index.html",import.meta.url),"utf8");
 
 test("registry changes re-use user-bound data and retain explicit refresh",()=>{

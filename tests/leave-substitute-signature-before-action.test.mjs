@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 
-const app=readFileSync(new URL("../app.js",import.meta.url),"utf8");
+const app=readFileSync(new URL("../app.js",import.meta.url),"utf8")+"\n"+readFileSync(new URL("../modules/dashboard-events.js",import.meta.url),"utf8");
 const ui=readFileSync(new URL("../workflow-signing.js",import.meta.url),"utf8");
 const sql=readFileSync(new URL("../supabase-leave-substitute-action-signatures-20261029.sql",import.meta.url),"utf8");
 const grant=readFileSync(new URL("../supabase-workflow-storage-execute-fix-20261029.sql",import.meta.url),"utf8");

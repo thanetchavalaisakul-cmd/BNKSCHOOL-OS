@@ -1,0 +1,180 @@
+{
+  "version": "5.12.9.58",
+  "functions": [
+    {
+      "group": "academic-report-pdf",
+      "name": "lessonUsagePdfHtml",
+      "sha256": "2b5e46a8a3858ea352196ea78ba33277249ac5cc10886c604d47c8178c6ae0a1"
+    },
+    {
+      "group": "academic-report-pdf",
+      "name": "learnerActivityPdfHtml",
+      "sha256": "a00cffd8a997c8ecf42ec24b747563159899c55ff921aa987338aee1f55ee758"
+    },
+    {
+      "group": "academic-report-pdf",
+      "name": "clubActivityPdfHtml",
+      "sha256": "53573beab579ee13a638fce90d70b2d7c87a73978c71daed5fe2797d906289a5"
+    },
+    {
+      "group": "academic-report-pdf",
+      "name": "postLessonPdfHtml",
+      "sha256": "e3e6a03512391944d22ea89f8160db188f5af85454f1e1e7c017a9970f6264df"
+    },
+    {
+      "group": "academic-report-pdf",
+      "name": "classroomResearchPdfHtml",
+      "sha256": "958c79a7b0faf227bb39be27321349b61ae0fb748cf214ccea52156116623c53"
+    },
+    {
+      "group": "academic-report-pdf",
+      "name": "learningMediaPdfHtml",
+      "sha256": "d02e42a20513a3f30987b910f232a0fe32d91a22ccbae107356a160526a692cd"
+    },
+    {
+      "group": "academic-dialogs",
+      "name": "postLessonFormModal",
+      "sha256": "87e42059cbcf38fbb1f85b7686411039735fa9111e6e8667ff6889f0628f7708"
+    },
+    {
+      "group": "academic-dialogs",
+      "name": "lessonUsageFormModal",
+      "sha256": "a2a87b975f675c9b68f1dd81570c71f9b262832177545133ddd98165907ffd8c"
+    },
+    {
+      "group": "academic-dialogs",
+      "name": "academicPlcPlanModal",
+      "sha256": "0a8678d1edbc6fa2547b3c59295a7034a8e23588922742a28768fe1320d45d03"
+    },
+    {
+      "group": "academic-dialogs",
+      "name": "learningMediaFormModal",
+      "sha256": "5cd3dad74beb0d9ede8736a8683ead0f9308b3a99f3fa7094d888e6eb1ee9d64"
+    },
+    {
+      "group": "academic-dialogs",
+      "name": "academicCertificateReviewModal",
+      "sha256": "4bcdde6af17a5d34a0e834009c5aa4e07e69e0f271dcd35e0409dabf4b58bc1c"
+    },
+    {
+      "group": "academic-dialogs",
+      "name": "academicTransferReviewModal",
+      "sha256": "ec21e1a66716704e8502762b79317935bf94c200f59b84494a1c1c29bc666a44"
+    },
+    {
+      "group": "academic-dialogs",
+      "name": "academicDocumentServiceReviewModal",
+      "sha256": "febe2e93fc8c7c24f8c7c00d37b2360da50804c353bb2f732bf3441b76143d32"
+    },
+    {
+      "group": "academic-dialogs",
+      "name": "academicCertificateRoleSettingsModal",
+      "sha256": "3cf4bfc73c7debb6560a0ffff3bd0f27494507ccd57f134fb8c6e5e577d59e71"
+    },
+    {
+      "group": "academic-dialogs",
+      "name": "academicDocumentServiceSettingsModal",
+      "sha256": "d694e2844e81f56d3cb30bccf5f4398e6d123e5eceb0ff9fbbed8ba4c30fcecd"
+    },
+    {
+      "group": "academic-dialogs",
+      "name": "academicRegistrationRoleSettingsModal",
+      "sha256": "9adb1280fdc521f800f385185205e7eb3579627cb946b4eb63a24cbc9edc17d9"
+    },
+    {
+      "group": "personnel-dialogs",
+      "name": "personnelPa2AssessmentModal",
+      "sha256": "f7ba9859135279244e55bff4ebd4f74f92490a1692d9f9bd679e69f4d171a3d0"
+    },
+    {
+      "group": "timetable-dialogs",
+      "name": "timetableTeacherCapabilityModal",
+      "sha256": "b209147e85a57dac5003c4cb0aec0619197cdd20f5eb9d0a4877ebef0ee60cf3"
+    },
+    {
+      "group": "student-dialogs",
+      "name": "studentFollowupFormModal",
+      "sha256": "ac0d676898287d841f79c2d241ca6a04ac53b6e141bd8421f2b9338495705d22"
+    },
+    {
+      "group": "student-dialogs",
+      "name": "studentCardCertifierSettingsModal",
+      "sha256": "93dcc1252da81a18ea62631a640e352ddd3a6f184f47a18547827a2e81f0f8a6"
+    },
+    {
+      "group": "dashboard-events",
+      "name": "bindDashboardEvents",
+      "sha256": "a92a18eb252ee0d35cc4e88c9a21db9a8e281fae8dedb63e7b4365261d799716"
+    },
+    {
+      "group": "procurement-pdf-templates",
+      "name": "procurementPackDocumentPagesV44Legacy",
+      "sha256": "e764b7bd6af4b8498f59322f40181b6bcfa06811d40af9989fbb95af2a1eb929"
+    },
+    {
+      "group": "procurement-pdf-templates",
+      "name": "procurementPackDocumentPagesBase",
+      "sha256": "662821203b63e48cc55ae5064ee7529902caff338964559e2a7084272c8a5f2b"
+    },
+    {
+      "group": "procurement-dialogs",
+      "name": "procurementFormModal",
+      "sha256": "8983eb6b29c3107382525917a629d8427748aac14c161da0f407342f13464bf8"
+    },
+    {
+      "group": "procurement-dialogs",
+      "name": "procurementFormModalV44Legacy",
+      "sha256": "98842da11c086db1705cb3a6e289b0bf56dc48573977506f76293a5aee8d58b4"
+    },
+    {
+      "group": "procurement-dialogs",
+      "name": "procurementSettingsModal",
+      "sha256": "deff8272a22c44cd2449344c66a8bfcd9632ff1641c294c0bd50942c33aa13d2"
+    },
+    {
+      "group": "academic-forms",
+      "name": "academicDocumentServiceFormModal",
+      "sha256": "554eeebc4d6df9a1b69170893f994c43e22154731540ed66ecd8b9edb3a4c49d"
+    },
+    {
+      "group": "academic-forms",
+      "name": "academicTransferFormModal",
+      "sha256": "64b636a652c5c5c36bcecc4f662771cac757fe8dd594987abeb893b996d817ea"
+    },
+    {
+      "group": "academic-forms",
+      "name": "academicCertificateFormModal",
+      "sha256": "519c4a355a65ebfde2bb074b13a2b33454dcb6015b4a06fa97e7fcd96b91646e"
+    },
+    {
+      "group": "academic-forms",
+      "name": "learnerActivityFormModal",
+      "sha256": "4f83bc20d90c205d3446df58d869dfc9391293b6be54b90d02a6f6f3e7d4b161"
+    },
+    {
+      "group": "academic-forms",
+      "name": "clubActivityFormModal",
+      "sha256": "baa36ac84ebd5d2e1fcde847eafed988e55042a2438c4f207797728046368ce6"
+    },
+    {
+      "group": "academic-forms",
+      "name": "classroomResearchFormModal",
+      "sha256": "555b5488e345f7ef53c42e02d24877e8e2170d3327a1cb2487627fd90f47e8c5"
+    },
+    {
+      "group": "school-lunch-dialogs",
+      "name": "schoolLunchRoundFormModal",
+      "sha256": "81e5c5b2f4d6beba0e26687905a3dcdcac1c1e96825f6f0058d4574efe8e8fe5"
+    },
+    {
+      "group": "learning-source-dialogs",
+      "name": "learningSourceFormModal",
+      "sha256": "ae61423e7b78533ffdbccca5544291e1bc94269419ff5ed9179eb820894fd658"
+    },
+    {
+      "group": "exam-dialogs",
+      "name": "examSetModal",
+      "sha256": "6ef53c719a95ca1afec192bc96ddd913489dda1f63578f558e717f67a8d202d7"
+    }
+  ]
+}

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const sql=readFileSync(new URL("../supabase-substitute-day-signature-atomic-20261030.sql",import.meta.url),"utf8");
-const app=readFileSync(new URL("../app.js",import.meta.url),"utf8");
+const app=readFileSync(new URL("../app.js",import.meta.url),"utf8")+"\n"+readFileSync(new URL("../modules/dashboard-events.js",import.meta.url),"utf8");
 const old=readFileSync(new URL("../supabase-substitute-day-unrestricted-20261030.sql",import.meta.url),"utf8");
 test("one validated signature is propagated across every real subject period before updating",()=>{
  const verify=sql.indexOf("perform public.record_bnk_action_signature(");

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import "./behavior-hard-delete.test.mjs";
 
-const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+const app = readFileSync(new URL("../app.js", import.meta.url), "utf8")+"\n"+readFileSync(new URL("../modules/dashboard-events.js",import.meta.url),"utf8");
 
 function functionSnippet(start, next) {
   const begin = app.indexOf(start);
