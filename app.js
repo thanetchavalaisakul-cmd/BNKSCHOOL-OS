@@ -7080,7 +7080,7 @@ async function saveSubstituteDayAssignments(signChoice=null) {
     }
     toast("บันทึกการจัดสอนแทนแล้ว","ระบบอัปเดตสถานะให้หัวหน้าบุคคลและผู้อำนวยการเห็นได้ทันที","success");
     state.substituteCandidateMap={}; await loadSubstituteWorkspace(); const fresh=substituteRowsForBatch(leaveId,date); if(fresh.some(canManageSubstituteLesson))await loadSubstituteDayCandidates(fresh); renderDashboard();
-  }catch(error){toast("บันทึกไม่สำเร็จ",friendlySubstituteError(error),"error");}finally{buttonLoading(button,false);}
+  }catch(error){toast("บันทึกไม่สำเร็จ",friendlySubstituteError(error),"error");if(signChoice)throw error;}finally{buttonLoading(button,false);}
 }
 
 function friendlySubstituteError(error) {

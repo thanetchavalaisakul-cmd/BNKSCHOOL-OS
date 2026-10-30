@@ -46,9 +46,9 @@ BEGIN
  WHEN p_system_code='academic_transfer' AND p_action_code='submit' THEN
   SELECT EXISTS(SELECT 1 FROM public.academic_transfer_requests r WHERE r.id=p_document_id AND r.created_by=v_uid AND r.status='draft') INTO v_ok;
  WHEN p_system_code='personnel_pa' AND p_action_code='pa_start' THEN
-  SELECT EXISTS(SELECT 1 FROM public.personnel_pa_submissions r WHERE r.id=p_document_id AND r.user_id=v_uid AND r.status='draft') INTO v_ok;
+  SELECT EXISTS(SELECT 1 FROM public.personnel_pa_submissions r WHERE r.id=p_document_id AND r.user_id=v_uid AND r.status IN('draft','submitted')) INTO v_ok;
  WHEN p_system_code='personnel_pa' AND p_action_code='pa_end' THEN
-  SELECT EXISTS(SELECT 1 FROM public.personnel_pa_reports r WHERE r.id=p_document_id AND r.user_id=v_uid AND r.status='draft') INTO v_ok;
+  SELECT EXISTS(SELECT 1 FROM public.personnel_pa_reports r WHERE r.id=p_document_id AND r.user_id=v_uid AND r.status IN('draft','submitted')) INTO v_ok;
  WHEN p_system_code='personnel_pa' AND p_action_code='pa_assess' THEN
   SELECT EXISTS(SELECT 1 FROM public.personnel_pa_assessments r JOIN public.personnel_pa_period_committee_members cm ON cm.id=r.committee_member_id WHERE r.id=p_document_id AND cm.evaluator_user_id=v_uid AND r.status='draft') INTO v_ok;
  WHEN p_system_code='home_visit' AND p_action_code='complete' THEN
