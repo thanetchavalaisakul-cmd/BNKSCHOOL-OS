@@ -5515,9 +5515,9 @@ async function loadTimetableWorkspace() {
     canLoadPeriodMaster
       ? supabase.from("timetable_period_template_items").select("*").order("sort_order")
       : Promise.resolve({ data: [], error: null }),
-    supabase.from("academic_subjects").select("*").eq("is_active",true).order("subject_name"),
-    supabase.from("teaching_assignments").select("*").eq("is_active",true).order("created_at"),
-    supabase.from("timetable_entries").select("*").order("weekday").order("created_at"),
+    fetchAllSupabaseRows(()=>supabase.from("academic_subjects").select("*").eq("is_active",true).order("subject_name").order("id")),
+    fetchAllSupabaseRows(()=>supabase.from("teaching_assignments").select("*").eq("is_active",true).order("created_at").order("id")),
+    fetchAllSupabaseRows(()=>supabase.from("timetable_entries").select("*").order("weekday").order("created_at").order("id")),
     supabase.from("homeroom_teachers").select("*").order("created_at"),
     canLoadRoster
       ? supabase.from("stage_heads").select("*").order("academic_year",{ascending:false})
@@ -16558,6 +16558,23 @@ function refreshOwnNotifications() {
   return notificationRefreshInFlight;
 }
 
+let bnkRealtimeRefreshTimer=null;
+let bnkRealtimeRefreshActive=false;
+let bnkRealtimeRefreshPending=false;
+function queueRealtimeDashboardRefresh(){
+  bnkRealtimeRefreshPending=true;
+  if(bnkRealtimeRefreshTimer||bnkRealtimeRefreshActive)return;
+  bnkRealtimeRefreshTimer=setTimeout(async()=>{
+    bnkRealtimeRefreshTimer=null;
+    if(!state.user||state.profile?.account_status!=="active"){bnkRealtimeRefreshPending=false;return;}
+    bnkRealtimeRefreshActive=true;
+    bnkRealtimeRefreshPending=false;
+    try{await renderDashboard();}
+    catch(error){console.warn("BNK Realtime refresh",error);}
+    finally{bnkRealtimeRefreshActive=false;if(bnkRealtimeRefreshPending)queueRealtimeDashboardRefresh();}
+  },300);
+}
+
 function subscribeRealtime() {
   return supabase
     .channel("school-os:user-events", { config: { private: false } })
@@ -16567,78 +16584,78 @@ function subscribeRealtime() {
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "lesson_plans" }, async () => {
       if (!state.user || state.profile?.account_status !== "active") return;
-      if (state.currentView === "module:lesson_plans") await renderDashboard();
+      if (state.currentView === "module:lesson_plans") queueRealtimeDashboardRefresh();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "workflow_actions" }, async () => {
       if (!state.user || state.profile?.account_status !== "active") return;
-      if (state.currentView === "module:lesson_plans" && state.selectedLessonPlanId) await renderDashboard();
+      if (state.currentView === "module:lesson_plans" && state.selectedLessonPlanId) queueRealtimeDashboardRefresh();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "leave_requests" }, async () => {
       if (!state.user || state.profile?.account_status !== "active") return;
-      if (state.currentView === "module:leave_management") await renderDashboard();
+      if (state.currentView === "module:leave_management") queueRealtimeDashboardRefresh();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "leave_actions" }, async () => {
       if (!state.user || state.profile?.account_status !== "active") return;
-      if (state.currentView === "module:leave_management") await renderDashboard();
+      if (state.currentView === "module:leave_management") queueRealtimeDashboardRefresh();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "official_attendance_records" }, async () => {
       if (!state.user || state.profile?.account_status !== "active") return;
-      if (state.currentView === "module:official_attendance") await renderDashboard();
+      if (state.currentView === "module:official_attendance") queueRealtimeDashboardRefresh();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "official_attendance_duty_records" }, async () => {
       if (!state.user || state.profile?.account_status !== "active") return;
-      if (state.currentView === "module:official_attendance") await renderDashboard();
+      if (state.currentView === "module:official_attendance") queueRealtimeDashboardRefresh();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "official_attendance_day_settings" }, async () => {
       if (!state.user || state.profile?.account_status !== "active") return;
-      if (state.currentView === "module:official_attendance") await renderDashboard();
+      if (state.currentView === "module:official_attendance") queueRealtimeDashboardRefresh();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "timetable_profiles" }, async () => {
       if (!state.user || state.profile?.account_status !== "active") return;
-      if (state.currentView === "module:timetable_management") await renderDashboard();
+      if (state.currentView === "module:timetable_management") queueRealtimeDashboardRefresh();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "timetable_entries" }, async () => {
       if (!state.user || state.profile?.account_status !== "active") return;
-      if (state.currentView === "module:timetable_management") await renderDashboard();
+      if (state.currentView === "module:timetable_management") queueRealtimeDashboardRefresh();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "substitute_lessons" }, async () => {
       if (!state.user || state.profile?.account_status !== "active") return;
-      if (state.currentView === "module:substitute_teaching") await renderDashboard();
+      if (state.currentView === "module:substitute_teaching") queueRealtimeDashboardRefresh();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "substitute_actions" }, async () => {
       if (!state.user || state.profile?.account_status !== "active") return;
-      if (state.currentView === "module:substitute_teaching" && state.selectedSubstituteLessonId) await renderDashboard();
+      if (state.currentView === "module:substitute_teaching" && state.selectedSubstituteLessonId) queueRealtimeDashboardRefresh();
     })
-    .on("postgres_changes", { event: "*", schema: "public", table: "school_projects" }, async () => { if(state.currentView==="module:project_management") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "project_activities" }, async () => { if(state.currentView==="module:project_management") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "budget_disbursements" }, async () => { if(state.currentView==="module:project_management") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "home_visit_records" }, async () => { if(state.currentView==="module:home_visit_management") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "students" }, async () => { if(state.studentRegistryImportInProgress)return; if(state.currentView==="module:student_registry"||state.currentView==="module:student_cards"||state.currentView==="module:home_visit_management") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "student_enrollments" }, async () => { if(state.studentRegistryImportInProgress)return; if(state.currentView==="module:student_registry"||state.currentView==="module:student_cards"||state.currentView==="module:home_visit_management") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_post_lesson_reports" }, async () => { if(state.currentView==="module:academic_submissions") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_post_lesson_behavior_scores" }, async () => { if(state.currentView==="module:academic_submissions") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_post_lesson_signatures" }, async () => { if(state.currentView==="module:academic_submissions") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_lesson_plan_usage_reports" }, async () => { if(state.currentView==="module:academic_submissions") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_lesson_plan_usage_signatures" }, async () => { if(state.currentView==="module:academic_submissions") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_learning_media_reports" }, async () => { if(state.currentView==="module:academic_submissions") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_learning_media_signatures" }, async () => { if(state.currentView==="module:academic_submissions") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_club_activity_reports" }, async () => { if(state.currentView==="module:academic_submissions") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_club_activity_members" }, async () => { if(state.currentView==="module:academic_submissions") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_club_activity_signatures" }, async () => { if(state.currentView==="module:academic_submissions") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_subject_group_heads" }, async () => { if(state.currentView==="module:academic_submissions") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_submission_deadlines" }, async () => { if(state.currentView==="module:academic_submissions") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_transfer_requests" }, async () => { if(state.currentView==="module:academic_registration") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_transfer_request_signatures" }, async () => { if(state.currentView==="module:academic_registration") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_certificate_requests" }, async () => { if(state.currentView==="module:academic_registration") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_certificate_request_signatures" }, async () => { if(state.currentView==="module:academic_registration") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_document_service_requests" }, async () => { if(state.currentView==="module:academic_registration") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "academic_document_service_signatures" }, async () => { if(state.currentView==="module:academic_registration") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "personnel_pa_periods" }, async () => { if(state.currentView==="module:personnel_pa") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "personnel_pa_submissions" }, async () => { if(state.currentView==="module:personnel_pa") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "personnel_pa_reports" }, async () => { if(state.currentView==="module:personnel_pa") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "student_cards" }, async () => { if(state.currentView==="module:student_cards") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "home_visit_settings" }, async () => { if(state.currentView==="module:home_visit_management") await renderDashboard(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "home_visit_household_members" }, async () => { if(state.currentView==="module:home_visit_management"&&state.selectedHomeVisitId) await renderDashboard(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "school_projects" }, async () => { if(state.currentView==="module:project_management") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "project_activities" }, async () => { if(state.currentView==="module:project_management") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "budget_disbursements" }, async () => { if(state.currentView==="module:project_management") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "home_visit_records" }, async () => { if(state.currentView==="module:home_visit_management") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "students" }, async () => { if(state.studentRegistryImportInProgress)return; if(state.currentView==="module:student_registry"||state.currentView==="module:student_cards"||state.currentView==="module:home_visit_management") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "student_enrollments" }, async () => { if(state.studentRegistryImportInProgress)return; if(state.currentView==="module:student_registry"||state.currentView==="module:student_cards"||state.currentView==="module:home_visit_management") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_post_lesson_reports" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_post_lesson_behavior_scores" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_post_lesson_signatures" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_lesson_plan_usage_reports" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_lesson_plan_usage_signatures" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_learning_media_reports" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_learning_media_signatures" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_club_activity_reports" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_club_activity_members" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_club_activity_signatures" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_subject_group_heads" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_submission_deadlines" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_transfer_requests" }, async () => { if(state.currentView==="module:academic_registration") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_transfer_request_signatures" }, async () => { if(state.currentView==="module:academic_registration") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_certificate_requests" }, async () => { if(state.currentView==="module:academic_registration") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_certificate_request_signatures" }, async () => { if(state.currentView==="module:academic_registration") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_document_service_requests" }, async () => { if(state.currentView==="module:academic_registration") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_document_service_signatures" }, async () => { if(state.currentView==="module:academic_registration") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "personnel_pa_periods" }, async () => { if(state.currentView==="module:personnel_pa") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "personnel_pa_submissions" }, async () => { if(state.currentView==="module:personnel_pa") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "personnel_pa_reports" }, async () => { if(state.currentView==="module:personnel_pa") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "student_cards" }, async () => { if(state.currentView==="module:student_cards") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "home_visit_settings" }, async () => { if(state.currentView==="module:home_visit_management") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "home_visit_household_members" }, async () => { if(state.currentView==="module:home_visit_management"&&state.selectedHomeVisitId) queueRealtimeDashboardRefresh(); })
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: state.user ? `id=eq.${state.user.id}` : undefined }, async () => {
       if (!state.user) return;
       await bootstrapApp();
