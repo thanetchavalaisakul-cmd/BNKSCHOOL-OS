@@ -1,11 +1,11 @@
 import {assertSignatureMethod,signatureOptionsHtml} from "./signature-standard.js?v=1";
 // Choose and bind a personal signature BEFORE a workflow transition occurs.
 // The database RPC atomically commits the action and its signature.
-export async function withWorkflowSignature({client,userId,title,notify,onConfirm,requireOnlineApproval=false}) {
+export async function withWorkflowSignature({client,userId,title,notify,onConfirm,onCancel,requireOnlineApproval=false}) {
   const {data:signatures,error:loadError}=await client.from("signatures")
     .select("id,label,is_default,storage_path,source").eq("user_id",userId)
     .order("created_at",{ascending:false});
-  if(loadError){notify("อ่านลายเซ็นไม่สำเร็จ",loadError.message,"error");return;}
+  if(loadError){notify("อ่านลายเซ็นไม่สำเร็จ",loadError.message,"error");onCancel?.();return;}
   const {data:prefs}=await client.rpc("get_my_signature_preferences");
   const config=Array.isArray(prefs)?prefs[0]:prefs||{};
   const preferredId=config.default_signature_id||signatures?.find(x=>x.is_default)?.id||signatures?.[0]?.id||"";
@@ -31,8 +31,8 @@ export async function withWorkflowSignature({client,userId,title,notify,onConfir
   </div>`;
   document.body.appendChild(modal);
   const close=()=>modal.remove();
-  modal.querySelector(".modal-close").onclick=close;
-  modal.querySelector(".modal-cancel").onclick=close;
+  modal.querySelector(".modal-close").onclick=()=>{close();onCancel?.();};
+  modal.querySelector(".modal-cancel").onclick=()=>{close();onCancel?.();};
   const method=modal.querySelector("#workflow-sign-method");
   method.value=config.preferred_method==="paper"?"paper":"stored";
   const refresh=()=>{for(const id of ["stored","drawn","upload","paper"])
