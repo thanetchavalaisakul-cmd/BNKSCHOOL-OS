@@ -1,0 +1,39 @@
+name: BNK whole-day substitute PDF matches per-period signature template
+on:
+  push:
+    branches: [fix/unified-day-substitute-pdf-20261030]
+permissions:
+  contents: write
+concurrency:
+  group: bnk-unified-day-substitute-pdf
+  cancel-in-progress: false
+jobs:
+  build-and-verify:
+    if: "!contains(github.event.head_commit.message, '[unified-day-pdf-built]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply verified scoped PDF patch
+        run: |
+          gzip -dc changes/substitute-day-pdf-unified.patch.gz > /tmp/substitute-day-pdf-unified.patch
+          git apply --check /tmp/substitute-day-pdf-unified.patch
+          git apply /tmp/substitute-day-pdf-unified.patch
+      - name: Build and run complete regressions
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify
+          git diff --check
+      - name: Commit tested PDF template and optimized script
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js app.min.js index.html
+          git commit -m "fix: reuse original substitute PDF for whole-day and show one signature in every slot [unified-day-pdf-built]"
+          git push origin HEAD:fix/unified-day-substitute-pdf-20261030
