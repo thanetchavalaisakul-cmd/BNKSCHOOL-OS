@@ -1,0 +1,11 @@
+.substitute-all-day-modes{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.substitute-all-day-panel .personnel-detail-top{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.substitute-all-day-panel .field{min-width:0}
+.substitute-all-day-panel .table-wrap{overflow-x:auto}
+.substitute-all-day-current{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;padding:14px 16px;border-radius:12px;background:#eff6ff;color:#1e3a8a;margin:12px 0}
+.substitute-day-choose{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin:16px 0}
+.substitute-day-choose>.field{flex:1 1 240px}
+.substitute-day-warning{color:#9a3412;padding:12px;border-left:3px solid #ea580c;background:#fff7ed;border-radius:8px;margin:10px 0}
+.substitute-day-task{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-top:1px solid #e2e8f0;padding:16px 0}
+.substitute-day-task p{margin:5px 0 0;color:#475569}
+@media(max-width:640px){.substitute-all-day-modes>.btn,.substitute-day-choose>.btn,.substitute-day-task>.btn{width:100%;min-height:44px}.substitute-day-choose{display:grid;grid-template-columns:minmax(0,1fr)}.substitute-all-day-panel .table-wrap{margin-inline:-12px}}
