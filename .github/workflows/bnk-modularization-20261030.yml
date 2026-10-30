@@ -1,0 +1,43 @@
+name: BNK SCHOOL OS modularization and full regression
+on:
+  push:
+    branches: [fix/bnk-modularization-20261030]
+permissions:
+  contents: write
+concurrency:
+  group: bnk-modularization-20261030
+  cancel-in-progress: false
+jobs:
+  extract-test-build:
+    if: "!contains(github.event.head_commit.message, '[modularization-built]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install isolated AST build tools
+        run: |
+          npm ci --no-audit --no-fund
+          npm install --no-save --package-lock=false --no-audit --no-fund acorn@8.19.0 eslint-scope@9.1.2
+      - name: Extract 35 original functions into 12 lazy modules
+        run: |
+          tar -xzf changes/bnk-modularize-20261030.tar.gz
+          node changes/modularize/apply.cjs
+          python3 changes/modularize/patch-tests.py
+      - name: Run all regression tests and validate every module
+        run: |
+          npm run verify
+          for file in modules/*.js; do node --check "$file"; done
+          git diff --check
+      - name: Commit tested modules and optimized app
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js app.min.js index.html modules tests docs/modules changes/modularize
+          git commit -m "refactor: move 35 functions into 12 lazily loaded modules [modularization-built]"
+          git push origin HEAD:fix/bnk-modularization-20261030
