@@ -14,10 +14,11 @@ test("four-method explicit signatures precede lesson plan and all registration s
  assert.doesNotMatch(app,/supabase\.rpc\("submit_academic_document_service_request",/);
 });
 test("PA workflow, home visits, budget, substitute use signed action gate",()=>{
- for(const action of ["pa_start","pa_end","pa_assess","complete","document_ready","assign"])
+ for(const action of ["pa_start","pa_end","pa_assess","complete","document_ready"])
   assert.ok(app.includes('"'+action+'"'),action);
  assert.match(app,/record_bnk_action_signature/);
  assert.match(app,/assign_bnk_substitute_signed/);
+ assert.match(foundation,/p_action_code=\x27assign\x27/);
  assert.match(app,/personnelPa2EvaluatorProfileComplete.*signature_method==="paper"/);
 });
 test("timetable own Auto Sign, no approval requirement",()=>{
