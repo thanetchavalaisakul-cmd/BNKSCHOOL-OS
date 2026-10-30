@@ -21,6 +21,7 @@ import { createTimetableConstraintFeature } from "./timetable-constraints.js?v=4
 import { staffDutyTeachingDisplay } from "./staff-duty-label.js?v=1";
 import { paginateRows } from "./student-pagination.js?v=1";
 import { openJointActivityModal } from "./timetable-joint.js?v=1";
+import { wholeDayDocumentRows, wholeDayDocumentImages } from "./substitute-day-document.mjs";
 import { compareProjectRecords, compareActivityRecords } from "./project-natural-sort.mjs";
 // Load document generation tools only when the user requests a PDF or image.
 let canvasModulePromise=null,jsPdfModulePromise=null,pdfDocumentModulePromise=null;
@@ -7172,43 +7173,45 @@ function substituteAllDayMineHtml() {
  (d.status==="assigned"?'<button class="btn btn-primary" data-confirm-substitute-all-day="'+d.id+'">ตอบรับการสอนแทนทั้งวัน</button>':'<button class="btn btn-secondary" data-substitute-all-day-pdf="'+d.id+'">เอกสาร PDF</button>')+'</article>').join("")+'</section>';
 }
 async function substituteAllDayPdfPreview(dayId) {
- const day=(state.substituteDayAssignments||[]).find(d=>d.id===dayId);
- if(!day)return toast("ไม่พบงานสอนแทนทั้งวัน","","error");
- const periods=substituteDayPeriods(dayId);
- if(!periods.length)return toast("ไม่พบคาบเรียนของวันนั้น","","error");
- const [images,logo,signersRes,director]=await Promise.all([
-  schoolDocumentSignatureImages(supabase,"substitute",day.leave_request_id,day.leave_date,toast),
-  schoolLogoDataUrl(),supabase.rpc("get_substitute_document_signers",{p_leave_request_id:day.leave_request_id}),
-  centralAutoSignatureAsset("substitute_teaching",day.leave_request_id)
- ]);
- const signers=signersRes.data?.[0]||{},src=images["substitute_day:"+day.id];
- const paper=day.signature_method==="paper";
- const signStatus=day.status==="accepted"?
-  (paper?"ครูตอบรับเมื่อ "+formatDate(day.accepted_at)+" · รอลายเซ็นจริงบนกระดาษ":"ครูตอบรับและลงลายเซ็นเมื่อ "+formatDate(day.accepted_at)):
-  "รอครูผู้รับมอบหมายตอบรับ";
- const body='<article class="a4-document"><div class="a4-document-inner"><header class="sub-doc-head">'+
- (logo?'<img class="a4-school-logo" src="'+logo+'" alt="ตราโรงเรียน">':"")+
- '<div class="school">'+escapeHtml(schoolName())+'</div><h1>บันทึกการปฏิบัติหน้าที่สอนแทนทั้งวัน</h1></header>'+
- '<div class="sub-doc-sub">วันที่ '+thaiDateOnly(day.leave_date)+' · ผู้ลา '+escapeHtml((state.substituteLessons||[]).find(x=>x.leave_request_id===day.leave_request_id)?.absent_teacher_name||"")+
- ' · '+escapeHtml(signStatus)+'</div><table class="sub-doc-table"><thead><tr><th>คาบ</th><th>เวลา</th><th>ชั้น/ห้อง</th><th>รายวิชา / การปฏิบัติหน้าที่</th><th>ผู้รับมอบหมาย</th></tr></thead><tbody>'+
- periods.map(p=>'<tr><td>'+Number(p.period_no)+'</td><td>'+timeShort(p.start_time)+'–'+timeShort(p.end_time)+'</td><td>'+escapeHtml(p.class_label||"—")+
- '</td><td>'+escapeHtml(p.subject_name||"ปฏิบัติหน้าที่แทนครูผู้ลา")+'</td><td>'+escapeHtml(day.substitute_teacher_name)+'</td></tr>').join("")+
- '</tbody></table><div class="sub-doc-signatures">'+
- substituteWetSign("ครูผู้รับมอบหมายทั้งวัน",day.substitute_teacher_name,src||null,signStatus)+
- substituteWetSign("หัวหน้ากลุ่มงานบริหารงานวิชาการ",signers.academic_head_name,images.academic_head||null)+
- substituteWetSign("ผู้อำนวยการโรงเรียน",director?.signer_name||signers.director_name,images.director||director?.image||null)+
- '</div></div></article>';
- const modal=document.createElement("div");modal.className="modal-backdrop a4-preview-backdrop";
- modal.innerHTML='<div class="a4-preview-shell"><div class="a4-preview-toolbar"><strong>บันทึกสอนแทนทั้งวัน · '+periods.length+' คาบ</strong><div class="a4-preview-actions"><button class="btn btn-ghost" id="sub-day-close">ปิด</button><button class="btn btn-primary" id="sub-day-print">พิมพ์ / บันทึก PDF</button></div></div><div class="a4-preview-scroll"><style>'+substituteDocumentStyles()+'</style>'+body+'</div></div>';
- document.body.appendChild(modal);
- modal.querySelector("#sub-day-close")?.addEventListener("click",()=>modal.remove());
- modal.querySelector("#sub-day-print")?.addEventListener("click",()=>{
-  const w=window.open("","_blank");if(!w)return toast("เปิดหน้าพิมพ์ไม่ได้","กรุณาอนุญาต Pop-up","error");
-  w.document.write('<!doctype html><html lang="th"><head><meta charset="UTF-8"><title>บันทึกสอนแทนทั้งวัน</title><style>'+substituteDocumentStyles()+'</style></head><body class="a4-print-body">'+body+'</body></html>');
-  w.document.close();w.addEventListener("load",()=>setTimeout(()=>w.print(),250));
- });
+  const day=(state.substituteDayAssignments||[]).find(d=>d.id===dayId&&d.status!=="cancelled");
+  if(!day)return toast("ไม่พบงานสอนแทนทั้งวัน","","error");
+  const periods=substituteDayPeriods(dayId);
+  if(!periods.length)return toast("ไม่พบคาบเรียนของวันนั้น","","error");
+  const lessons=substituteRowsForBatch(day.leave_request_id,day.leave_date);
+  const leave=(state.leaveRequests||[]).find(r=>r.id===day.leave_request_id)||null;
+  const rows=wholeDayDocumentRows(periods,lessons,day,leave);
+  const [images,schoolLogo,signersRes,directorSignature]=await Promise.all([
+    schoolDocumentSignatureImages(supabase,"substitute",day.leave_request_id,day.leave_date,toast),
+    schoolLogoDataUrl(),
+    supabase.rpc("get_substitute_document_signers",{p_leave_request_id:day.leave_request_id}),
+    centralAutoSignatureAsset("substitute_teaching",day.leave_request_id)
+  ]);
+  if(signersRes.error)return toast("เตรียมชื่อผู้ลงนามไม่ได้",signersRes.error.message,"error");
+  // Keep every original header/table/signer/PDF style from the per-period document.
+  // The one accepted teacher signature is shown on EVERY period, including duty-only periods.
+  // The confirmed substitute_day: slot is mirrored into each real lesson and duty-only PDF row.
+  const documentImages=wholeDayDocumentImages(images,rows,day);
+  const signers=signersRes.data?.[0]||{};
+  const body=buildSubstituteDocument(rows,signers,schoolLogo,directorSignature,documentImages);
+  const signStatus=day.status==="accepted"
+    ?(day.signature_method==="paper"?"ตอบรับแล้ว · รอลายเซ็นจริงบนกระดาษ":"ตอบรับพร้อมลงลายเซ็นครบทุกคาบแล้ว")
+    :"รอครูผู้รับมอบหมายตอบรับและเลือกวิธีลงลายเซ็น";
+  const modal=document.createElement("div");modal.className="modal-backdrop a4-preview-backdrop";
+  modal.innerHTML='<div class="a4-preview-shell"><div class="a4-preview-toolbar"><div><strong>บันทึกการจัดครูสอนแทน · '+periods.length+' คาบ</strong><span>A4 แนวนอน · '+escapeHtml(signStatus)+'</span></div>'+
+    '<div class="a4-preview-actions"><button class="btn btn-ghost" id="sub-day-close">ปิด</button>'+
+    (day.status==="assigned"&&day.substitute_teacher_id===state.user.id?'<button class="btn btn-secondary" id="sub-day-accept">✍ ตอบรับและเลือกวิธีลงลายเซ็น</button>':"")+
+    '<button class="btn btn-primary" id="sub-day-print">พิมพ์ / บันทึก PDF</button></div></div>'+
+    '<div class="a4-preview-scroll"><style>'+substituteDocumentStyles()+'</style>'+body+'</div></div>';
+  document.body.appendChild(modal);
+  modal.querySelector("#sub-day-close")?.addEventListener("click",()=>modal.remove());
+  modal.querySelector("#sub-day-accept")?.addEventListener("click",async()=>{modal.remove();await confirmSubstituteAllDay(day.id);});
+  modal.querySelector("#sub-day-print")?.addEventListener("click",()=>{
+    const w=window.open("","_blank");
+    if(!w)return toast("เปิดหน้าพิมพ์ไม่ได้","กรุณาอนุญาต Pop-up","error");
+    w.document.write('<!doctype html><html lang="th"><head><meta charset="UTF-8"><title>บันทึกการจัดครูสอนแทน</title><style>'+substituteDocumentStyles()+'</style></head><body class="a4-print-body">'+body+'<script>window.addEventListener("load",()=>{(document.fonts?document.fonts.ready:Promise.resolve()).finally(()=>setTimeout(()=>window.print(),250));});<\/script></body></html>');
+    w.document.close();
+  });
 }
-
 
 function substituteDayPlannerHtml() {
  const mode=substituteAllDayModeHtml();
