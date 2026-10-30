@@ -21,6 +21,7 @@ import { createTimetableConstraintFeature } from "./timetable-constraints.js?v=4
 import { staffDutyTeachingDisplay } from "./staff-duty-label.js?v=1";
 import { paginateRows } from "./student-pagination.js?v=1";
 import { openJointActivityModal } from "./timetable-joint.js?v=1";
+import { compareProjectRecords, compareActivityRecords } from "./project-natural-sort.mjs";
 // Load document generation tools only when the user requests a PDF or image.
 let canvasModulePromise=null,jsPdfModulePromise=null,pdfDocumentModulePromise=null;
 async function html2canvas(...args){
@@ -7450,8 +7451,8 @@ async function loadProjectWorkspace(){
     supabase.from("personnel_public_directory").select("*").order("full_name"),
     supabase.from("signatures").select("*").eq("user_id",state.user.id).order("created_at",{ascending:false}),
   ]);
-  state.schoolProjects=p.error?[]:(p.data||[]);
-  state.projectActivities=a.error?[]:(a.data||[]);
+  state.schoolProjects=p.error?[]:(p.data||[]).sort(compareProjectRecords);
+  state.projectActivities=a.error?[]:(a.data||[]).sort(compareActivityRecords);
   state.budgetDisbursements=b.error?[]:(b.data||[]);
   state.budgetControlSettings=c.error?[]:(c.data||[]);
   state.budgetSignerAssignments=s.error?[]:(s.data||[]);
@@ -12716,8 +12717,8 @@ async function loadProcurementWorkspace(){
   state.procurementCases=casesRes.data||[];
   state.procurementVendors=vendorRes.error?[]:(vendorRes.data||[]);
   state.procurementItemCatalog=itemRes.error?[]:(itemRes.data||[]);
-  state.procurementProjects=projectRes.error?[]:(projectRes.data||[]);
-  state.procurementActivities=activityRes.error?[]:(activityRes.data||[]);
+  state.procurementProjects=projectRes.error?[]:(projectRes.data||[]).sort(compareProjectRecords);
+  state.procurementActivities=activityRes.error?[]:(activityRes.data||[]).sort(compareActivityRecords);
   state.procurementPersonnel=personnelRes.error?[]:(personnelRes.data||[]);
   state.procurementSystemSettings=settingsRes.error?{}:(settingsRes.data||{});
   state.procurementControlNumbers=controlRes.error?[]:(controlRes.data||[]);
