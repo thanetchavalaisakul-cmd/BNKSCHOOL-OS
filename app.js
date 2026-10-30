@@ -6896,7 +6896,8 @@ function substitutePeriodRows() {
 
 function substituteRowsForView() {
   let rows=substitutePeriodRows();
-  if(state.substituteView==="mine") rows=rows.filter(x=>x.substitute_teacher_id===state.user.id);
+  if(state.substituteView==="mine") rows=rows.filter(x=>x.substitute_teacher_id===state.user.id
+    && !substituteActiveDay(x.leave_request_id,x.leave_date));
   else if(state.substituteView==="absent") rows=rows.filter(x=>x.absent_teacher_id===state.user.id);
   else if(state.substituteView==="pending") rows=rows.filter(x=>x.status==="unassigned");
   return [...rows].sort((a,b)=>String(a.leave_date).localeCompare(String(b.leave_date))||Number(a.period_no)-Number(b.period_no));
@@ -6935,6 +6936,12 @@ async function loadSubstituteWorkspace() {
   ]);
   state.substituteLessons=lessonsRes.error?[]:(lessonsRes.data||[]);
   state.substituteActions=actionsRes.error?[]:(actionsRes.data||[]);
+  const [daysRes,dayPeriodsRes]=await Promise.all([
+    supabase.from("substitute_day_assignments").select("*").order("leave_date",{ascending:false}),
+    supabase.from("substitute_day_periods").select("*").order("period_no")
+  ]);
+  state.substituteDayAssignments=daysRes.error?[]:(daysRes.data||[]);
+  state.substituteDayPeriodRows=dayPeriodsRes.error?[]:(dayPeriodsRes.data||[]);
   const [coverRes,unitRes,classesRes]=await Promise.all([
     supabase.from("preschool_group_covers").select("*").order("leave_date",{ascending:false}).limit(1500),
     supabase.from("preschool_shared_weekly_units").select("*").order("week_start"),
@@ -7019,7 +7026,7 @@ function substituteBatchCardsHtml(rows) {
   }).join("")}</div>`;
 }
 
-function substituteAssignedTableHtml(rows) {
+function legacySubstituteAssignedTableHtml(rows) {
   if(!rows.length)return `<div class="empty"><strong>ยังไม่มีงานสอนแทน</strong><span>เมื่อได้รับมอบหมาย รายการจะแสดงที่นี่</span></div>`;
   return `<div class="table-wrap"><table class="table substitute-table"><thead><tr><th>วันที่</th><th>คาบ / เวลา</th><th>ชั้น / วิชา</th><th>ครูผู้ลา</th><th>สถานะ</th><th></th></tr></thead><tbody>${rows.map(row=>`<tr><td><strong>${thaiDateOnly(row.leave_date)}</strong></td><td><strong>คาบ ${row.period_no}</strong><br><span class="table-muted">${timeShort(row.start_time)}–${timeShort(row.end_time)}</span></td><td><strong>${escapeHtml(row.class_label)}</strong><br><span class="table-muted">${escapeHtml(row.subject_name)}</span></td><td>${escapeHtml(row.absent_teacher_name)}</td><td>${substituteStatusPill(row.status)}</td><td><button class="btn btn-ghost" data-substitute-open="${row.id}">รายละเอียด</button></td></tr>`).join("")}</tbody></table></div>`;
 }
@@ -7053,10 +7060,172 @@ async function openSubstituteDayPlanner(leaveRequestId,date=null) {
   state.selectedSubstituteDate=date&&dates.includes(date)?date:(dates[0]||null);
   const rows=substituteRowsForBatch(leaveRequestId,state.selectedSubstituteDate);
   if(rows.some(canManageSubstituteLesson))await loadSubstituteDayCandidates(rows);
+  await loadSubstituteAllDayContext(leaveRequestId,state.selectedSubstituteDate);
   await renderDashboard();
 }
 
+
+/* BNK SCHOOL OS: full-day substitute assignment. All writes use atomic authenticated RPCs. */
+function substituteActiveDay(leaveId,date) {
+ return (state.substituteDayAssignments||[]).find(d=>d.leave_request_id===leaveId&&d.leave_date===date&&d.status!=="cancelled")||null;
+}
+function substituteDayPeriods(dayId) {
+ return (state.substituteDayPeriodRows||[]).filter(p=>p.day_assignment_id===dayId).sort((a,b)=>Number(a.period_no)-Number(b.period_no));
+}
+async function loadSubstituteAllDayContext(leaveId,date) {
+ state.substituteDayPlan=[];state.substituteDayCandidates=[];state.substituteDayError="";
+ if(!leaveId||!date)return;
+ const rows=substituteRowsForBatch(leaveId,date);
+ if(!rows.length)return;
+ const call=[supabase.rpc("preview_substitute_day",{p_leave_request_id:leaveId,p_leave_date:date})];
+ if(rows.some(canManageSubstituteLesson))call.push(supabase.rpc("get_substitute_day_candidates",{p_leave_request_id:leaveId,p_leave_date:date}));
+ const [plan,people]=await Promise.all(call);
+ if(plan.error)state.substituteDayError=plan.error.message;
+ else state.substituteDayPlan=plan.data||[];
+ if(people?.error)state.substituteDayError=people.error.message;
+ else state.substituteDayCandidates=people?.data||[];
+}
+function substituteAllDayModeHtml() {
+ const active=substituteActiveDay(state.selectedSubstituteLeaveId,state.selectedSubstituteDate);
+ return '<div class="substitute-all-day-modes" role="group" aria-label="รูปแบบการจัดสอนแทน">'+
+ '<button class="btn '+(state.substituteDayMode!=="all"?"btn-primary":"btn-ghost")+'" data-substitute-mode="period">จัดสรรรายคาบ</button>'+
+ '<button class="btn '+(state.substituteDayMode==="all"?"btn-primary":"btn-ghost")+'" data-substitute-mode="all">จัดสรรครูคนเดียวทั้งวัน</button></div>'+
+ (active&&state.substituteDayMode!=="all"?'<p class="substitute-day-warning">มีการมอบหมายทั้งวันอยู่แล้ว หากต้องการกลับไปจัดรายคาบ กรุณายกเลิกชุดทั้งวันก่อน</p>':"");
+}
+function substituteAllDayPlannerHtml() {
+ const leaveId=state.selectedSubstituteLeaveId,date=state.selectedSubstituteDate,rows=substituteRowsForBatch(leaveId,date);
+ const active=substituteActiveDay(leaveId,date),canEdit=rows.some(canManageSubstituteLesson);
+ const dates=substituteBatchDates(leaveId);
+ const plan=active?substituteDayPeriods(active.id):(state.substituteDayPlan||[]);
+ const preview=plan.map(p=>'<tr><td>คาบ '+Number(p.period_no)+'</td><td>'+timeShort(p.start_time)+'–'+timeShort(p.end_time)+'</td><td>'+
+ (p.subject_name?'<strong>'+escapeHtml(p.subject_name)+'</strong><small class="table-muted"> · '+escapeHtml(p.class_label||"")+'</small>':'<span class="table-muted">ปฏิบัติหน้าที่แทนครูผู้ลา (ไม่มีรายวิชาตามตาราง)</span>')+
+ '</td><td>'+(active?escapeHtml(active.substitute_teacher_name):'<span class="table-muted">รอเลือกครู</span>')+'</td><td>'+
+ (active?(active.status==="accepted"?'ตอบรับแล้ว':"รอตอบรับ"):"—")+'</td></tr>').join("");
+ const candidates=state.substituteDayCandidates||[];
+ const options=candidates.map(c=>'<option value="'+escapeHtml(c.teacher_id)+'" '+(!c.available?'disabled':'')+'>'+
+ escapeHtml(c.teacher_name)+(c.available?' · ว่างทั้งวัน':' · '+(c.conflict_reason||"ไม่ว่าง"))+'</option>').join("");
+ const status=active?(active.status==="accepted"?(active.signature_method==="paper"?"ตอบรับแล้ว · รอลายเซ็นจริงบนกระดาษ":"ตอบรับพร้อมลงลายเซ็นแล้ว"):"มอบหมายแล้ว · รอตอบรับ"):"ยังไม่ได้มอบหมาย";
+ const first=rows[0];
+ return '<section class="panel substitute-all-day-panel"><div class="personnel-detail-top"><button class="type-back-link" id="substitute-day-back">← กลับรายการ</button>'+
+ '<div><h3>จัดสรรครูคนเดียวทั้งวัน</h3><p>ผู้ลา '+escapeHtml(first?.absent_teacher_name||"")+' · จำนวน '+plan.length+' คาบ · '+escapeHtml(status)+'</p></div></div>'+
+ '<div class="field"><label for="substitute-day-date">เลือกวันที่ลา</label><select class="select" id="substitute-day-date">'+
+ dates.map(d=>'<option value="'+d+'" '+(d===date?'selected':'')+'>'+thaiDateOnly(d)+'</option>').join("")+'</select></div>'+
+ (state.substituteDayError?'<p class="substitute-day-warning">'+escapeHtml(state.substituteDayError)+'</p>':'')+
+ (active?'<div class="substitute-all-day-current"><strong>ครูผู้รับผิดชอบ: '+escapeHtml(active.substitute_teacher_name)+'</strong><span>'+escapeHtml(status)+
+ (active.accepted_at?' · '+formatDate(active.accepted_at):"")+'</span></div>':"")+
+ (canEdit?'<div class="substitute-day-choose"><div class="field"><label for="substitute-all-day-teacher">ครูสอนแทนตลอดทั้งวัน (เลือกเพียงครั้งเดียว)</label><select class="select" id="substitute-all-day-teacher"><option value="">— เลือกครูที่ไม่มีภาระชนทั้งวัน —</option>'+options+'</select></div>'+
+ '<button class="btn btn-primary" id="save-substitute-all-day" '+(!plan.length?'disabled':'')+'>'+(active?"เปลี่ยนครูทั้งวัน":"มอบหมายครบทุกคาบ")+'</button>'+
+ (active?'<button class="btn btn-danger" id="cancel-substitute-all-day">ยกเลิกชุดทั้งวัน</button>':"")+
+ '</div>':'')+
+ '<p class="table-muted">ระบบตรวจคาบสอนประจำ คำขอลา และงานสอนแทนอื่นก่อนบันทึก ไม่จำกัดช่วงชั้นและไม่เพิ่มวิชาปลอม</p>'+
+ '<div class="table-wrap"><table class="table substitute-table"><thead><tr><th>คาบ</th><th>เวลา</th><th>รายวิชา / หน้าที่</th><th>ครูสอนแทน</th><th>ตอบรับ</th></tr></thead><tbody>'+preview+'</tbody></table></div>'+
+ (active?'<button class="btn btn-secondary" id="substitute-all-day-pdf">พิมพ์ / PDF ทั้งวัน</button>':'')+'</section>';
+}
+async function saveSubstituteAllDay() {
+ const leaveId=state.selectedSubstituteLeaveId,date=state.selectedSubstituteDate;
+ const teacherId=document.querySelector("#substitute-all-day-teacher")?.value;
+ if(!teacherId)return toast("กรุณาเลือกครูสอนแทน","ต้องเลือกครูที่ว่างตลอดทั้งวัน","error");
+ const selected=(state.substituteDayCandidates||[]).find(x=>x.teacher_id===teacherId);
+ if(!selected?.available)return toast("ครูไม่ว่างทั้งวัน",selected?.conflict_reason||"กรุณาตรวจสอบตารางสอน","error");
+ const btn=document.querySelector("#save-substitute-all-day");buttonLoading(btn,true,"กำลังตรวจและบันทึก...");
+ try{
+  await bnkSignatureBeforeAction("เลือกลายเซ็นก่อนมอบหมายครูสอนแทนทั้งวัน",async choice=>{
+   const {error}=await supabase.rpc("assign_substitute_day_signed",{
+    p_leave_request_id:leaveId,p_leave_date:date,p_teacher_id:teacherId,
+    p_method:choice.method,p_signature_id:choice.signatureId,p_note:null
+   });
+   if(error)throw error;
+   toast("มอบหมายครูสอนแทนทั้งวันแล้ว","ครบทุกคาบในวันเดียว ครูผู้รับมอบหมายตอบรับเพียงครั้งเดียว","success");
+   await renderDashboard();
+  });
+ }catch(error){toast("มอบหมายทั้งวันไม่สำเร็จ",friendlySubstituteError(error),"error");}
+ finally{buttonLoading(btn,false);}
+}
+async function confirmSubstituteAllDay(dayId) {
+ const day=(state.substituteDayAssignments||[]).find(d=>d.id===dayId);
+ if(!day||day.substitute_teacher_id!==state.user.id||day.status!=="assigned")return;
+ await withWorkflowSignature({client:supabase,userId:state.user.id,
+  title:"ตอบรับการสอนแทนทั้งวัน · ลงลายเซ็นครั้งเดียว",notify:toast,
+  onConfirm:async({method,signatureId})=>{
+   const {error}=await supabase.rpc("confirm_substitute_day_signed",{p_day_assignment_id:dayId,p_method:method,p_signature:signatureId});
+   if(error)throw error;
+   toast("ตอบรับการสอนแทนทั้งวันสำเร็จ",method==="paper"?"บันทึกการตอบรับแล้ว · รอเซ็นเอกสารกระดาษ":"ลายเซ็นครอบคลุมทุกคาบในวันเดียวกัน","success");
+   await renderDashboard();
+  }
+ });
+}
+async function cancelSubstituteAllDay() {
+ const day=substituteActiveDay(state.selectedSubstituteLeaveId,state.selectedSubstituteDate);
+ if(!day||!window.confirm("ยกเลิกการมอบหมายทั้งวัน? ระบบจะคืนคาบรายวิชาจริงเป็นรอจัดครู"))return;
+ const {error}=await supabase.rpc("cancel_substitute_day",{p_day_assignment_id:day.id,p_note:"ยกเลิกจากหน้าจัดสรรครู"});
+ if(error)return toast("ยกเลิกไม่สำเร็จ",friendlySubstituteError(error),"error");
+ toast("ยกเลิกการมอบหมายทั้งวันแล้ว","","success");await renderDashboard();
+}
+function substituteAllDayMineHtml() {
+ const days=(state.substituteDayAssignments||[]).filter(d=>d.substitute_teacher_id===state.user.id&&d.status!=="cancelled"
+  &&Number(d.academic_year)===substituteCurrentPeriod().academicYear&&Number(d.semester)===substituteCurrentPeriod().semester);
+ if(!days.length)return "";
+ return '<section class="panel substitute-all-day-panel"><div class="panel-head"><div class="panel-title-wrap"><h3>งานสอนแทนทั้งวัน · ตอบรับครั้งเดียว</h3></div></div>'+
+ days.map(d=>'<article class="substitute-day-task"><div><strong>'+thaiDateOnly(d.leave_date)+' · '+escapeHtml(d.substitute_teacher_name)+'</strong>'+
+ '<p>รับผิดชอบทั้งวัน '+substituteDayPeriods(d.id).length+' คาบ · '+(d.status==="accepted"?(d.signature_method==="paper"?"ตอบรับแล้ว · รอเซ็นบนกระดาษ":"ตอบรับและลงลายเซ็นแล้ว"):"รอตอบรับ")+'</p></div>'+
+ (d.status==="assigned"?'<button class="btn btn-primary" data-confirm-substitute-all-day="'+d.id+'">ตอบรับการสอนแทนทั้งวัน</button>':'<button class="btn btn-secondary" data-substitute-all-day-pdf="'+d.id+'">เอกสาร PDF</button>')+'</article>').join("")+'</section>';
+}
+async function substituteAllDayPdfPreview(dayId) {
+ const day=(state.substituteDayAssignments||[]).find(d=>d.id===dayId);
+ if(!day)return toast("ไม่พบงานสอนแทนทั้งวัน","","error");
+ const periods=substituteDayPeriods(dayId);
+ if(!periods.length)return toast("ไม่พบคาบเรียนของวันนั้น","","error");
+ const [images,logo,signersRes,director]=await Promise.all([
+  schoolDocumentSignatureImages(supabase,"substitute",day.leave_request_id,day.leave_date,toast),
+  schoolLogoDataUrl(),supabase.rpc("get_substitute_document_signers",{p_leave_request_id:day.leave_request_id}),
+  centralAutoSignatureAsset("substitute_teaching",day.leave_request_id)
+ ]);
+ const signers=signersRes.data?.[0]||{},src=images["substitute_day:"+day.id];
+ const paper=day.signature_method==="paper";
+ const signStatus=day.status==="accepted"?
+  (paper?"ครูตอบรับเมื่อ "+formatDate(day.accepted_at)+" · รอลายเซ็นจริงบนกระดาษ":"ครูตอบรับและลงลายเซ็นเมื่อ "+formatDate(day.accepted_at)):
+  "รอครูผู้รับมอบหมายตอบรับ";
+ const body='<article class="a4-document"><div class="a4-document-inner"><header class="sub-doc-head">'+
+ (logo?'<img class="a4-school-logo" src="'+logo+'" alt="ตราโรงเรียน">':"")+
+ '<div class="school">'+escapeHtml(schoolName())+'</div><h1>บันทึกการปฏิบัติหน้าที่สอนแทนทั้งวัน</h1></header>'+
+ '<div class="sub-doc-sub">วันที่ '+thaiDateOnly(day.leave_date)+' · ผู้ลา '+escapeHtml((state.substituteLessons||[]).find(x=>x.leave_request_id===day.leave_request_id)?.absent_teacher_name||"")+
+ ' · '+escapeHtml(signStatus)+'</div><table class="sub-doc-table"><thead><tr><th>คาบ</th><th>เวลา</th><th>ชั้น/ห้อง</th><th>รายวิชา / การปฏิบัติหน้าที่</th><th>ผู้รับมอบหมาย</th></tr></thead><tbody>'+
+ periods.map(p=>'<tr><td>'+Number(p.period_no)+'</td><td>'+timeShort(p.start_time)+'–'+timeShort(p.end_time)+'</td><td>'+escapeHtml(p.class_label||"—")+
+ '</td><td>'+escapeHtml(p.subject_name||"ปฏิบัติหน้าที่แทนครูผู้ลา")+'</td><td>'+escapeHtml(day.substitute_teacher_name)+'</td></tr>').join("")+
+ '</tbody></table><div class="sub-doc-signatures">'+
+ substituteWetSign("ครูผู้รับมอบหมายทั้งวัน",day.substitute_teacher_name,src||null,signStatus)+
+ substituteWetSign("หัวหน้ากลุ่มงานบริหารงานวิชาการ",signers.academic_head_name,images.academic_head||null)+
+ substituteWetSign("ผู้อำนวยการโรงเรียน",director?.signer_name||signers.director_name,images.director||director?.image||null)+
+ '</div></div></article>';
+ const modal=document.createElement("div");modal.className="modal-backdrop a4-preview-backdrop";
+ modal.innerHTML='<div class="a4-preview-shell"><div class="a4-preview-toolbar"><strong>บันทึกสอนแทนทั้งวัน · '+periods.length+' คาบ</strong><div class="a4-preview-actions"><button class="btn btn-ghost" id="sub-day-close">ปิด</button><button class="btn btn-primary" id="sub-day-print">พิมพ์ / บันทึก PDF</button></div></div><div class="a4-preview-scroll"><style>'+substituteDocumentStyles()+'</style>'+body+'</div></div>';
+ document.body.appendChild(modal);
+ modal.querySelector("#sub-day-close")?.addEventListener("click",()=>modal.remove());
+ modal.querySelector("#sub-day-print")?.addEventListener("click",()=>{
+  const w=window.open("","_blank");if(!w)return toast("เปิดหน้าพิมพ์ไม่ได้","กรุณาอนุญาต Pop-up","error");
+  w.document.write('<!doctype html><html lang="th"><head><meta charset="UTF-8"><title>บันทึกสอนแทนทั้งวัน</title><style>'+substituteDocumentStyles()+'</style></head><body class="a4-print-body">'+body+'</body></html>');
+  w.document.close();w.addEventListener("load",()=>setTimeout(()=>w.print(),250));
+ });
+}
+
+
 function substituteDayPlannerHtml() {
+ const mode=substituteAllDayModeHtml();
+ const active=substituteActiveDay(state.selectedSubstituteLeaveId,state.selectedSubstituteDate);
+ if(state.substituteDayMode==="all")return mode+substituteAllDayPlannerHtml();
+ if(active)return mode+'<section class="panel"><p>มีการมอบหมายทั้งวันอยู่แล้ว กรุณาเปิดโหมดทั้งวันเพื่อยกเลิกหรือเปลี่ยนครูก่อน</p></section>';
+ return mode+legacySubstituteDayPlannerHtml();
+}
+function substituteAssignedTableHtml(rows) {
+ const task=state.substituteView==="mine"?substituteAllDayMineHtml():"";
+ return task+(rows.length||!task?legacySubstituteAssignedTableHtml(rows):"");
+}
+async function substitutePdfPreview(leaveId,date) {
+ const day=substituteActiveDay(leaveId,date);
+ return day?substituteAllDayPdfPreview(day.id):legacySubstitutePdfPreview(leaveId,date);
+}
+
+function legacySubstituteDayPlannerHtml() {
   const leaveId=state.selectedSubstituteLeaveId,dates=substituteBatchDates(leaveId),date=state.selectedSubstituteDate||dates[0],rows=substituteRowsForBatch(leaveId,date);
   if(!rows.length)return `<section class="panel"><button class="type-back-link" id="substitute-day-back">← กลับรายการ</button><div class="empty"><strong>ยังไม่พบคาบสอนในวันที่เลือก</strong><span>ตารางสอนต้องอยู่ในสถานะ Published จึงจะสร้างรายการสอนแทนได้</span></div></section>`;
   const first=rows[0],progress=substituteBatchProgress(leaveId,date),manageable=rows.some(canManageSubstituteLesson);
@@ -7243,7 +7412,7 @@ function buildSubstituteDocument(rows,signers,schoolLogo,directorSignature=null,
   return `<article class="a4-document"><div class="a4-document-inner"><header class="sub-doc-head">${schoolLogo?`<img class="a4-school-logo" src="${schoolLogo}" alt="ตราโรงเรียน">`:""}<div class="school">${escapeHtml(schoolName())}</div><div class="meta">${escapeHtml(schoolAddress())}</div><div class="meta">${escapeHtml(educationOffice())}</div><h1>บันทึกการจัดครูสอนแทน</h1></header><div class="sub-doc-sub"><span>ผู้ลา: <strong>${escapeHtml(first.absent_teacher_name)}</strong></span><span>วันที่: <strong>${thaiDateOnly(first.leave_date)}</strong></span><span>คำขอลา #${first.leave_request_no}</span></div><table class="sub-doc-table"><thead><tr><th style="width:10mm">#</th><th style="width:16mm">คาบ</th><th style="width:29mm">เวลา</th><th style="width:28mm">ชั้น/ห้อง</th><th>รายวิชา</th><th style="width:45mm">ครูผู้สอนแทน</th><th style="width:48mm">ลายมือชื่อผู้สอนแทน</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.period_no}</td><td>${timeShort(r.start_time)}–${timeShort(r.end_time)}</td><td>${escapeHtml(r.class_label)}</td><td>${escapeHtml(r.subject_name)}</td><td>${escapeHtml(r.substitute_teacher_name||"ยังไม่กำหนด")}</td><td class="sig-cell">${docImages["substitute:"+r.id]?'<img class="sub-doc-sign-image" src="'+docImages["substitute:"+r.id]+'" alt="ลายเซ็นครูผู้สอนแทน">':""}</td></tr>`).join("")}</tbody></table><div class="sub-doc-signatures">${substituteWetSign("ผู้ยื่นคำขอลา / ผู้จัดสอนแทน",first.absent_teacher_name,docImages.requester||null)}${substituteWetSign("หัวหน้ากลุ่มงานบริหารงานวิชาการ",signers.academic_head_name,docImages.academic_head||null)}${stageCodes.map(code=>substituteWetSign("หัวหน้าช่วงชั้น "+(TIMETABLE_STAGE_LABEL[code]||code),stageCodes.length===1?signers.stage_head_name:"",docImages["stage:"+code]||null)).join("")}${substituteWetSign("ผู้อำนวยการโรงเรียน",directorSignature?.signer_name||signers.director_name,docImages.director||(docImages._paperSlots?.has("director")?null:directorSignature?.image)||null,"")}</div><div class="sub-doc-foot">เอกสารนี้ใช้เป็นหลักฐานการแจ้งและรับทราบการปฏิบัติหน้าที่สอนแทน · ช่องผู้บริหารรองรับลายเซ็นอัตโนมัติตามนโยบายกลาง</div></div></article>`;
 }
 
-async function substitutePdfPreview(leaveRequestId,leaveDate) {
+async function legacySubstitutePdfPreview(leaveRequestId,leaveDate) {
   const rows=substituteRowsForBatch(leaveRequestId,leaveDate),progress=substituteBatchProgress(leaveRequestId,leaveDate);
   if(!rows.length)return toast("ไม่มีข้อมูลสำหรับ Export","","error"); if(!progress.complete)return toast("ยังจัดครูไม่ครบ","กรุณาเลือกครูสอนแทนให้ครบทุกคาบก่อน Export PDF","error");
   const [signersRes,schoolLogo,directorSignature,docImages]=await Promise.all([supabase.rpc("get_substitute_document_signers",{p_leave_request_id:leaveRequestId}),schoolLogoDataUrl(),centralAutoSignatureAsset("substitute_teaching",leaveRequestId),schoolDocumentSignatureImages(supabase,"substitute",leaveRequestId,leaveDate,toast)]); if(signersRes.error)return toast("เตรียมชื่อผู้ลงนามไม่ได้",signersRes.error.message,"error");
@@ -15703,6 +15872,17 @@ function bindDashboardEvents() {
     await openSubstituteDayPlanner(leaveId,select?.value||null);
   }));
   document.querySelector("#substitute-day-date")?.addEventListener("change",async e=>await openSubstituteDayPlanner(state.selectedSubstituteLeaveId,e.currentTarget.value));
+  document.querySelectorAll("[data-substitute-mode]").forEach(b=>b.addEventListener("click",()=>{
+    state.substituteDayMode=b.dataset.substituteMode;renderDashboard();
+  }));
+  document.querySelector("#save-substitute-all-day")?.addEventListener("click",saveSubstituteAllDay);
+  document.querySelector("#cancel-substitute-all-day")?.addEventListener("click",cancelSubstituteAllDay);
+  document.querySelector("#substitute-all-day-pdf")?.addEventListener("click",()=>{
+    const day=substituteActiveDay(state.selectedSubstituteLeaveId,state.selectedSubstituteDate);
+    if(day)substituteAllDayPdfPreview(day.id);
+  });
+  document.querySelectorAll("[data-confirm-substitute-all-day]").forEach(b=>b.addEventListener("click",()=>confirmSubstituteAllDay(b.dataset.confirmSubstituteAllDay)));
+  document.querySelectorAll("[data-substitute-all-day-pdf]").forEach(b=>b.addEventListener("click",()=>substituteAllDayPdfPreview(b.dataset.substituteAllDayPdf)));
   document.querySelector("#substitute-day-back")?.addEventListener("click",()=>{
     state.selectedSubstituteLeaveId=null; state.selectedSubstituteDate=null; state.substituteCandidateMap={}; renderDashboard();
   });
