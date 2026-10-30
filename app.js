@@ -7103,7 +7103,7 @@ function substituteAllDayPlannerHtml() {
  (active?(active.status==="accepted"?'ตอบรับแล้ว':"รอตอบรับ"):"—")+'</td></tr>').join("");
  const candidates=state.substituteDayCandidates||[];
  const options=candidates.map(c=>'<option value="'+escapeHtml(c.teacher_id)+'" '+(!c.available?'disabled':'')+'>'+
- escapeHtml(c.teacher_name)+(c.available?' · ว่างทั้งวัน':' · '+(c.conflict_reason||"ไม่ว่าง"))+'</option>').join("");
+ escapeHtml(c.teacher_name)+(c.conflict_reason?' · '+escapeHtml(c.conflict_reason):' · เลือกได้')+'</option>').join("");
  const status=active?(active.status==="accepted"?(active.signature_method==="paper"?"ตอบรับแล้ว · รอลายเซ็นจริงบนกระดาษ":"ตอบรับพร้อมลงลายเซ็นแล้ว"):"มอบหมายแล้ว · รอตอบรับ"):"ยังไม่ได้มอบหมาย";
  const first=rows[0];
  return '<section class="panel substitute-all-day-panel"><div class="personnel-detail-top"><button class="type-back-link" id="substitute-day-back">← กลับรายการ</button>'+
@@ -7113,20 +7113,20 @@ function substituteAllDayPlannerHtml() {
  (state.substituteDayError?'<p class="substitute-day-warning">'+escapeHtml(state.substituteDayError)+'</p>':'')+
  (active?'<div class="substitute-all-day-current"><strong>ครูผู้รับผิดชอบ: '+escapeHtml(active.substitute_teacher_name)+'</strong><span>'+escapeHtml(status)+
  (active.accepted_at?' · '+formatDate(active.accepted_at):"")+'</span></div>':"")+
- (canEdit?'<div class="substitute-day-choose"><div class="field"><label for="substitute-all-day-teacher">ครูสอนแทนตลอดทั้งวัน (เลือกเพียงครั้งเดียว)</label><select class="select" id="substitute-all-day-teacher"><option value="">— เลือกครูที่ไม่มีภาระชนทั้งวัน —</option>'+options+'</select></div>'+
+ (canEdit?'<div class="substitute-day-choose"><div class="field"><label for="substitute-all-day-teacher">ครูสอนแทนตลอดทั้งวัน (เลือกเพียงครั้งเดียว)</label><select class="select" id="substitute-all-day-teacher"><option value="">— เลือกครูผู้รับผิดชอบทั้งวัน —</option>'+options+'</select></div>'+
  '<button class="btn btn-primary" id="save-substitute-all-day" '+(!plan.length?'disabled':'')+'>'+(active?"เปลี่ยนครูทั้งวัน":"มอบหมายครบทุกคาบ")+'</button>'+
  (active?'<button class="btn btn-danger" id="cancel-substitute-all-day">ยกเลิกชุดทั้งวัน</button>':"")+
  '</div>':'')+
- '<p class="table-muted">ระบบตรวจคาบสอนประจำ คำขอลา และงานสอนแทนอื่นก่อนบันทึก ไม่จำกัดช่วงชั้นและไม่เพิ่มวิชาปลอม</p>'+
+ '<p class="table-muted">เลือกครูที่ยังใช้งานอยู่ได้แม้มีคาบสอน คำขอลา หรืองานอื่นซ้อนกัน โรงเรียนจัดภาระหน้าที่ภายในเอง โดยไม่แก้ตารางสอนหลัก</p>'+
  '<div class="table-wrap"><table class="table substitute-table"><thead><tr><th>คาบ</th><th>เวลา</th><th>รายวิชา / หน้าที่</th><th>ครูสอนแทน</th><th>ตอบรับ</th></tr></thead><tbody>'+preview+'</tbody></table></div>'+
  (active?'<button class="btn btn-secondary" id="substitute-all-day-pdf">พิมพ์ / PDF ทั้งวัน</button>':'')+'</section>';
 }
 async function saveSubstituteAllDay() {
  const leaveId=state.selectedSubstituteLeaveId,date=state.selectedSubstituteDate;
  const teacherId=document.querySelector("#substitute-all-day-teacher")?.value;
- if(!teacherId)return toast("กรุณาเลือกครูสอนแทน","ต้องเลือกครูที่ว่างตลอดทั้งวัน","error");
+ if(!teacherId)return toast("กรุณาเลือกครูสอนแทน","เลือกครูผู้รับผิดชอบทั้งวันหนึ่งคน","error");
  const selected=(state.substituteDayCandidates||[]).find(x=>x.teacher_id===teacherId);
- if(!selected?.available)return toast("ครูไม่ว่างทั้งวัน",selected?.conflict_reason||"กรุณาตรวจสอบตารางสอน","error");
+ if(!selected?.available)return toast("ไม่สามารถเลือกครูผู้ลา",selected?.conflict_reason||"กรุณาเลือกครูคนอื่น","error");
  const btn=document.querySelector("#save-substitute-all-day");buttonLoading(btn,true,"กำลังตรวจและบันทึก...");
  try{
   await bnkSignatureBeforeAction("เลือกลายเซ็นก่อนมอบหมายครูสอนแทนทั้งวัน",async choice=>{
