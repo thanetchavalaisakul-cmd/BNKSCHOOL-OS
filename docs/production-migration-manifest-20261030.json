@@ -1,0 +1,960 @@
+{
+  "generated_date": "2026-10-30",
+  "source": "Supabase production migration history",
+  "production_migrations": 238,
+  "notes": "Manifest is an inventory, NOT a restorable schema dump. For full disaster recovery export complete DDL, policies, extensions, storage, functions and test a scratch restore.",
+  "migrations": [
+    {
+      "version": "20260916094713",
+      "name": "school_os_core_v1"
+    },
+    {
+      "version": "20260916094727",
+      "name": "lesson_plan_module_v1"
+    },
+    {
+      "version": "20260916095405",
+      "name": "auth_foundation_and_role_helpers"
+    },
+    {
+      "version": "20260916095421",
+      "name": "rls_policies_and_grants"
+    },
+    {
+      "version": "20260916095502",
+      "name": "approval_workflow_rpcs"
+    },
+    {
+      "version": "20260916095540",
+      "name": "storage_realtime_and_workflow_fix"
+    },
+    {
+      "version": "20260916095608",
+      "name": "teacher_cross_module_access_model"
+    },
+    {
+      "version": "20260916095647",
+      "name": "rls_performance_and_fk_indexes"
+    },
+    {
+      "version": "20260916101556",
+      "name": "lesson_plan_ui_support_and_signature_enforcement"
+    },
+    {
+      "version": "20260916101637",
+      "name": "signature_visibility_and_immutability_for_approved_plans"
+    },
+    {
+      "version": "20260916101704",
+      "name": "enable_realtime_for_school_os_workflow"
+    },
+    {
+      "version": "20260916101923",
+      "name": "require_pdf_before_lesson_plan_submission"
+    },
+    {
+      "version": "20260916103050",
+      "name": "normalize_lesson_plan_insert_security_fields"
+    },
+    {
+      "version": "20260916103212",
+      "name": "fix_lesson_plan_returning_rls"
+    },
+    {
+      "version": "20260916105043",
+      "name": "draft_delete_and_head_signature_workflow_v2"
+    },
+    {
+      "version": "20260916110124",
+      "name": "workflow_actor_snapshot_for_print"
+    },
+    {
+      "version": "20260916112501",
+      "name": "approved_lesson_plan_pdf_archive"
+    },
+    {
+      "version": "20260916112725",
+      "name": "approved_pdf_generated_by_index"
+    },
+    {
+      "version": "20260916112947",
+      "name": "fix_approved_pdf_storage_path_validation"
+    },
+    {
+      "version": "20260916113713",
+      "name": "lesson_plan_weekly_semester_modes_v1"
+    },
+    {
+      "version": "20260916114352",
+      "name": "lesson_plan_hybrid_attachments_v2_9"
+    },
+    {
+      "version": "20260916120528",
+      "name": "academic_head_active_teacher_roster"
+    },
+    {
+      "version": "20260916120714",
+      "name": "consolidate_profiles_teacher_roster_rls"
+    },
+    {
+      "version": "20260916121641",
+      "name": "user_profile_subject_groups_system_settings"
+    },
+    {
+      "version": "20260916122127",
+      "name": "index_new_user_settings_foreign_keys"
+    },
+    {
+      "version": "20260916124544",
+      "name": "department_heads_keep_teacher_capability"
+    },
+    {
+      "version": "20260916124803",
+      "name": "simplify_lesson_plan_insert_rls_after_normalize"
+    },
+    {
+      "version": "20260916124837",
+      "name": "lesson_plan_insert_rls_use_normalized_trigger_guard"
+    },
+    {
+      "version": "20260916124930",
+      "name": "lesson_plan_returning_safe_role_scope"
+    },
+    {
+      "version": "20260916125040",
+      "name": "academic_head_own_lesson_plan_direct_to_director"
+    },
+    {
+      "version": "20260916131314",
+      "name": "personnel_leave_management"
+    },
+    {
+      "version": "20260916131449",
+      "name": "leave_quota_enforcement"
+    },
+    {
+      "version": "20260916131903",
+      "name": "leave_management_indexes"
+    },
+    {
+      "version": "20260916133432",
+      "name": "leave_academic_term_reporting"
+    },
+    {
+      "version": "20260916135420",
+      "name": "leave_quota_per_semester_v3_3_3"
+    },
+    {
+      "version": "20260916141204",
+      "name": "academic_timetable_management_v4"
+    },
+    {
+      "version": "20260916141323",
+      "name": "fix_timetable_weekday_validation_v4"
+    },
+    {
+      "version": "20260916141456",
+      "name": "timetable_teacher_snapshots_and_read_scope_v4"
+    },
+    {
+      "version": "20260916141641",
+      "name": "harden_timetable_draft_and_publish_v4"
+    },
+    {
+      "version": "20260916142400",
+      "name": "optimize_timetable_rls_and_indexes_v4"
+    },
+    {
+      "version": "20260916143913",
+      "name": "timetable_period_settings_v4_1"
+    },
+    {
+      "version": "20260916144023",
+      "name": "timetable_period_mode_detach_v4_1"
+    },
+    {
+      "version": "20260916144216",
+      "name": "lock_down_timetable_period_rpcs_v4_1"
+    },
+    {
+      "version": "20260916144247",
+      "name": "index_timetable_period_template_creator_v4_1"
+    },
+    {
+      "version": "20260916145131",
+      "name": "stage_head_timetable_management_v4_2"
+    },
+    {
+      "version": "20260916145526",
+      "name": "stage_head_timetable_roster_v4_2"
+    },
+    {
+      "version": "20260916150347",
+      "name": "timetable_lunch_numbered_period_v4_3_final"
+    },
+    {
+      "version": "20260916151236",
+      "name": "substitute_teaching_v5"
+    },
+    {
+      "version": "20260916151326",
+      "name": "substitute_rls_helper_execute"
+    },
+    {
+      "version": "20260916151716",
+      "name": "substitute_rpc_revoke_anon"
+    },
+    {
+      "version": "20260916151734",
+      "name": "substitute_foreign_key_indexes"
+    },
+    {
+      "version": "20260916153839",
+      "name": "substitute_arrange_on_leave_submission"
+    },
+    {
+      "version": "20260916154017",
+      "name": "substitute_document_signers"
+    },
+    {
+      "version": "20260917000420",
+      "name": "project_budget_management_v6"
+    },
+    {
+      "version": "20260917001535",
+      "name": "project_budget_paid_status_guard"
+    },
+    {
+      "version": "20260917010848",
+      "name": "fix_budget_disbursement_insert_returning_rls"
+    },
+    {
+      "version": "20260917012053",
+      "name": "restrict_activity_disbursement_to_activity_owner"
+    },
+    {
+      "version": "20260917012954",
+      "name": "budget_disbursement_line_items_v6_2"
+    },
+    {
+      "version": "20260917013050",
+      "name": "budget_request_owner_only_v6_2"
+    },
+    {
+      "version": "20260917014628",
+      "name": "home_visit_management_v7_0_final"
+    },
+    {
+      "version": "20260917014700",
+      "name": "home_visit_insert_returning_rls_fix_v7_0"
+    },
+    {
+      "version": "20260917014753",
+      "name": "home_visit_signature_scope_v7_0"
+    },
+    {
+      "version": "20260917020015",
+      "name": "stage_head_schoolwide_published_timetable_export_v7_0"
+    },
+    {
+      "version": "20260917041028",
+      "name": "personnel_public_directory_v8"
+    },
+    {
+      "version": "20260917041147",
+      "name": "budget_control_and_flexible_signers_v8"
+    },
+    {
+      "version": "20260917041808",
+      "name": "budget_control_internal_increment_fix_v8"
+    },
+    {
+      "version": "20260917041959",
+      "name": "budget_inspector_same_requester_department_v8"
+    },
+    {
+      "version": "20260917042228",
+      "name": "personnel_public_photo_exact_path_v8"
+    },
+    {
+      "version": "20260917053123",
+      "name": "secure_record_deletion_with_password_confirmation_v8_2"
+    },
+    {
+      "version": "20260917053331",
+      "name": "super_admin_storage_cleanup_for_secure_delete_v8_2"
+    },
+    {
+      "version": "20260917090503",
+      "name": "broaden_secure_record_deletion_v8_3"
+    },
+    {
+      "version": "20260917090637",
+      "name": "cleanup_notifications_after_record_delete_v8_3"
+    },
+    {
+      "version": "20260917103728",
+      "name": "student_registry_core_v9"
+    },
+    {
+      "version": "20260917104002",
+      "name": "student_room_management_permissions_v9"
+    },
+    {
+      "version": "20260917112550",
+      "name": "student_registry_import_and_home_visit_window_v9"
+    },
+    {
+      "version": "20260917113651",
+      "name": "restore_home_visit_period_scoped_controls_v9"
+    },
+    {
+      "version": "20260917113821",
+      "name": "remove_redundant_home_visit_global_settings_v9"
+    },
+    {
+      "version": "20260917113853",
+      "name": "home_visit_missing_period_closed_v9"
+    },
+    {
+      "version": "20260917113917",
+      "name": "student_registry_fk_indexes_v9"
+    },
+    {
+      "version": "20260917115141",
+      "name": "student_registry_compact_seed_helper_v9"
+    },
+    {
+      "version": "20260917122408",
+      "name": "v10_student_id_cards"
+    },
+    {
+      "version": "20260917122757",
+      "name": "v10_student_id_card_helper_hardening"
+    },
+    {
+      "version": "20260917122936",
+      "name": "v10_student_id_card_performance_fixes"
+    },
+    {
+      "version": "20260917125734",
+      "name": "student_registry_academic_year_and_exit_tracking_v10_2"
+    },
+    {
+      "version": "20260917130059",
+      "name": "student_enrollment_reactivation_cleanup_v10_2"
+    },
+    {
+      "version": "20260917131703",
+      "name": "student_registry_semester_copy_v10_3"
+    },
+    {
+      "version": "20260917133153",
+      "name": "student_registry_role_scopes_v10_4"
+    },
+    {
+      "version": "20260917135105",
+      "name": "student_card_homeroom_photo_permissions_v10_5"
+    },
+    {
+      "version": "20260917142020",
+      "name": "student_registry_import_numbering_and_homeroom_card_issue_v10_6"
+    },
+    {
+      "version": "20260917145047",
+      "name": "academic_calendar_100_days_v10_7"
+    },
+    {
+      "version": "20260917145543",
+      "name": "academic_calendar_fk_indexes_v10_7"
+    },
+    {
+      "version": "20260917145934",
+      "name": "fix_academic_calendar_private_function_permissions_v10_7_1"
+    },
+    {
+      "version": "20260917153834",
+      "name": "academic_supervision_plc_core_v10_8"
+    },
+    {
+      "version": "20260917153902",
+      "name": "academic_supervision_plc_rpcs_v10_8"
+    },
+    {
+      "version": "20260917154337",
+      "name": "academic_calendar_stage_flexibility_v10_8"
+    },
+    {
+      "version": "20260917155642",
+      "name": "academic_supervision_stage_scope_and_supervisor"
+    },
+    {
+      "version": "20260917155652",
+      "name": "academic_supervision_supervisor_can_view_assignment"
+    },
+    {
+      "version": "20260917233419",
+      "name": "academic_registration_transfer_requests_v10_9"
+    },
+    {
+      "version": "20260917233927",
+      "name": "academic_registration_transfer_updated_by_index_v10_9"
+    },
+    {
+      "version": "20260917235647",
+      "name": "academic_registration_transfer_signatures_v10_9_1"
+    },
+    {
+      "version": "20260918005047",
+      "name": "academic_registration_picker_permissions_v10_9_2"
+    },
+    {
+      "version": "20260918010042",
+      "name": "academic_registration_single_registrar_v10_9_3"
+    },
+    {
+      "version": "20260918010608",
+      "name": "academic_registration_realtime_v10_9_4"
+    },
+    {
+      "version": "20260918011834",
+      "name": "student_number_global_rule_v10_9_6"
+    },
+    {
+      "version": "20260918015638",
+      "name": "academic_registration_delete_requests_v10_9_7"
+    },
+    {
+      "version": "20260918020852",
+      "name": "academic_registration_pdf_signers_v10_9_9"
+    },
+    {
+      "version": "20260918022846",
+      "name": "academic_registration_finance_role_v10_9_11"
+    },
+    {
+      "version": "20260918024706",
+      "name": "academic_registration_official_result_v10_9_14"
+    },
+    {
+      "version": "20260918030905",
+      "name": "academic_certificate_requests_v10_10_0"
+    },
+    {
+      "version": "20260918030934",
+      "name": "academic_certificate_photo_access_v10_10_0"
+    },
+    {
+      "version": "20260918031015",
+      "name": "academic_certificate_preparer_setting_v10_10_0"
+    },
+    {
+      "version": "20260918031357",
+      "name": "academic_certificate_fk_indexes_v10_10_0"
+    },
+    {
+      "version": "20260918040956",
+      "name": "academic_certificate_separate_roles_v10_10_2"
+    },
+    {
+      "version": "20260918041051",
+      "name": "academic_certificate_role_candidates_v10_10_2"
+    },
+    {
+      "version": "20260918041343",
+      "name": "academic_certificate_roles_acl_v10_10_2"
+    },
+    {
+      "version": "20260918052619",
+      "name": "academic_certificate_auto_number_v10_10_6"
+    },
+    {
+      "version": "20260918052659",
+      "name": "academic_certificate_number_ensure_access_v10_10_6"
+    },
+    {
+      "version": "20260919044501",
+      "name": "bnk_v11_0_16_learning_media"
+    },
+    {
+      "version": "20260919072619",
+      "name": "bnk_v11_0_17_central_approval"
+    },
+    {
+      "version": "20260919072921",
+      "name": "bnk_v11_0_17_security_hardening"
+    },
+    {
+      "version": "20260919083432",
+      "name": "bnk_v11_0_18_classroom_research"
+    },
+    {
+      "version": "20260919092313",
+      "name": "bnk_v11_0_19_learner_development"
+    },
+    {
+      "version": "20260919094140",
+      "name": "bnk_v11_0_19_1_learner_activity_roles"
+    },
+    {
+      "version": "20260919112053",
+      "name": "bnk_v11_0_20_club_activity"
+    },
+    {
+      "version": "20260919112657",
+      "name": "bnk_v11_0_20_1_fix_club_member_save"
+    },
+    {
+      "version": "20260919114325",
+      "name": "bnk_v11_0_21_shared_homeroom_secure_delete"
+    },
+    {
+      "version": "20260921004738",
+      "name": "bnk_v11_0_22_scope_learner_dual"
+    },
+    {
+      "version": "20260921004822",
+      "name": "bnk_v11_0_22_club_team_dual"
+    },
+    {
+      "version": "20260921005100",
+      "name": "bnk_v11_0_22_upload_file_integrity"
+    },
+    {
+      "version": "20260921005413",
+      "name": "bnk_v11_0_22_homeroom_live_scope"
+    },
+    {
+      "version": "20260921005601",
+      "name": "bnk_v11_0_22_mode_switch_cleanup"
+    },
+    {
+      "version": "20260921015639",
+      "name": "bnk_v11_0_23_academic_submission_monitoring"
+    },
+    {
+      "version": "20260921032446",
+      "name": "bnk_v11_0_24_user_signature_profile"
+    },
+    {
+      "version": "20260921032536",
+      "name": "bnk_v11_0_24_shared_signature_snapshots"
+    },
+    {
+      "version": "20260921032625",
+      "name": "bnk_v11_0_24_personal_auto_actions"
+    },
+    {
+      "version": "20260921032802",
+      "name": "bnk_v11_0_24_signature_consistency_backfill"
+    },
+    {
+      "version": "20260921052838",
+      "name": "bnk_v11_0_25_student_card_certifier_snapshot"
+    },
+    {
+      "version": "20260921053105",
+      "name": "bnk_v11_0_25_student_card_certifier_index"
+    },
+    {
+      "version": "20260921053139",
+      "name": "bnk_v11_0_25_require_student_card_certifier"
+    },
+    {
+      "version": "20260921071413",
+      "name": "bnk_v11_0_26_official_attendance_core"
+    },
+    {
+      "version": "20260921072113",
+      "name": "bnk_v11_0_26_official_attendance_hardening"
+    },
+    {
+      "version": "20260921072219",
+      "name": "bnk_v11_0_26_attendance_effective_start"
+    },
+    {
+      "version": "20260921080422",
+      "name": "bnk_v11_0_26_3_attendance_duty_admin_exemption"
+    },
+    {
+      "version": "20260921104156",
+      "name": "bnk_v11_0_27_attendance_modes"
+    },
+    {
+      "version": "20260921104744",
+      "name": "bnk_v11_0_27_attendance_mode_lock_operational"
+    },
+    {
+      "version": "20260921111833",
+      "name": "bnk_v11_0_27_3_test_center_super_admin_toggle"
+    },
+    {
+      "version": "20260921121507",
+      "name": "bnk_v11_0_27_6_attendance_cancellation_audit"
+    },
+    {
+      "version": "20260921123701",
+      "name": "bnk_v11_0_27_6_1_attendance_rls_read_hotfix"
+    },
+    {
+      "version": "20260921124857",
+      "name": "bnk_v11_0_27_6_2_qr_ambiguity_hotfix"
+    },
+    {
+      "version": "20260922005827",
+      "name": "bnk_v11_0_27_6_8_transfer_official_number"
+    },
+    {
+      "version": "20260922011740",
+      "name": "bnk_v11_0_28_learning_sources_core"
+    },
+    {
+      "version": "20260922012527",
+      "name": "bnk_v11_0_28_learning_sources_visibility"
+    },
+    {
+      "version": "20260922015145",
+      "name": "bnk_v11_0_28_1_learning_source_storage_hotfix"
+    },
+    {
+      "version": "20260922053651",
+      "name": "bnk_v11_0_29_student_followup_core"
+    },
+    {
+      "version": "20260922053956",
+      "name": "bnk_v11_0_29_student_followup_issue_guard"
+    },
+    {
+      "version": "20260922054049",
+      "name": "bnk_v11_0_29_student_followup_follow_permissions"
+    },
+    {
+      "version": "20260922062531",
+      "name": "bnk_v11_0_29_1_student_followup_document_settings"
+    },
+    {
+      "version": "20260922072246",
+      "name": "bnk_v11_0_28_3_student_registry_integrity_hotfix"
+    },
+    {
+      "version": "20260922075216",
+      "name": "bnk_v11_0_28_5_student_import_reconciliation"
+    },
+    {
+      "version": "20260924053451",
+      "name": "bnk_v5_1_5_procurement_control_release"
+    },
+    {
+      "version": "20260924080502",
+      "name": "bnk_v5_3_0_academic_exam_item_analysis"
+    },
+    {
+      "version": "20260924091419",
+      "name": "bnk_v5_4_0_personnel_pa_start_year"
+    },
+    {
+      "version": "20260924101844",
+      "name": "bnk_v5_5_0_personnel_pa_end_year_report"
+    },
+    {
+      "version": "20260924102346",
+      "name": "bnk_v5_5_0_personnel_pa_report_storage_guard"
+    },
+    {
+      "version": "20260924114751",
+      "name": "bnk_v5_7_0_personnel_pa2_evaluation"
+    },
+    {
+      "version": "20260924124958",
+      "name": "bnk_v5_8_0_personnel_pa_evaluator_accounts_shared_committee"
+    },
+    {
+      "version": "20260924132017",
+      "name": "bnk_v5_8_0_pa2_submit_time_evaluator_snapshot"
+    },
+    {
+      "version": "20260924133738",
+      "name": "bnk_v5_8_1_allow_committee_before_evaluator_profile"
+    },
+    {
+      "version": "20260924135220",
+      "name": "bnk_v5_8_2_fix_pa2_jsonb_object_count"
+    },
+    {
+      "version": "20260924232334",
+      "name": "bnk_v5_10_0_personnel_pa_document_profile_auto_sign"
+    },
+    {
+      "version": "20260925011724",
+      "name": "bnk_v5_10_1_budget_acceptance_committee_cross_department"
+    },
+    {
+      "version": "20260925030818",
+      "name": "bnk_dashboard_overview_v1"
+    },
+    {
+      "version": "20261006081235",
+      "name": "bnk_keep_alive_v1"
+    },
+    {
+      "version": "20261007065715",
+      "name": "bnk_procurement_manual_control_numbers_v1"
+    },
+    {
+      "version": "20261007065916",
+      "name": "bnk_procurement_manual_control_cancel_audit_v1"
+    },
+    {
+      "version": "20261007235957",
+      "name": "bnk_school_lunch_documents_v1"
+    },
+    {
+      "version": "20261008000936",
+      "name": "bnk_school_lunch_round_recalc_trigger_fix_v1"
+    },
+    {
+      "version": "20261008001700",
+      "name": "bnk_school_lunch_replace_timeline_v1"
+    },
+    {
+      "version": "20261008104604",
+      "name": "bnk_school_lunch_link_procurement_control_numbers_v1"
+    },
+    {
+      "version": "20261008104910",
+      "name": "bnk_school_lunch_link_procurement_control_numbers_v2"
+    },
+    {
+      "version": "20261027084456",
+      "name": "stage_head_academic_subject_creation_and_stage_offerings_20261027"
+    },
+    {
+      "version": "20261027120431",
+      "name": "timetable_class_subject_name_override_20261027"
+    },
+    {
+      "version": "20261028014932",
+      "name": "scope_pa_evaluators_to_pa_module_only"
+    },
+    {
+      "version": "20261028020243",
+      "name": "reset_electricity_trial_records_before_real_use_20261028"
+    },
+    {
+      "version": "20261028064912",
+      "name": "timetable_joint_activities_20261028"
+    },
+    {
+      "version": "20261028065407",
+      "name": "timetable_joint_activities_owner_hardening_20261028"
+    },
+    {
+      "version": "20261028065436",
+      "name": "timetable_joint_co_teacher_visibility_20261028"
+    },
+    {
+      "version": "20261028075739",
+      "name": "student_behavior_general_admin_20261028"
+    },
+    {
+      "version": "20261028080620",
+      "name": "student_behavior_fix_active_profiles"
+    },
+    {
+      "version": "20261028080741",
+      "name": "student_behavior_case_audit_notify_hardening"
+    },
+    {
+      "version": "20261028094340",
+      "name": "education_fee_collection_module_20261028"
+    },
+    {
+      "version": "20261028094819",
+      "name": "education_fee_collection_rate_protection"
+    },
+    {
+      "version": "20261028100153",
+      "name": "education_fee_homeroom_and_flexible_cycles_20261028"
+    },
+    {
+      "version": "20261028100211",
+      "name": "education_fee_guard_active_rate_only_20261028"
+    },
+    {
+      "version": "20261028113013",
+      "name": "timetable_constraints_lock_and_generate_20261028"
+    },
+    {
+      "version": "20261028113059",
+      "name": "timetable_lock_batch_20261028"
+    },
+    {
+      "version": "20261028113757",
+      "name": "fix_timetable_teacher_unavailability_validation_record"
+    },
+    {
+      "version": "20261028115903",
+      "name": "timetable_demo_class_scoped_manager"
+    },
+    {
+      "version": "20261028120332",
+      "name": "timetable_teacher_block_respect_actual_periods_2569"
+    },
+    {
+      "version": "20261028121510",
+      "name": "timetable_demo_teachers_for_p33_2569"
+    },
+    {
+      "version": "20261028122325",
+      "name": "demo_timetable_assignments_unavailable_entries_2569"
+    },
+    {
+      "version": "20261028122535",
+      "name": "demo_timetable_validate_period_record_fix"
+    },
+    {
+      "version": "20261028125332",
+      "name": "atomic_timetable_commit_publish_20261028"
+    },
+    {
+      "version": "20261028125352",
+      "name": "timetable_p33_staff_real_assignment_20261028"
+    },
+    {
+      "version": "20261028131405",
+      "name": "archive_and_remove_p33_mock_timetable_20261028"
+    },
+    {
+      "version": "20261028133126",
+      "name": "preschool_teacher_duty_weekly_units_v2_20261028"
+    },
+    {
+      "version": "20261028133210",
+      "name": "archive_and_remove_temporary_p33_room_2569"
+    },
+    {
+      "version": "20261029010220",
+      "name": "optimize_joint_activity_rls_permissions_20261029"
+    },
+    {
+      "version": "20261029011702",
+      "name": "phase2_batch_timetable_rls_authorized_profiles_fix_20261029"
+    },
+    {
+      "version": "20261029020812",
+      "name": "safely_delete_school_projects_with_archived_procurement_links_20261029"
+    },
+    {
+      "version": "20261029035306",
+      "name": "behavior_hard_delete_event_20261029"
+    },
+    {
+      "version": "20261029063653",
+      "name": "central_approval_notifications_20261029"
+    },
+    {
+      "version": "20261029064836",
+      "name": "central_notifications_dedupe_read_20261029"
+    },
+    {
+      "version": "20261029065207",
+      "name": "central_notification_results_20261029"
+    },
+    {
+      "version": "20261029113228",
+      "name": "leave_and_substitute_document_signature_methods_20261029"
+    },
+    {
+      "version": "20261029114102",
+      "name": "school_document_signatures_leave_substitute_20261029"
+    },
+    {
+      "version": "20261029114951",
+      "name": "school_document_signature_assets_20261029"
+    },
+    {
+      "version": "20261029133221",
+      "name": "school_document_autosign_20261029"
+    },
+    {
+      "version": "20261029134609",
+      "name": "leave_substitute_action_signatures_20261029"
+    },
+    {
+      "version": "20261029135013",
+      "name": "workflow_storage_signature_visibility_20261029"
+    },
+    {
+      "version": "20261029150109",
+      "name": "budget_planning_staff_distinct_signer_slot_20261029"
+    },
+    {
+      "version": "20261029151946",
+      "name": "budget_parallel_signer_confirmations_20261029"
+    },
+    {
+      "version": "20261029210945",
+      "name": "bnk_central_signature_compliance_audit_20261030"
+    },
+    {
+      "version": "20261029213527",
+      "name": "budget_paper_approval_separate_decision_from_signature_20261030"
+    },
+    {
+      "version": "20261029215802",
+      "name": "atomic_four_method_academic_registration_20261030"
+    },
+    {
+      "version": "20261029221923",
+      "name": "home_visit_four_method_paper_identity_20261030"
+    },
+    {
+      "version": "20261029223158",
+      "name": "lesson_plan_four_method_explicit_approvals_20261030_v2"
+    },
+    {
+      "version": "20261029223819",
+      "name": "six_academic_reporting_saved_signatures_20261030"
+    },
+    {
+      "version": "20261029225018",
+      "name": "pa_evaluator_four_signing_methods_20261030"
+    },
+    {
+      "version": "20261029235349",
+      "name": "bnk_signature_9_systems_action_foundation_20261030"
+    },
+    {
+      "version": "20261030000111",
+      "name": "bnk_pa_resubmit_signature_choice_fix_20261030"
+    },
+    {
+      "version": "20261030000513",
+      "name": "bnk_signature_nine_systems_enforce_before_action_20261030"
+    },
+    {
+      "version": "20261030004847",
+      "name": "substitute_all_day_group_acceptance_20261030"
+    },
+    {
+      "version": "20261030011138",
+      "name": "unlock_all_day_substitute_candidate_conflicts_20261030"
+    },
+    {
+      "version": "20261030014434",
+      "name": "fix_atomic_substitute_day_preaction_signature_20261030"
+    },
+    {
+      "version": "20261030022049",
+      "name": "isolate_shared_signature_gate_and_leave_cascade_20261030"
+    },
+    {
+      "version": "20261030032932",
+      "name": "allow_activity_owner_requester_as_budget_inspector_20261030"
+    },
+    {
+      "version": "20261030034827",
+      "name": "bnk_security_internal_numbering_and_triggers_20261030"
+    }
+  ]
+}
