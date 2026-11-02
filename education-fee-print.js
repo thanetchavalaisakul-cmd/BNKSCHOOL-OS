@@ -54,7 +54,7 @@ function summary(d){
  <table><thead><tr><th style="width:9%">ที่</th><th style="width:37%">ชื่อ–นามสกุล</th><th style="width:14%">ชั้น</th><th class="num" style="width:14%">ต้องชำระ</th><th class="num" style="width:13%">ชำระแล้ว</th><th class="num" style="width:13%">ค้าง</th></tr></thead>
  <tbody>${rows.map((r,i)=>`<tr><td>${th(i+1)}</td><td>${th(r.student.full_name)}</td><td>${th(r.student.class_name)}</td><td class="num">${money(r.due)}</td><td class="num">${money(r.paid)}</td><td class="num">${money(r.balance)}</td></tr>`).join("")}
  <tr class="total"><td colspan="3">รวม</td><td class="num">${money(overall)}</td><td class="num">${money(paid)}</td><td class="num">${money(Math.max(0,overall-paid))}</td></tr></tbody></table>
- <div class="footer">จัดทำจากระบบ BNK SCHOOL OS ณ ${date(new Date().toISOString())} · จำนวนเงินคำนวณจากอัตราและรายการรับเงินที่บันทึกจริง</div>`;
+ <div class="footer">${d.importedFromSheet?"ข้อมูลจาก Google Sheets เป็นยอดสะสมเดิม ไม่ใช่ใบเสร็จรับเงินย้อนหลัง และแสดงเฉพาะรายการที่ยืนยันได้":"จัดทำจากระบบ BNK SCHOOL OS ณ "+date(new Date().toISOString())+" · จำนวนเงินคำนวณจากอัตราและรายการรับเงินที่บันทึกจริง"}</div>`;
 }
 
 function individual(d){
