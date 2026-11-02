@@ -29,6 +29,8 @@ test("parent data import detects displaced columns, preserving occupations separ
  assert.match(app,/father_occupation:old\.father_last_name/);
  assert.match(app,/mother_last_name:old\.mother_first_name/);
  assert.match(app,/mother_occupation:old\.mother_last_name/);
+ assert.match(app,/guardian_first_name:old\.guardian_prefix/);
+ assert.match(app,/guardian_last_name:old\.guardian_first_name/);
  assert.match(app,/disadvantaged_status:old\.mother_occupation/);
  assert.match(forms,/academicRegistryPersonNameOnly\(existing\?\.guardian_name/);
 });
@@ -55,6 +57,6 @@ test("certificate request PDF has three vertically contained signature panels",(
  assert.match(css,/\.cert-request-page \.cert-approval-signature\{[^}]*margin:0!important/s);
  assert.match(css,/\.cert-request-page \.cert-sign-name,/);
  assert.match(html,/styles\.css\?v=5\.12\.9\.63/);
- assert.match(html,/app\.min\.js\?v=5\.12\.9\.63/);
+ assert.match(html,/app\.min\.js\?v=5\.12\.9\.64/);
 });
 

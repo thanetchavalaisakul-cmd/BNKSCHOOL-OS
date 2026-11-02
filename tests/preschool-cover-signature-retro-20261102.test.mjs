@@ -34,6 +34,6 @@ test("PDF uses current saved signature only for already acknowledged teachers wi
  assert.match(app,/ภาพลายเซ็นจากโปรไฟล์ ณ วันที่พิมพ์/);
  assert.match(app,/ลงนามย้อนหลัง/);
  assert.match(app,/preschoolCoverWetSignature\("ผู้อำนวยการโรงเรียน"/);
- assert.match(page,/app\.min\.js\?v=5\.12\.9\.63/);
+ assert.match(page,/app\.min\.js\?v=5\.12\.9\.64/);
 });
 

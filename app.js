@@ -8248,7 +8248,9 @@ function parseStudentWorksheet(ws){
        &&parentTitle.has(o.guardian_relationship)&&parentTitle.has(o.father_occupation)){
       const old={...o};
       Object.assign(o,{
-        guardian_last_name:null,
+        guardian_prefix:null,
+        guardian_first_name:old.guardian_prefix,
+        guardian_last_name:old.guardian_first_name,
         guardian_occupation:old.guardian_last_name,
         guardian_relationship:old.guardian_occupation,
         father_prefix:old.guardian_relationship,
