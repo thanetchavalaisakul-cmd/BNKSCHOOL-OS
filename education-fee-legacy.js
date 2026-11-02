@@ -65,14 +65,14 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
     const one=legacyComponent(r,"tuition",1),two=legacyComponent(r,"tuition",2),water=legacyComponent(r,"water",1),sum=legacyTotals(r);
     const status=r.review_status==="excluded"?"ไม่คิดยอด":r.review_status==="review"?"รอตรวจสอบ":sum.balance===0?"ครบแล้ว":sum.paid>0?"ค้างบางส่วน":"ยังไม่ชำระ";
     const canUseNative=F.year==="2569"&&r.student_id&&F.roster.some(x=>x.student_id===r.student_id);
-    const button=F.manager&&r.review_status==="ready"&&sum.balance>0?
+    const button=F.manager&&r.review_status==="ready"&&sum.balance>0&&(r.academic_year!=="2569"||!!r.student_id)?
      '<button class="btn btn-primary btn-sm" '+(canUseNative?'data-fee-legacy-native':'data-fee-legacy-pay')+'="'+e(r.id)+'">บันทึกรับเงิน</button>':"—";
     return '<tr><td><strong>'+e(r.full_name)+'</strong><small> · '+e(r.student_code||"ไม่ระบุรหัส")+'</small></td>'+
      '<td>'+e(r.class_name)+'</td><td class="num">'+fmt(one.paid)+' / '+fmt(one.due)+'</td>'+
      (F.year==="2568"?'<td class="num">'+fmt(two.paid)+' / '+fmt(two.due)+'</td>':"")+
      '<td class="num">'+fmt(water.paid)+' / '+fmt(water.due)+'</td><td class="num">'+
      (r.review_status==="ready"?fmt(sum.balance):"—")+'</td><td>'+e(status)+
-     (r.source_note?'<small> · '+e(r.source_note)+'</small>':"")+'</td><td>'+button+'</td></tr>';
+     (r.source_note?'<small> · '+e(r.source_note)+'</small>':"")+(r.academic_year==="2569"&&!r.student_id?'<small> · ต้องตรวจสอบตัวตนก่อนรับเงินเพิ่ม</small>':"")+'</td><td>'+button+'</td></tr>';
    }).join("")+'</tbody></table></div>';
   const tail=rows.length>show.length?'<p class="helper">แสดง '+show.length+' จาก '+rows.length+' รายการ ใช้ตัวกรองหรือ CSV เพื่อดูทั้งหมด</p>':
    rows.length===0?'<p class="edufee-empty">ยังไม่มีข้อมูลในปีการศึกษานี้</p>':"";
