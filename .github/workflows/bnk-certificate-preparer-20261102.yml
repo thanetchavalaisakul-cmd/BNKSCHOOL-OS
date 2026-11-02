@@ -1,0 +1,37 @@
+name: BNK certificate preparer all-school scoped fix
+on:
+  push:
+    branches: [fix/certificate-schoolwide-preparer-20261102]
+permissions:
+  contents: write
+concurrency:
+  group: bnk-certificate-preparer-20261102
+  cancel-in-progress: false
+jobs:
+  verify-and-build:
+    if: "!contains(github.event.head_commit.message, '[certificate-built]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply certificate preparer UI-only patch
+        run: python3 changes/certificate-preparer-20261102.py
+      - name: Verify full OS regression suite
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify
+          node --check modules/academic-forms.js
+          git diff --check
+      - name: Record verified optimized bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js app.min.js modules/academic-forms.js index.html tests/module-boundaries.test.mjs
+          git commit -m "fix: designated certificate preparer can choose any school student [certificate-built]"
+          git push origin HEAD:fix/certificate-schoolwide-preparer-20261102
