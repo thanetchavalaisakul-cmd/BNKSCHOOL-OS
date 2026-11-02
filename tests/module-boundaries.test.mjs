@@ -10,7 +10,7 @@ test("each of 12 feature modules is loaded dynamically only when used",()=>{
  for(const name of groups){
   const filename="../modules/"+name+".js";
   const contents=readFileSync(new URL(filename,import.meta.url),"utf8");
-  assert.ok(app.includes('import("./modules/'+name+'.js?v='+(name==='academic-forms'?'5.12.9.59':name==='dashboard-events'?'5.12.9.62':'5.12.9.58')+'")'),name);
+  assert.ok(app.includes('import("./modules/'+name+'.js?v='+(name==='academic-forms'?'5.12.9.63':name==='dashboard-events'?'5.12.9.62':'5.12.9.58')+'")'),name);
   assert.match(contents,/export function create[A-Za-z]+Feature\(ctx\)/);
   assert.match(contents,/const \{/);
   assert.doesNotMatch(app,new RegExp('^import .*modules/'+name,'m'));

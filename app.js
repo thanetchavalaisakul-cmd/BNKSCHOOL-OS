@@ -96,7 +96,7 @@ async function loadProcurementDialogsFeature(){
 
 let bnkAcademicFormsFeaturePromise=null;
 async function loadAcademicFormsFeature(){
- bnkAcademicFormsFeaturePromise??=import("./modules/academic-forms.js?v=5.12.9.59").then(mod=>mod.createAcademicFormsFeature({ACADEMIC_CERTIFICATE_PURPOSE_LABEL,academicCertificateCanFinalizeUi,academicCertificateCanManageUi,academicCertificateCanPrepareUi,academicCertificateClassOptions,academicCertificateStudentName,academicCertificateStudentPickerOptions,academicDocumentServiceCanManageUi,academicDocumentServiceStudentSelectOptions,academicRegDisplayDate,academicRegThaiDigits,academicRegistrationCanManageUi,academicSubmissionPeriod,academicTransferClassOptions,academicTransferStudentName,academicTransferStudentOptionLabel,academicTransferUpsertRequestDom,buttonLoading,classroomResearchAssignmentOptions,classroomResearchOnePageData,classroomResearchTypeOptions,classroomResearchVersionsFor,clubActivityLines,clubActivityParseLines,clubActivityParsePlan,clubActivityPlanText,clubActivitySharedIds,clubActivityTeamChecklistHtml,clubActivityUploadSourceFile,escapeHtml,isSuperAdminUser,learnerActivityActivities,learnerActivityClassOptions,learnerActivityClassTeam,learnerActivityCollectConfig,learnerActivityConfigRow,learnerActivityDefaultActivities,learnerActivitySharedIds,learnerActivityTeamChecklistHtml,learnerActivityUploadSourceFile,loadAcademicRegistrationWorkspace,loadAcademicSubmissionWorkspace,renderDashboard,state,supabase,toast})).catch(error=>{bnkAcademicFormsFeaturePromise=null;throw error;});
+ bnkAcademicFormsFeaturePromise??=import("./modules/academic-forms.js?v=5.12.9.63").then(mod=>mod.createAcademicFormsFeature({academicRegistryPersonNameOnly,ACADEMIC_CERTIFICATE_PURPOSE_LABEL,academicCertificateCanFinalizeUi,academicCertificateCanManageUi,academicCertificateCanPrepareUi,academicCertificateClassOptions,academicCertificateStudentName,academicCertificateStudentPickerOptions,academicDocumentServiceCanManageUi,academicDocumentServiceStudentSelectOptions,academicRegDisplayDate,academicRegThaiDigits,academicRegistrationCanManageUi,academicSubmissionPeriod,academicTransferClassOptions,academicTransferStudentName,academicTransferStudentOptionLabel,academicTransferUpsertRequestDom,buttonLoading,classroomResearchAssignmentOptions,classroomResearchOnePageData,classroomResearchTypeOptions,classroomResearchVersionsFor,clubActivityLines,clubActivityParseLines,clubActivityParsePlan,clubActivityPlanText,clubActivitySharedIds,clubActivityTeamChecklistHtml,clubActivityUploadSourceFile,escapeHtml,isSuperAdminUser,learnerActivityActivities,learnerActivityClassOptions,learnerActivityClassTeam,learnerActivityCollectConfig,learnerActivityConfigRow,learnerActivityDefaultActivities,learnerActivitySharedIds,learnerActivityTeamChecklistHtml,learnerActivityUploadSourceFile,loadAcademicRegistrationWorkspace,loadAcademicSubmissionWorkspace,renderDashboard,state,supabase,toast})).catch(error=>{bnkAcademicFormsFeaturePromise=null;throw error;});
  return bnkAcademicFormsFeaturePromise;
 }
 
@@ -8242,7 +8242,27 @@ function parseStudentWorksheet(ws){
     const citizen=String(r[legacy?0:ix("เลขประจำตัวประชาชน/เลข G",0)]??"").trim(),level=String(r[legacy?1:ix("ระดับชั้น",1)]??"").trim(),room=String(r[legacy?2:ix("ห้อง",2)]??"").trim(),studentCode=String(r[legacy?3:ix("เลขประจำตัวนักเรียน",4)]??"").trim(),prefix=String(r[legacy?4:ix("คำนำหน้าชื่อ",5)]??"").trim(),first=String(r[legacy?5:ix("ชื่อ",6)]??"").trim(),last=String(r[legacy?6:ix("นามสกุล",7)]??"").trim(),birth=parseStudentExcelDate(r[legacy?7:ix("วันเกิด",8)]),gender=["เด็กชาย","นาย"].includes(prefix)?"ชาย":["เด็กหญิง","นางสาว"].includes(prefix)?"หญิง":null;
     if(!citizen||!level||!room||!studentCode||!first||!last||!birth)errors.push(`แถว ${ri+1}: ข้อมูลบังคับไม่ครบ`);
     if(!gender)errors.push(`แถว ${ri+1}: ไม่สามารถระบุเพศจากคำนำหน้า "${prefix||'-'}"`);
-    const o={citizen_id:citizen,level_name:level,room_name:room,student_number:0,student_code:studentCode,prefix,first_name:first,last_name:last,birth_date:birth,gender,_source_row:ri+1};const at=i=>r[i];Object.assign(o,{weight_kg:Number(at(9))||null,height_cm:Number(at(10))||null,blood_group:cleanExcelCell(at(11)),religion:cleanExcelCell(at(12)),ethnicity:cleanExcelCell(at(13)),nationality:cleanExcelCell(at(14)),house_no:cleanExcelCell(at(15)),village_no:cleanExcelCell(at(16)),road_soi:cleanExcelCell(at(17)),subdistrict:cleanExcelCell(at(18)),district:cleanExcelCell(at(19)),province:cleanExcelCell(at(20)),guardian_prefix:cleanExcelCell(at(21)),guardian_first_name:cleanExcelCell(at(22)),guardian_last_name:cleanExcelCell(at(23)),guardian_occupation:cleanExcelCell(at(24)),guardian_relationship:cleanExcelCell(at(25)),father_prefix:cleanExcelCell(at(26)),father_first_name:cleanExcelCell(at(27)),father_last_name:cleanExcelCell(at(28)),father_occupation:cleanExcelCell(at(29)),mother_prefix:cleanExcelCell(at(30)),mother_first_name:cleanExcelCell(at(31)),mother_last_name:cleanExcelCell(at(32)),mother_occupation:cleanExcelCell(at(33)),disadvantaged_status:cleanExcelCell(at(34)),pending_disposal_status:cleanExcelCell(at(35))});out.push(o);
+    const o={citizen_id:citizen,level_name:level,room_name:room,student_number:0,student_code:studentCode,prefix,first_name:first,last_name:last,birth_date:birth,gender,_source_row:ri+1};const at=i=>r[i];Object.assign(o,{weight_kg:Number(at(9))||null,height_cm:Number(at(10))||null,blood_group:cleanExcelCell(at(11)),religion:cleanExcelCell(at(12)),ethnicity:cleanExcelCell(at(13)),nationality:cleanExcelCell(at(14)),house_no:cleanExcelCell(at(15)),village_no:cleanExcelCell(at(16)),road_soi:cleanExcelCell(at(17)),subdistrict:cleanExcelCell(at(18)),district:cleanExcelCell(at(19)),province:cleanExcelCell(at(20)),guardian_prefix:cleanExcelCell(at(21)),guardian_first_name:cleanExcelCell(at(22)),guardian_last_name:cleanExcelCell(at(23)),guardian_occupation:cleanExcelCell(at(24)),guardian_relationship:cleanExcelCell(at(25)),father_prefix:cleanExcelCell(at(26)),father_first_name:cleanExcelCell(at(27)),father_last_name:cleanExcelCell(at(28)),father_occupation:cleanExcelCell(at(29)),mother_prefix:cleanExcelCell(at(30)),mother_first_name:cleanExcelCell(at(31)),mother_last_name:cleanExcelCell(at(32)),mother_occupation:cleanExcelCell(at(33)),disadvantaged_status:cleanExcelCell(at(34)),pending_disposal_status:cleanExcelCell(at(35))});
+    const parentTitle=new Set(["นาย","นาง","นางสาว","เด็กหญิง"]);
+    if(o.disadvantaged_status==null&&o.mother_occupation==="เด็กยากจน"
+       &&parentTitle.has(o.guardian_relationship)&&parentTitle.has(o.father_occupation)){
+      const old={...o};
+      Object.assign(o,{
+        guardian_last_name:null,
+        guardian_occupation:old.guardian_last_name,
+        guardian_relationship:old.guardian_occupation,
+        father_prefix:old.guardian_relationship,
+        father_first_name:old.father_prefix,
+        father_last_name:old.father_first_name,
+        father_occupation:old.father_last_name,
+        mother_prefix:old.father_occupation,
+        mother_first_name:old.mother_prefix,
+        mother_last_name:old.mother_first_name,
+        mother_occupation:old.mother_last_name,
+        disadvantaged_status:old.mother_occupation
+      });
+    }
+    out.push(o);
   }
   return {rows:out,errors};
 }
@@ -9556,6 +9576,11 @@ async function academicCertificateDelete(requestId){
   }catch(err){toast("ลบคำร้องไม่สำเร็จ",err.message||String(err),"error");}
 }
 async function academicCertificateReviewModal(...args){return (await loadAcademicDialogsFeature()).academicCertificateReviewModal(...args);}
+function academicRegistryPersonNameOnly(value){
+  const name=String(value??"").replace(/\s+/g," ").trim();
+  if(!name)return "";
+  return name.replace(/\s+(?:เกษตรกรรม|เกษตรกร|รับจ้าง(?:ทั่วไป)?|ค้าขาย(?:ทั่วไป)?|ไม่ได้ประกอบอาชีพ|นักธุรกิจ-ค้าขาย|พนักงานรัฐวิสาหกิจ|พนักงาน\/เจ้าหน้าที่ของรัฐ\/ลูกจ้างประจำ\/ลูกจ้างชั่วคราว|อื่น\s*ๆ|อาชีพอิสระ)\s*$/u,"").trim();
+}
 async function academicCertificatePdfSigners(){const {data,error}=await supabase.rpc("get_academic_certificate_signers");if(error)throw error;return Object.fromEntries((data||[]).map(x=>[x.signer_slot,x]));}
 async function academicCertificatePdfSignatures(requestId){
   const rows=academicCertificateSignaturesFor(requestId),out={};
@@ -9599,8 +9624,8 @@ function academicCertificateRequestPageHtml(r,signers,sigs){
     <section class="cert-personal-info">
       <div class="cert-info-row one">${academicCertificateInfoCell("ด้วยข้าพเจ้า",escapeHtml(r.student_name))}</div>
       <div class="cert-info-row two">${academicCertificateInfoCell("เกิดวันที่",`${b.day} ${b.month} ${b.year}`)}${academicCertificateInfoCell("เลขประจำตัวนักเรียน",academicRegPdfText(r.student_code||""))}</div>
-      <div class="cert-info-row two">${academicCertificateInfoCell("กำลังศึกษาอยู่ชั้น",escapeHtml(r.class_label||r.former_class_label||"—"))}${academicCertificateInfoCell("บิดาชื่อ",escapeHtml(r.father_name||"—"))}</div>
-      <div class="cert-info-row one">${academicCertificateInfoCell("มารดาชื่อ",escapeHtml(r.mother_name||"—"))}</div>
+      <div class="cert-info-row two">${academicCertificateInfoCell("กำลังศึกษาอยู่ชั้น",escapeHtml(r.class_label||r.former_class_label||"—"))}${academicCertificateInfoCell("บิดาชื่อ",escapeHtml(academicRegistryPersonNameOnly(r.father_name)||"—"))}</div>
+      <div class="cert-info-row one">${academicCertificateInfoCell("มารดาชื่อ",escapeHtml(academicRegistryPersonNameOnly(r.mother_name)||"—"))}</div>
       <div class="cert-info-row one">${academicCertificateInfoCell("ที่อยู่",escapeHtml(academicRegPdfText(r.student_address||"—")))}</div>
     </section>
     <div class="cert-section cert-choice-section"><strong>มีความประสงค์จะขอหนังสือรับรอง</strong>
@@ -9613,7 +9638,7 @@ function academicCertificateRequestPageHtml(r,signers,sigs){
       <div class="cert-request-close-text">จึงเรียนมาเพื่อโปรดพิจารณาตรวจสอบความถูกต้องและออกเอกสารดังกล่าว</div>
       <div class="cert-applicant-sign">
         <div>ลงชื่อ ............................................................ ผู้ยื่นคำร้อง</div>
-        <div>( ${escapeHtml(r.applicant_name||"")} )</div>
+        <div>( ${escapeHtml(academicRegistryPersonNameOnly(r.applicant_name))} )</div>
       </div>
     </div>
     <div class="cert-approval-grid">${academicCertificateApprovalBox(r,"preparer","ผู้จัดทำเอกสาร",signers,sigs)}${academicCertificateApprovalBox(r,"registrar","นายทะเบียน",signers,sigs)}${academicCertificateApprovalBox(r,"director","ผู้บริหารสถานศึกษา",signers,sigs)}</div>
@@ -9723,7 +9748,7 @@ function academicTransferDetailHtml(r){
   const officialNumberMeta=r.official_document_number_updated_at?`แก้ไขล่าสุด ${thaiDateTimeDocument(r.official_document_number_updated_at)}${r.official_document_number_updated_by_name?` · ${escapeHtml(r.official_document_number_updated_by_name)}`:""}`:"ระบบจะเว้นจุดใน PDF จนกว่าจะกำหนดเลขที่";
   return `<section class="panel academic-transfer-detail" data-academic-transfer-detail="${r.id}">
     <div class="panel-head"><div class="panel-title-wrap"><h3>${escapeHtml(r.request_code||"คำร้องใบย้าย")}</h3><p>${escapeHtml(r.student_name)} · ${escapeHtml(r.class_label)} · เลขที่ ${escapeHtml(r.student_number??"—")} · อัปเดต ${academicRegDisplayDate(r.updated_at)}</p></div><div class="action-row">${canEdit?`<button class="btn btn-ghost" data-academic-transfer-edit="${r.id}">แก้ไขคำร้อง</button>`:""}</div></div>
-    <div class="academic-transfer-summary-grid"><article><span>ผู้ปกครอง/ผู้ยื่น</span><strong>${escapeHtml(r.guardian_name)}</strong><small>${escapeHtml(r.contact_phone)}</small></article><article><span>นักเรียน</span><strong>${escapeHtml(r.student_name)}</strong><small>${escapeHtml(r.class_label)} · เลขที่ ${escapeHtml(r.student_number??"—")} · รหัส ${escapeHtml(r.student_code)}</small></article><article><span>เหตุผล</span><strong>${r.reason_type==="continue_study"?`ศึกษาต่อ ณ ${escapeHtml(r.destination_school||"—")}`:escapeHtml(r.other_reason||"อื่น ๆ")}</strong><small>${r.reason_type==="continue_study"?`${escapeHtml(r.destination_district||"")} ${escapeHtml(r.destination_province||"")}`:""}</small></article><article><span>กำหนดย้าย</span><strong>${academicRegDisplayDate(r.transfer_date)}</strong><small>ปีการศึกษา ${escapeHtml(r.academic_year)}</small></article></div>
+    <div class="academic-transfer-summary-grid"><article><span>ผู้ปกครอง/ผู้ยื่น</span><strong>${escapeHtml(academicRegistryPersonNameOnly(r.guardian_name))}</strong><small>${escapeHtml(r.contact_phone)}</small></article><article><span>นักเรียน</span><strong>${escapeHtml(r.student_name)}</strong><small>${escapeHtml(r.class_label)} · เลขที่ ${escapeHtml(r.student_number??"—")} · รหัส ${escapeHtml(r.student_code)}</small></article><article><span>เหตุผล</span><strong>${r.reason_type==="continue_study"?`ศึกษาต่อ ณ ${escapeHtml(r.destination_school||"—")}`:escapeHtml(r.other_reason||"อื่น ๆ")}</strong><small>${r.reason_type==="continue_study"?`${escapeHtml(r.destination_district||"")} ${escapeHtml(r.destination_province||"")}`:""}</small></article><article><span>กำหนดย้าย</span><strong>${academicRegDisplayDate(r.transfer_date)}</strong><small>ปีการศึกษา ${escapeHtml(r.academic_year)}</small></article></div>
 
     <div class="academic-transfer-output-grid">
       <article class="academic-transfer-output-card">
@@ -9942,7 +9967,7 @@ function academicTransferPdfDocumentHtml(r,signers,signatures){
     <h2 class="transfer-doc-section-title">ส่วนของครูประจำชั้น / ผู้ปกครองกรอกข้อความ</h2>
 
     <div class="transfer-doc-paragraph">
-      ข้าพเจ้า <span class="transfer-doc-field w-guardian">${escapeHtml(r.guardian_name||"")}</span>
+      ข้าพเจ้า <span class="transfer-doc-field w-guardian">${escapeHtml(academicRegistryPersonNameOnly(r.guardian_name))}</span>
       เป็นผู้ปกครองของ <span class="transfer-doc-field w-student">${escapeHtml(r.student_name||"")}</span>
     </div>
     <div class="transfer-doc-grid cols-4">
@@ -9955,8 +9980,8 @@ function academicTransferPdfDocumentHtml(r,signers,signatures){
       <div><label>เกิดวันที่</label><span>${bd.day} ${bd.month} ${bd.year}</span></div>
       <div><label>เบอร์โทรที่ติดต่อได้</label><span>${academicRegPdfText(r.contact_phone||"")}</span></div>
       <div class="span-2"><label>เลขประจำตัวประชาชน</label><span>${academicRegPdfText(r.citizen_id||"")}</span></div>
-      <div><label>ชื่อ-สกุลบิดา</label><span>${escapeHtml(r.father_name||"—")}</span></div>
-      <div><label>ชื่อ-สกุลมารดา</label><span>${escapeHtml(r.mother_name||"—")}</span></div>
+      <div><label>ชื่อ-สกุลบิดา</label><span>${escapeHtml(academicRegistryPersonNameOnly(r.father_name)||"—")}</span></div>
+      <div><label>ชื่อ-สกุลมารดา</label><span>${escapeHtml(academicRegistryPersonNameOnly(r.mother_name)||"—")}</span></div>
     </div>
 
     <div class="transfer-doc-reason-block">
@@ -9987,7 +10012,7 @@ function academicTransferPdfDocumentHtml(r,signers,signatures){
       <div>จึงเรียนมาเพื่อโปรดพิจารณาตรวจสอบความถูกต้องและออกเอกสารดังกล่าว</div>
       <div class="transfer-doc-applicant">
         <div>ลงชื่อ .................................................................... ผู้ยื่นคำร้อง</div>
-        <div>( ${escapeHtml(r.applicant_name||r.guardian_name||"")} )</div>
+        <div>( ${escapeHtml(academicRegistryPersonNameOnly(r.applicant_name||r.guardian_name))} )</div>
       </div>
     </div>
 
@@ -10124,7 +10149,7 @@ function academicTransferOfficialDocumentHtml(r,signers){
       <div class="official-transfer-date official-garuda-date-start">${finalized.day} ${finalized.month} ${finalized.year}</div>
       <div class="official-transfer-meta"><div><b>เรื่อง</b><span>ส่งนักเรียนขอย้ายมาเข้าเรียน</span></div><div><b>เรียน</b><span>ผู้อำนวยการโรงเรียน</span></div></div>
       <div class="official-transfer-body">
-        <p>ด้วย${escapeHtml(r.guardian_name||"")} ที่อยู่ ${escapeHtml(academicRegPdfText(r.guardian_address||""))} มีความประสงค์ขอย้ายนักเรียนในปกครองซึ่งเรียนอยู่ในโรงเรียนนี้ ไปเข้าเรียน${escapeHtml(destinationSchool)} ดังนี้</p>
+        <p>ด้วย${escapeHtml(academicRegistryPersonNameOnly(r.guardian_name))} ที่อยู่ ${escapeHtml(academicRegPdfText(r.guardian_address||""))} มีความประสงค์ขอย้ายนักเรียนในปกครองซึ่งเรียนอยู่ในโรงเรียนนี้ ไปเข้าเรียน${escapeHtml(destinationSchool)} ดังนี้</p>
         <p class="official-transfer-indent">${escapeHtml(r.student_name||"")} เลขประจำตัวประชาชน ${academicRegPdfText(r.citizen_id||"")} เกิดวันที่ ${born.day} เดือน ${born.month} พ.ศ. ${born.year} นักเรียนชั้น${academicRegFormalClassLabel(r.class_label)}</p>
         <p>ทั้งนี้เนื่องจาก ${escapeHtml(reasonText)} และการย้ายไปเข้าเรียนในโรงเรียนดังกล่าวนักเรียนจะพักอาศัยอยู่${escapeHtml(academicRegPdfText(r.destination_residence||""))}</p>
         <p>จึงเรียนมาเพื่อโปรดทราบและพิจารณาดำเนินการต่อไป</p>
