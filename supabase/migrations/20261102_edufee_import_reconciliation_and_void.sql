@@ -111,9 +111,7 @@ begin
  values(p_request,p_row_id,p_category,p_semester,p_amount,p_paid_on,nullif(btrim(p_payer),''),nullif(btrim(p_note),''),(select auth.uid()))
  returning * into v_result;
  return v_result;
-end $function$
-
-
+end $function$;
 create or replace function public.edufee_void_import_receipt(
  p_id uuid,p_reason text
 ) returns boolean
