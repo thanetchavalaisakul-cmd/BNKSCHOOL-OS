@@ -134,7 +134,18 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
   '</tbody></table></div>'+(p.length?"":'<p class="edufee-empty">ยังไม่มีรายการรับชำระในขอบเขตที่เลือก</p>')+'</section>';
  }
  function register(){
-  const rows=rosterFiltered().map(totals);return '<section class="panel"><div class="edufee-head"><h3>ทะเบียนสถานะการชำระเงินรายบุคคล</h3><button class="btn btn-ghost" id="edufee-csv">ส่งออก Excel (CSV)</button></div>'+rosterTable(rows)+'</section>'
+  const students=rosterFiltered(),rows=students.map(totals);
+  const insurance=students.map(st=>{const b=bill(st,"deposit"),chosen=depositSelected(st.student_id);
+    return '<tr><td>'+e(st.full_name)+'</td><td>'+e(st.class_name)+'</td><td>'+
+      (canCollect(st.class_id)?'<label><input type="checkbox" data-fee-insurance-option="'+e(st.student_id)+'" '+(chosen?"checked":"")+'> '+(chosen?"เลือกทำประกัน":"ยังไม่เลือกทำประกัน")+'</label>':
+      (chosen?"เลือกทำประกัน":"ยังไม่เลือกทำประกัน"))+'</td>'+
+      '<td class="num">'+fmt(b.due)+'</td><td class="num">'+fmt(b.paid)+'</td><td class="num">'+fmt(b.balance)+'</td></tr>';
+  }).join("");
+  return '<section class="panel"><div class="edufee-head"><h3>ทะเบียนสถานะการชำระเงินรายบุคคล</h3><button class="btn btn-ghost" id="edufee-csv">ส่งออก Excel (CSV)</button></div>'+rosterTable(rows)+'</section>'+
+   '<section class="panel"><div class="edufee-head"><h3>ค่าประกันรายปี · สมัครใจเป็นรายนักเรียน</h3><button class="btn btn-primary" id="edufee-deposit-pdf">PDF รายชื่อค่าประกันแยกต่างหาก</button></div>'+
+   '<p class="helper">ติ๊กเครื่องหมายถูกเฉพาะนักเรียนที่สมัครใจทำประกัน ไม่เลือก = ไม่เรียกเก็บค่าประกัน ไม่สร้างหนี้ และไม่กระทบค่าบำรุงรายเทอมหรือค่าน้ำ</p>'+
+   '<div class="table-wrap"><table class="table"><thead><tr><th>ชื่อ–นามสกุล</th><th>ห้อง</th><th>สมัครใจทำประกัน</th><th>ต้องชำระรายปี</th><th>รับแล้วรายปี</th><th>ค้างรายปี</th></tr></thead><tbody>'+
+   insurance+'</tbody></table></div></section>';
  }
  function person(){
   const s=F.roster.find(s=>s.student_id===F.historyStudent);if(!s)return history();
