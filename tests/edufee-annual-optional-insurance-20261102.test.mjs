@@ -61,7 +61,7 @@ test("database rejects insurance payment without election and prevents term-cycl
  assert.match(migration,/edufee_set_deposit_choice/);
  assert.match(migration,/edufee_can_collect/);
  assert.match(migration,/edufee_annual_cycles_guard/);
- assert.match(migration,/semester=1 and category='deposit'/);
+ assert.doesNotMatch(migration,/update public\\.edufee_windows/i);
  assert.doesNotMatch(migration,/update public\.edufee_windows[^;]+semester=2/i);
 });
 test("year-only insurance PDF and term-two report separation exist",()=>{
