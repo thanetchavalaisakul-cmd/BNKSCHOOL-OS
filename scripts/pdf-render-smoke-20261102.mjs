@@ -108,7 +108,7 @@ for(const [kind,markup] of realPdfTemplates){
  assert(!markup.includes("เกษตรกรรม")&&!markup.includes("รับจ้างทั่วไป"),kind+" must not display occupation suffix");
  const h=join(dir,kind+".html"),pdf=join(dir,kind+".pdf");
  writeFileSync(h,'<!doctype html><html lang="th"><head><meta charset="utf-8"><style>'+liveStyle+
- ' @page{size:A4 portrait;margin:7mm;} body{background:white;}</style></head><body>'+markup+'</body></html>');
+ ' @page{size:A4 portrait;margin:0;} body{background:white;}</style></head><body>'+markup+'</body></html>');
  execFileSync(browser,[
   "--headless","--no-sandbox","--disable-dev-shm-usage","--disable-gpu","--no-pdf-header-footer",
   "--virtual-time-budget=6000","--print-to-pdf="+pdf,pathToFileURL(h).href
@@ -117,7 +117,7 @@ for(const [kind,markup] of realPdfTemplates){
  const info=execFileSync("pdfinfo",[pdf],{encoding:"utf8"});
  const count=Number(info.match(/^Pages:\s+(\d+)/m)?.[1]);
  const pageSize=info.match(/^Page size:\s+([\d.]+)\s+x\s+([\d.]+)/m);
- assert(count>=1&&count<=3,kind+" must produce actual bounded PDF");
+ assert.equal(count,1,kind+" must fit on one real A4 PDF page");
  assert(pageSize&&Number(pageSize[1])<Number(pageSize[2]),kind+" must be A4 portrait");
  console.log("REAL_PDF_OK template="+kind+" pages="+count+" bytes="+statSync(pdf).size+" occupations=excluded");
 }
