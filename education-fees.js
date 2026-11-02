@@ -1,5 +1,5 @@
 
-import { educationPrint } from "./education-fee-print.js?v=2";
+import { educationPrint } from "./education-fee-print.js?v=3";
 import { createEducationFeeLegacy } from "./education-fee-legacy.js?v=1";
 export function createEducationFeeFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont}){
  const F={tab:"dashboard",year:"2569",semester:2,loaded:false,loading:false,error:"",access:false,manager:false,admin:false,
