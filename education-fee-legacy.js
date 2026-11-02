@@ -1,4 +1,5 @@
 
+import { feeStudentMatches } from "./education-fee-search.js?v=1";
 export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,toast,renderDashboard,educationPrint,printOpts}){
  F.legacyRows=[];F.legacyReceipts=[];F.legacyClassFilter="";F.legacyStatusFilter="all";F.legacySearch="";
  const rerender=()=>renderDashboard();
@@ -35,7 +36,7 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
  }
  const filtered=()=>F.legacyRows.filter(r=>(!F.legacyClassFilter||r.class_name===F.legacyClassFilter)&&
   (F.legacyStatusFilter==="all"||r.review_status===F.legacyStatusFilter)&&
-  (!F.legacySearch||[r.full_name,r.student_code,r.class_name].join(" ").toLocaleLowerCase().includes(F.legacySearch.trim().toLocaleLowerCase())));
+  feeStudentMatches(r,F.searchText)&&(!F.legacySearch||feeStudentMatches(r,F.legacySearch)));
  function view(){
   const all=F.legacyRows,rows=filtered(),ready=all.filter(r=>r.review_status==="ready").map(legacyTotals);
   const due=ready.reduce((n,x)=>n+x.due,0),paid=ready.reduce((n,x)=>n+x.paid,0),
@@ -55,8 +56,7 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
   const controls='<div class="edufee-filter"><label>ห้อง<select id="edufee-legacy-class">'+sc("","ทุกห้อง",F.legacyClassFilter)+
    classes.map(x=>sc(x,x,F.legacyClassFilter)).join("")+'</select></label><label>สถานะ<select id="edufee-legacy-status">'+
    [["all","ทุกสถานะ"],["ready","ยืนยันแล้ว"],["review","รอตรวจสอบ"],["excluded","ไม่คิดยอด"]]
-    .map(x=>sc(x[0],x[1],F.legacyStatusFilter)).join("")+'</select></label>'+
-   '<label>ค้นหารหัส/ชื่อ<input class="input" id="edufee-legacy-search" value="'+e(F.legacySearch)+'" placeholder="พิมพ์แล้วกด Enter"></label></div>';
+    .map(x=>sc(x[0],x[1],F.legacyStatusFilter)).join("")+'</select></label></div>';
   const show=rows.slice(0,120);
   const table='<div class="table-wrap"><table class="table edufee-table"><thead><tr><th>ชื่อ–นามสกุล / รหัส</th><th>ชั้น</th>'+
    '<th>เทอม 1 รับแล้ว / กำหนด</th>'+(F.year==="2568"?"<th>เทอม 2 รับแล้ว / กำหนด</th>":"")+
@@ -136,7 +136,6 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
  function bind(){
   document.querySelector("#edufee-legacy-class")?.addEventListener("change",ev=>{F.legacyClassFilter=ev.target.value;rerender()});
   document.querySelector("#edufee-legacy-status")?.addEventListener("change",ev=>{F.legacyStatusFilter=ev.target.value;rerender()});
-  document.querySelector("#edufee-legacy-search")?.addEventListener("change",ev=>{F.legacySearch=ev.target.value;rerender()});
   document.querySelector("#edufee-legacy-csv")?.addEventListener("click",csv);
   document.querySelector("#edufee-legacy-pdf")?.addEventListener("click",pdf);
   document.querySelectorAll("[data-fee-legacy-pay]").forEach(b=>b.addEventListener("click",()=>paymentModal(b.dataset.feeLegacyPay)));
