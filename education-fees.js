@@ -3,10 +3,10 @@ import { educationPrint } from "./education-fee-print.js?v=3";
 import { createEducationFeeLegacy } from "./education-fee-legacy.js?v=1";
 export function createEducationFeeFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont}){
  const F={tab:"dashboard",year:"2569",semester:2,loaded:false,loading:false,error:"",access:false,manager:false,admin:false,
- roster:[],payments:[],rates:[],windows:[],cycles:[],staff:[],people:[],collectibleClassIds:[],classFilter:"all",gradeFilter:"",studentFilter:"",historyTerm:"all",historyOrder:"newest",
+ roster:[],payments:[],rates:[],windows:[],cycles:[],depositChoices:[],staff:[],people:[],collectibleClassIds:[],classFilter:"all",gradeFilter:"",studentFilter:"",historyTerm:"all",historyOrder:"newest",
  receiveGrade:"",receiveClass:"",receiveStudent:"",historyStudent:"",pending:false};
  const e=v=>escapeHtml(String(v??""));
- const cats=[["tuition","ค่าบำรุงการศึกษา"],["deposit","ค่าประกัน"],["water","ค่าน้ำ"]];
+ const cats=[["tuition","ค่าบำรุงการศึกษา (รายภาคเรียน)"],["deposit","ค่าประกัน (สมัครใจ รายปี)"],["water","ค่าน้ำ (รายปี)"]];
  const catName=k=>cats.find(c=>c[0]===k)?.[1]||k;
  const fmt=v=>Number(v||0).toLocaleString("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2});
  const htmlMoney=v=>fmt(v)+" ฿";
@@ -20,15 +20,20 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
  const rooms=()=>allClasses().filter(c=>c.name.replace(/\/[^/]*$/,"")===F.receiveGrade);
  const selectedRooms=()=>F.roster.filter(s=>s.class_id===F.receiveClass).sort((a,b)=>Number(a.student_number||0)-Number(b.student_number||0));
  const activeWindow=(year,sem,cat)=>F.windows.find(x=>x.academic_year===String(year)&&Number(x.semester)===Number(sem)&&x.category===cat)?.enabled===true;
- const cycleOf=cat=>F.cycles.find(c=>c.academic_year===F.year&&c.category===cat)?.cycle||(cat==="tuition"?"semester":"annual");
+ const cycleOf=cat=>cat==="deposit"||cat==="water"?"annual":F.cycles.find(c=>c.academic_year===F.year&&c.category===cat)?.cycle||"semester";
+ const depositSelected=sid=>F.depositChoices.some(c=>c.student_id===sid&&c.academic_year===F.year&&c.opted_in===true);
  const rateFor=(cat,sem)=>Number(F.rates.find(r=>r.academic_year===F.year&&Number(r.semester)===Number(sem)&&r.category===cat)?.amount||0);
  const rate=(cat,sem=F.semester)=>rateFor(cat,cycleOf(cat)==="annual"?0:sem);
  const yearlyActive=cat=>activeWindow(F.year,1,cat)||activeWindow(F.year,2,cat);
  const target=cat=>cycleOf(cat)==="annual"?(yearlyActive(cat)?rate(cat):0):(activeWindow(F.year,F.semester,cat)?rate(cat):0);
  const paid=(sid,cat,sem=F.semester)=>F.payments.filter(p=>p.student_id===sid&&p.academic_year===F.year&&p.category===cat
    &&(cycleOf(cat)==="annual"||Number(p.semester)===sem)&&!p.voided_at).reduce((n,p)=>n+Number(p.amount),0)+legacy.importedPaid(sid,cat,sem);
- const bill=(s,cat)=>({due:target(cat),paid:paid(s.student_id,cat),balance:Math.max(0,target(cat)-paid(s.student_id,cat))});
- const totals=s=>{const x=cats.map(c=>bill(s,c[0]));return {student:s,due:x.reduce((n,b)=>n+b.due,0),paid:x.reduce((n,b)=>n+b.paid,0),balance:x.reduce((n,b)=>n+b.balance,0)}};
+ const bill=(s,cat)=>{const due=cat==="deposit"&&!depositSelected(s.student_id)?0:target(cat);
+  const received=paid(s.student_id,cat);return {due,paid:received,balance:Math.max(0,due-received)};};
+ // The semester-2 summary is for semester-2 tuition only.
+ // Water and voluntary insurance are annual and must not masquerade as semester-2 fees.
+ const totals=s=>{const x=cats.filter(([k])=>F.semester!==2||cycleOf(k)!=="annual").map(([k])=>bill(s,k));
+  return {student:s,due:x.reduce((n,b)=>n+b.due,0),paid:x.reduce((n,b)=>n+b.paid,0),balance:x.reduce((n,b)=>n+b.balance,0)};};
  const gradeOf=name=>String(name||"").replace(/\/[^/]*$/,"");
  const rosterFiltered=()=>F.roster.filter(s=>(!F.gradeFilter||gradeOf(s.class_name)===F.gradeFilter)
  &&(F.classFilter==="all"||s.class_id===F.classFilter)&&(!F.studentFilter||s.student_id===F.studentFilter));
@@ -55,14 +60,15 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
     supabase.from("personnel_public_directory").select("user_id,full_name,role").order("full_name"),
     allPayments(),
     supabase.from("edufee_cycles").select("*").eq("academic_year",F.year),
-    supabase.rpc("edufee_my_collectible_classes",{p_year:F.year,p_semester:F.semester})
+    supabase.rpc("edufee_my_collectible_classes",{p_year:F.year,p_semester:F.semester}),
+    supabase.from("edufee_deposit_choices").select("student_id,academic_year,opted_in").eq("academic_year",F.year)
    ]);
    for(const [i,label] of [[2,"ทะเบียนนักเรียน"],[3,"อัตราค่าบำรุง"],[4,"รอบการจัดเก็บ"]])if(results[i].error)throw new Error(label+": "+results[i].error.message);
    F.manager=results[0].data===true;F.admin=state.profile?.role==="super_admin";
    F.roster=results[2].data||[];F.rates=results[3].data||[];F.windows=results[4].data||[];
-   if(results[8].error||results[9].error)throw new Error(results[8].error?.message||results[9].error?.message);
+   if(results[8].error||results[9].error||results[10].error)throw new Error(results[8].error?.message||results[9].error?.message||results[10].error?.message);
    F.staff=results[5].data||[];F.people=results[6].data||[];F.payments=results[7]||[];
-   F.cycles=results[8].data||[];
+   F.cycles=results[8].data||[];F.depositChoices=results[10].data||[];
    F.collectibleClassIds=(results[9].data||[]).map(c=>c.class_id);
    F.access=results[1].data===true||F.roster.length>0||F.staff.some(s=>s.user_id===state.user?.id);await legacy.load();
    if(F.gradeFilter&&!grades().includes(F.gradeFilter))F.gradeFilter="";
@@ -79,7 +85,9 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
   '<label>นักเรียน <select id="edufee-scope-student">'+sc("","นักเรียนทุกคน",F.studentFilter)+scopeStudents().map(x=>sc(x.student_id,x.full_name+" · "+x.class_name,F.studentFilter)).join("")+'</select></label></div>';
  const stats=()=>{const all=rosterFiltered().map(totals),due=all.reduce((n,x)=>n+x.due,0),got=all.reduce((n,x)=>n+x.paid,0),rest=all.reduce((n,x)=>n+x.balance,0),complete=all.filter(x=>x.balance===0&&x.due>0).length;return {all,due,got,rest,complete}};
  const status=row=>row.due<=0?"ยังไม่เปิดเก็บ":row.balance<=0?"ชำระครบ":row.paid>0?"ชำระบางส่วน":"ยังไม่ชำระ";
- function feeRows(s){return cats.map(([k,name])=>{const b=bill(s,k);return '<tr><td>'+name+'</td><td class="num">'+fmt(b.due)+'</td><td class="num">'+fmt(b.paid)+'</td><td class="num">'+fmt(b.balance)+'</td></tr>'}).join("")}
+ function feeRows(s){return cats.map(([k,name])=>{const b=bill(s,k);
+  const label=cycleOf(k)==="annual"?(F.semester===2?" · รายปี (ไม่รวมยอดเทอม 2)":" · รวมทั้งปี"):" · ภาคเรียนที่ "+F.semester;
+  return '<tr><td>'+name+label+'</td><td class="num">'+fmt(b.due)+'</td><td class="num">'+fmt(b.paid)+'</td><td class="num">'+fmt(b.balance)+'</td></tr>'}).join("")}
  const colhead='<thead><tr><th>นักเรียน</th><th>ห้อง</th><th class="num">ต้องชำระ</th><th class="num">รับแล้ว</th><th class="num">คงค้าง</th><th>สถานะ</th><th>ดูรายการ</th></tr></thead>';
  function rosterTable(rows){
   return '<div class="table-wrap"><table class="table edufee-table">'+colhead+'<tbody>'+rows.map(r=>'<tr><td>'+e(r.student.full_name)+'</td><td>'+e(className(r.student))+'</td><td class="num">'+fmt(r.due)+'</td><td class="num">'+fmt(r.paid)+'</td><td class="num">'+fmt(r.balance)+'</td><td><span class="edufee-pill '+(r.balance<=0?"ok":r.paid>0?"half":"pending")+'">'+status(r)+'</span></td><td><button class="btn btn-ghost" data-fee-person="'+e(r.student.student_id)+'">รายละเอียด</button></td></tr>').join("")+'</tbody></table></div>'
