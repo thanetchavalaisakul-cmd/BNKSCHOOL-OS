@@ -1,0 +1,42 @@
+name: Verify budget, approved amendment and preschool PDF
+on:
+  push:
+    branches:
+      - feature/budget-custom-controls-amendments-preschool-pdf-20261102
+permissions:
+  contents: write
+jobs:
+  verify:
+    if: "!contains(github.event.head_commit.message, '[pdf-verified]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build and verify application and migration
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify
+          node --check app.js
+          node --check modules/dashboard-events.js
+          git diff --check
+      - name: Chrome real-PDF print and one-page landscape verification
+        run: |
+          command -v google-chrome || command -v chromium
+          command -v pdfinfo
+          command -v pdftotext
+          node scripts/pdf-render-smoke-20261102.mjs
+      - name: Commit verified browser bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.min.js
+          if ! git diff --cached --quiet; then
+            git commit -m "build: verified budget and preschool PDF release [pdf-verified]"
+            git push origin HEAD:feature/budget-custom-controls-amendments-preschool-pdf-20261102
+          fi
