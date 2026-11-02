@@ -1,0 +1,38 @@
+name: Academic parent name import and certificate PDF repair
+on:
+  push:
+    branches: [fix/parent-fields-certificate-pdf-20261102]
+permissions:
+  contents: write
+concurrency:
+  group: bnk-parent-fields-certificate-pdf-20261102
+  cancel-in-progress: false
+jobs:
+  verify-build:
+    if: "!contains(github.event.head_commit.message, '[parent-built]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply scoped student registry name and PDF layout patch
+        run: python3 changes/parent_registry_and_document_20261102.py
+      - name: Validate full application and module syntax
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify
+          node --check app.js
+          node --check modules/academic-forms.js
+          git diff --check
+      - name: Commit verified JS bundle, CSS and version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js app.min.js styles.css index.html modules/academic-forms.js tests/certificate-preparer-schoolwide.test.mjs tests/preschool-cover-signature-retro-20261102.test.mjs tests/module-boundaries.test.mjs
+          git commit -m "fix: render parent name separately from occupation and align certificate approvals [parent-built]"
+          git push origin HEAD:fix/parent-fields-certificate-pdf-20261102
