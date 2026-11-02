@@ -206,16 +206,25 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
   if(!F.access)return hero+'<section class="panel"><h3>ยังไม่ได้รับสิทธิ์ใช้งาน</h3><p>กรุณาให้ Super Admin แต่งตั้งผู้รับผิดชอบการเงิน หรือใช้บัญชีผู้บริหารที่ได้รับสิทธิ์ดูรายงาน</p></section>';
   const contents=F.tab==="legacy"||(F.year==="2568"&&F.tab!=="settings")?legacy.view():F.tab==="dashboard"?dashboard():F.tab==="collect"?collect():F.tab==="registry"?register():F.tab==="person"?person():F.tab==="history"?history():F.tab==="settings"?settings():
    '<section class="panel"><h3>รายงานสรุปทั้งโรงเรียน รายชั้น รายห้อง และรายบุคคล</h3><p>เลือกปีการศึกษา ภาคเรียน ระดับชั้น ห้องเรียน หรือชื่อผู้เรียนจากตัวกรอง แล้วส่งออกเอกสาร</p><div class="edufee-actions"><button class="btn btn-primary" id="edufee-print-report">พิมพ์รายงาน A4 / PDF</button><button class="btn btn-ghost" id="edufee-csv">ส่งออก Excel (CSV)</button></div>'+rosterTable(rosterFiltered().map(totals))+'</section>';
-  return hero+tabs()+scope()+feeSearchResults()+contents;
+  return hero+tabs()+scope()+'<div id="edufee-search-pane">'+feeSearchResults()+contents+'</div>';
  }
  const rerender=()=>renderDashboard();
  // Local search must not trigger the global dashboard's expensive fee reload,
  // metrics RPC or unrelated module rebinds on every Thai character.
+ let rebindingSearchPane=false;
  function renderSearchLocally(){
-  const region=document.querySelector(".dashboard .content");
-  if(!region||!region.querySelector("#edufee-search"))return rerender();
-  region.innerHTML=view();
-  bind();
+  const pane=document.querySelector("#edufee-search-pane");
+  if(!pane)return rerender();
+  // Preserve the original search input node and Android keyboard while updating the results.
+  const temp=document.createElement("div");temp.innerHTML=view();
+  const fresh=temp.querySelector("#edufee-search-pane");
+  if(!fresh)return rerender();
+  pane.innerHTML=fresh.innerHTML;
+  const picker=document.querySelector("#edufee-scope-student");
+  if(picker)picker.innerHTML=sc("","นักเรียนทุกคน",F.studentFilter)+
+   scopeStudents().map(st=>sc(st.student_id,st.full_name+" · "+st.class_name,F.studentFilter)).join("");
+  rebindingSearchPane=true;
+  try{bind();}finally{rebindingSearchPane=false;}
  }
 
  function exportCSV(){
@@ -246,6 +255,7 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
   educationPrint({type:"receipt",data:{payment:p,student:s,schoolName:state.systemSettings?.school_name_th,collectorName:collector},...printOpts()});
  }
  function bind(){
+  if(!rebindingSearchPane){
   document.querySelector("#edufee-reload")?.addEventListener("click",async()=>{await load();rerender()});
   document.querySelectorAll("[data-fee-tab]").forEach(b=>b.addEventListener("click",()=>{F.tab=b.dataset.feeTab;F.historyStudent="";rerender()}));
   document.querySelector("#edufee-year")?.addEventListener("change",async ev=>{F.year=ev.target.value;F.tab="dashboard";F.legacyClassFilter="";F.legacyStatusFilter="all";F.legacySearch="";F.searchText="";F.gradeFilter="";F.classFilter="all";F.studentFilter="";F.receiveGrade=F.receiveClass=F.receiveStudent="";await load();rerender()});
@@ -261,6 +271,11 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
   };
   document.querySelector("#edufee-search")?.addEventListener("input",updateSearch);
   document.querySelector("#edufee-search")?.addEventListener("compositionend",updateSearch);
+  document.querySelector("#edufee-scope-grade")?.addEventListener("change",ev=>{F.gradeFilter=ev.target.value;F.classFilter="all";F.studentFilter="";F.historyStudent="";rerender()});
+  document.querySelector("#edufee-class")?.addEventListener("change",ev=>{F.classFilter=ev.target.value;F.studentFilter="";F.historyStudent="";rerender()});
+  document.querySelector("#edufee-scope-student")?.addEventListener("change",ev=>{F.studentFilter=ev.target.value;F.historyStudent="";rerender()});
+
+  }
   document.querySelectorAll("[data-fee-search-detail]").forEach(b=>b.addEventListener("click",()=>{
    F.historyStudent=b.dataset.feeSearchDetail;F.tab="person";rerender();
   }));
@@ -273,9 +288,6 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
    const st=F.legacyRows.find(x=>x.id===b.dataset.feeSearchLegacy);if(!st)return;
    F.tab="legacy";F.legacyClassFilter=st.class_name;F.legacyStatusFilter="all";rerender();
   }));
-  document.querySelector("#edufee-scope-grade")?.addEventListener("change",ev=>{F.gradeFilter=ev.target.value;F.classFilter="all";F.studentFilter="";F.historyStudent="";rerender()});
-  document.querySelector("#edufee-class")?.addEventListener("change",ev=>{F.classFilter=ev.target.value;F.studentFilter="";F.historyStudent="";rerender()});
-  document.querySelector("#edufee-scope-student")?.addEventListener("change",ev=>{F.studentFilter=ev.target.value;F.historyStudent="";rerender()});
   document.querySelectorAll("[data-fee-room]").forEach(b=>b.onclick=()=>{F.classFilter=b.dataset.feeRoom;F.gradeFilter=gradeOf(allClasses().find(c=>c.id===F.classFilter)?.name);F.studentFilter="";F.tab="registry";rerender()});
   document.querySelectorAll("[data-fee-person]").forEach(b=>b.onclick=()=>{F.historyStudent=b.dataset.feePerson;F.tab="person";rerender()});
   document.querySelector("#edufee-person-back")?.addEventListener("click",()=>{F.historyStudent="";F.tab="registry";rerender()});
