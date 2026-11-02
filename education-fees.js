@@ -209,6 +209,15 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
   return hero+tabs()+scope()+feeSearchResults()+contents;
  }
  const rerender=()=>renderDashboard();
+ // Local search must not trigger the global dashboard's expensive fee reload,
+ // metrics RPC or unrelated module rebinds on every Thai character.
+ function renderSearchLocally(){
+  const region=document.querySelector(".dashboard .content");
+  if(!region||!region.querySelector("#edufee-search"))return rerender();
+  region.innerHTML=view();
+  bind();
+ }
+
  function exportCSV(){
   const columns=["รหัสนักเรียน","ชื่อ-นามสกุล","ห้อง","ค่าเทอมต้องชำระ","ค่าเทอมรับแล้ว","สมัครใจทำประกันรายปี","ค่าประกันรายปีต้องชำระ","ค่าประกันรายปีรับแล้ว","ค่าน้ำรายปีต้องชำระ","ค่าน้ำรายปีรับแล้ว","รวมเฉพาะรอบที่เลือกต้องชำระ","รับแล้วเฉพาะรอบที่เลือก","คงค้างเฉพาะรอบที่เลือก"];
   const safe=v=>{const x=String(v??"");return '"'+(/^[=+@\-\t\r]/.test(x)?"'"+x:x).replace(/"/g,'""')+'"';};
@@ -246,7 +255,7 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
    const source=ev.currentTarget,term=source.value;
    if(F.searchText===term)return;
    const start=source.selectionStart,end=source.selectionEnd;
-   F.searchText=term;rerender();
+   F.searchText=term;renderSearchLocally();
    const next=document.querySelector("#edufee-search");
    if(next){next.focus();if(start!==null&&end!==null)next.setSelectionRange(start,end);}
   };
