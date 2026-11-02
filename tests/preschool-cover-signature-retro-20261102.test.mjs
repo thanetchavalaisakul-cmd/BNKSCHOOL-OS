@@ -19,4 +19,21 @@ test("private signature images can only be downloaded by authorized preschool do
  assert.match(schema,/REVOKE ALL ON FUNCTION private\.can_read_preschool_cover_signature_storage/);
 });
 test("new acknowledgements require one of four central signature methods",()=>{
- assert.match(schema,/acknowledge_preschool_group_cov���q�^
+ assert.match(schema,/acknowledge_preschool_group_cover_signed/);
+ for(const method of ["stored","drawn","upload","paper"])assert.ok(schema.includes("'"+method+"'"),method);
+ assert.match(schema,/p_signature_id AND user_id=auth\.uid\(\)/);
+ assert.match(schema,/public\.acknowledge_preschool_group_cover\(p_cover_id,p_acknowledge\)/);
+ assert.match(app,/signatureOptionsHtml\(signatures\.length\?"stored":"paper"\)/);
+ assert.match(app,/preschoolCoverChooseSignature\(\)/);
+ assert.match(app,/supabase\.rpc\("acknowledge_preschool_group_cover_signed"/);
+});
+test("PDF uses current saved signature only for already acknowledged teachers with explicit label",()=>{
+ assert.match(app,/supabase\.rpc\("get_preschool_cover_signature_assets"/);
+ assert.match(app,/signatureByTeacher/);
+ assert.match(app,/class="ps-sign-image"/);
+ assert.match(app,/ภาพลายเซ็นจากโปรไฟล์ ณ วันที่พิมพ์/);
+ assert.match(app,/ไม่ใช่การลงนามย้อนหลัง/);
+ assert.match(app,/preschoolCoverWetSignature\("ผู้อำนวยการโรงเรียน"/);
+ assert.match(page,/app\.min\.js\?v=5\.12\.9\.61/);
+});
+
