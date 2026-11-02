@@ -28,6 +28,11 @@ jobs:
           npm run verify
           node --check app.js
           node --check modules/academic-forms.js
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('styles.css')
+          p.write_text(p.read_text().rstrip('\n')+'\n')
+          PY
           git diff --check
       - name: Commit verified JS bundle, CSS and version
         run: |
