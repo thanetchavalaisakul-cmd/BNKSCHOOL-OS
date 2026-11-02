@@ -63,8 +63,7 @@ BEGIN
  INSERT INTO public.edufee_audit(payment_id,actor_id,action,note)
  VALUES(v_row.id,auth.uid(),'recorded','Recorded payment');
  RETURN v_row;
-END $function$
-
+END $function$;
 CREATE OR REPLACE FUNCTION public.edufee_record_import_receipt(p_row_id uuid, p_semester smallint, p_category text, p_amount numeric, p_paid_on date, p_payer text, p_note text, p_request uuid)
  RETURNS edufee_import_receipts
  LANGUAGE plpgsql
