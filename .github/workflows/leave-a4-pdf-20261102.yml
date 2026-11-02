@@ -1,0 +1,39 @@
+name: Verify leave A4 document layout without modifying approval flow
+on:
+  push:
+    branches:
+      - fix/leave-pdf-print-layout-20261102
+permissions:
+  contents: write
+jobs:
+  verify:
+    if: "!contains(github.event.head_commit.message, '[leave-pdf-verified]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build and run all application tests
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify
+          node --check app.js
+      - name: Render actual leave request PDF and check A4 portrait one-page output
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+          node scripts/leave-a4-pdf-smoke-20261102.mjs
+      - name: Commit verified browser bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.min.js
+          if ! git diff --cached --quiet; then
+            git commit -m "build: tested leave form A4 layout [leave-pdf-verified]"
+            git push origin HEAD:fix/leave-pdf-print-layout-20261102
+          fi

@@ -5140,7 +5140,39 @@ function leaveA4Styles() {
     .leave-print-sign-space{margin-bottom:1.5mm;white-space:nowrap;min-height:14mm;display:flex;align-items:flex-end;justify-content:center;gap:2mm}.leave-print-sign-image{display:inline-block;max-width:42mm;max-height:13mm;object-fit:contain;mix-blend-mode:multiply;}
     .leave-print-sign strong,.leave-print-sign span,.leave-print-sign small,.leave-print-sign em{display:block;}
     .leave-print-sign small{font-size:11pt}.leave-print-sign em{font-size:10.5pt;color:#555;margin-top:1mm;}
-    @media(max-width:700px){.leave-print-signatures{grid-template-columns:1fr}.leave-print-grid{grid-template-columns:1fr}}
+    /* Leave-specific print rules: never turn an official A4 form into the mobile layout. */
+    @page{size:A4 portrait;margin:7mm;}
+    .leave-print-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:1mm 4mm;}
+    .leave-print-grid>div{grid-template-columns:30mm minmax(0,1fr);gap:1.5mm;min-width:0;overflow-wrap:anywhere;padding:.5mm 0;}
+    .leave-print-signatures{grid-template-columns:repeat(3,minmax(0,1fr));gap:2mm;margin-top:3mm;}
+    .leave-print-sign{font-size:11pt;line-height:1.15;min-width:0;overflow-wrap:anywhere;}
+    .leave-print-sign-space{min-height:9mm;}
+    .leave-print-sign-image{max-height:9mm;max-width:37mm;}
+    .leave-print-title{font-size:16.5pt;margin:1.5mm 0;}
+    .leave-print-ref{font-size:11.5pt;margin-bottom:1mm;}
+    .leave-print-section{font-size:12pt;line-height:1.15;margin-top:1.5mm;overflow-wrap:anywhere;}
+    .leave-print-section h2{font-size:13pt;margin-bottom:.5mm;}
+    .leave-print-quota{font-size:10pt;line-height:1.1;margin-top:1mm;}
+    .leave-print-stats-table{font-size:9pt;line-height:1.06;margin-top:.8mm;}
+    .leave-print-stats-table th,.leave-print-stats-table td{padding:.6mm .4mm;}
+    .a4-doc-head{padding-bottom:2mm;margin-bottom:2mm;}
+    .a4-school-logo{height:16mm;max-width:26mm;margin-bottom:1mm;}
+    .a4-school-name{font-size:15pt;}
+    .a4-school-meta{font-size:11.5pt;}
+    .a4-foot{margin-top:2mm;padding-top:1mm;font-size:10pt;}
+    .a4-document-inner{padding:0;}
+    @media screen{
+      .a4-preview-scroll{overflow:auto;}
+      .a4-preview-scroll .a4-document{box-sizing:border-box;width:196mm!important;min-width:196mm!important;min-height:0!important;padding:3mm!important;margin:0 auto!important;}
+    }
+    @media print{
+      body.a4-print-body{background:#fff!important;}
+      .a4-document{box-sizing:border-box;width:196mm!important;min-width:0!important;min-height:0!important;margin:0!important;padding:3mm!important;}
+      .a4-document-inner{padding:0!important;}
+      .leave-print-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+      .leave-print-signatures{grid-template-columns:repeat(3,minmax(0,1fr))!important;}
+      .a4-doc-head,.leave-print-stats-wrap,.leave-print-signatures,.a4-foot{break-inside:avoid;page-break-inside:avoid;}
+    }
   `;
 }
 
