@@ -50,6 +50,7 @@ assert(statSync(output).size>3000,"Non-empty PDF required");
 const meta=execFileSync("pdfinfo",[output],{encoding:"utf8"});
 const pages=Number(meta.match(/^Pages:\s+(\d+)/m)?.[1]);
 const dims=meta.match(/^Page size:\s+([\d.]+)\s+x\s+([\d.]+)/m);
+console.log("ACTUAL_PDF_LAYOUT "+(meta.match(/^Pages:.*$/m)?.[0]||"")+" "+(meta.match(/^Page size:.*$/m)?.[0]||""));
 assert.equal(pages,1,"Preschool cover must be exactly one printed page");
 assert(dims&&Number(dims[1])>Number(dims[2]),"Preschool cover must use A4 landscape");
 console.log("PRESCHOOL_PDF_RENDER_OK pages="+pages+" orientation=landscape memberRows="+members.length+" bytes="+statSync(output).size);

@@ -7413,7 +7413,7 @@ function preschoolCoverDocStyles(){
   .ps-doc-sign-card strong,.ps-doc-sign-card span{display:block}
   .ps-doc-sign-card .ps-doc-signer-name{min-height:4mm;overflow-wrap:anywhere}
   .ps-doc-foot{margin-top:2mm;font-size:9.5pt;line-height:1.12;break-inside:avoid}
-  @media print{.a4-document,.a4-document-inner{margin:0!important;break-inside:avoid;page-break-inside:avoid}}
+  @media print{.a4-document{zoom:.74!important;width:277mm;min-height:0!important}.a4-document,.a4-document-inner{margin:0!important;break-inside:avoid;page-break-inside:avoid}}
   `;
 }
 // Names come from existing personnel / timetable data; no new SQL is needed.
