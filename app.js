@@ -7308,12 +7308,58 @@ async function syncPreschoolCovers(){
   if(error)return toast("ซิงก์ไม่ได้",error.message,"error");
   toast("ซิงก์ใบฝากปฐมวัยแล้ว",`ตรวจพบรายการประจำวันที่เข้าเงื่อนไข ${data||0} รายการ`,"success");await renderDashboard();
 }
+async function preschoolCoverChooseSignature(){
+ await refreshMySignatureProfile();
+ return new Promise(resolve=>{
+  const signatures=state.signatures||[],prefs=state.signaturePreferences||{};
+  const modal=document.createElement("div");modal.className="modal-backdrop";
+  modal.innerHTML=`<div class="modal" style="max-width:520px"><div class="modal-head">
+    <div><h3>รับทราบและลงลายเซ็น</h3><p>เลือกวิธีลงลายเซ็นกลางก่อนกดยืนยัน</p></div>
+    <button type="button" class="modal-close" id="ps-sign-close">×</button></div>
+    <div class="modal-body">
+     <div class="field"><label>วิธีลงลายเซ็น</label><select class="select" id="ps-sign-method">${signatureOptionsHtml(signatures.length?"stored":"paper")}</select></div>
+     <div class="field" id="ps-sign-image-field"><label>ภาพลายเซ็นของคุณ</label><select class="select" id="ps-sign-image"></select></div>
+     <p class="helper" id="ps-sign-hint"></p>
+     <button type="button" class="btn btn-ghost" id="ps-sign-manage">เพิ่ม / จัดการลายเซ็นกลาง</button>
+    </div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="ps-sign-cancel">ยกเลิก</button>
+    <button type="button" class="btn btn-primary" id="ps-sign-confirm">ยืนยันรับทราบ</button></div></div>`;
+  document.body.appendChild(modal);
+  let finished=false;
+  const done=value=>{if(finished)return;finished=true;modal.remove();resolve(value);};
+  const methodEl=modal.querySelector("#ps-sign-method"),sigEl=modal.querySelector("#ps-sign-image");
+  const update=()=>{
+   const method=methodEl.value,available=signatures.filter(sig=>method==="stored"||sig.source===method);
+   modal.querySelector("#ps-sign-image-field").hidden=method==="paper";
+   const preferred=prefs.default_signature_id||signatures.find(sig=>sig.is_default)?.id||"";
+   sigEl.innerHTML=available.map(sig=>`<option value="${escapeHtml(sig.id)}" ${sig.id===preferred?"selected":""}>${escapeHtml(sig.label||"ลายเซ็น")}</option>`).join("");
+   modal.querySelector("#ps-sign-hint").textContent=method==="paper"?"เว้นช่องสำหรับเซ็นบนกระดาษ":
+     available.length?"บันทึกผู้ลงนามและวันเวลาที่กดยืนยันจริง":"ยังไม่มีลายเซ็นแบบนี้ กรุณาเพิ่มในระบบลายเซ็นกลาง";
+  };
+  methodEl.onchange=update;update();
+  modal.querySelector("#ps-sign-close").onclick=()=>done(null);
+  modal.querySelector("#ps-sign-cancel").onclick=()=>done(null);
+  modal.querySelector("#ps-sign-manage").onclick=()=>{
+   const mode=methodEl.value==="drawn"?"drawn":"upload";done(null);signatureManagerModal(mode);
+  };
+  modal.querySelector("#ps-sign-confirm").onclick=()=>{
+   const method=methodEl.value;
+   if(method!=="paper"&&!sigEl.value){toast("ยังไม่มีลายเซ็น","เพิ่มลายเซ็นกลางหรือเลือกเซ็นบนกระดาษก่อน","error");return;}
+   done({method,signatureId:method==="paper"?null:sigEl.value});
+  };
+ });
+}
 async function acknowledgePreschoolCover(id,ack,button){
-  if(!ack&&!confirm("ยกเลิกการรับทราบใบฝากสอนนี้หรือไม่?"))return;
-  buttonLoading(button,true,"กำลังบันทึก...");
-  const {error}=await supabase.rpc("acknowledge_preschool_group_cover",{p_cover_id:id,p_acknowledge:ack});buttonLoading(button,false);
-  if(error)return toast("บันทึกการรับทราบไม่ได้",error.message,"error");
-  toast(ack?"รับทราบใบฝากสอนแล้ว":"ยกเลิกการรับทราบแล้ว","บันทึกสถานะไว้ในระบบแล้ว","success");await renderDashboard();
+ if(!ack&&!confirm("ยกเลิกการรับทราบใบฝากสอนนี้หรือไม่?"))return;
+ const choice=ack?await preschoolCoverChooseSignature():{method:"paper",signatureId:null};
+ if(!choice)return;
+ buttonLoading(button,true,"กำลังบันทึก...");
+ const {error}=await supabase.rpc("acknowledge_preschool_group_cover_signed",{
+  p_cover_id:id,p_acknowledge:ack,p_method:choice.method,p_signature_id:choice.signatureId
+ });
+ buttonLoading(button,false);
+ if(error)return toast("บันทึกการรับทราบไม่ได้",error.message,"error");
+ toast(ack?"รับทราบพร้อมวิธีลงลายเซ็นแล้ว":"ยกเลิกการรับทราบแล้ว","บันทึกเวลาจริงในระบบ","success");
+ await renderDashboard();
 }
 function preschoolCoverDocStyles(){
   return `${a4DocumentStyles()} @page{size:A4 portrait;margin:13mm;}
@@ -7327,7 +7373,9 @@ function preschoolCoverDocStyles(){
   .ps-doc-table th{background:#fafafa;font-weight:700;text-align:center}
   .ps-doc-table thead{display:table-header-group}
   .ps-doc-table tbody tr{break-inside:avoid;page-break-inside:avoid}
-  .ps-sign-date{font-size:11pt;color:#444}
+  .ps-sign-date{display:block;font-size:10pt;color:#444}
+  .ps-sign-image{max-width:39mm;max-height:9mm;object-fit:contain;display:block;margin:auto}
+  .ps-sign-note{display:block;font-size:9pt;line-height:1.1;color:#555}
   .ps-doc-sign-block{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:9mm;row-gap:5mm;margin-top:8mm;break-inside:avoid;page-break-inside:avoid}
   .ps-doc-sign-card{text-align:center;font-size:15pt;line-height:1.25;min-width:0;break-inside:avoid}
   .ps-doc-sign-space{height:8mm}
@@ -7375,12 +7423,27 @@ function preschoolCoverWetSignature(title,name){
 function buildPreschoolCoverDocument(g,assets={}){
   const members=preschoolCoverMembers(g.id);
   const unit=preschoolUnitForDate(g.class_id,g.leave_date);
-  return `<article class="a4-document"><div class="a4-document-inner"><header class="ps-doc-title">${assets.schoolLogo?`<img class="a4-school-logo" src="${assets.schoolLogo}" style="height:19mm" alt="ตราโรงเรียน">`:""}<div>${escapeHtml(schoolName())}</div><h1>บันทึกการฝากดูแลและจัดประสบการณ์ระดับปฐมวัย</h1><div>ระบบจัดการสอนแทน · ภาคเรียนที่ ${g.semester} ปีการศึกษา ${g.academic_year}</div></header><div class="ps-doc-summary"><div>ผู้ฝาก: <strong>${escapeHtml(g.absent_teacher_name)}</strong> &nbsp; ชั้นเรียน: <strong>${escapeHtml(g.class_label)}</strong></div><div>วันที่ฝากดูแล: <strong>${thaiDateOnly(g.leave_date)}</strong></div><div>หน่วยการจัดประสบการณ์: <strong>${escapeHtml(unit?.unit_title||"ยังไม่กำหนดหน่วย")}</strong>${unit?` (สัปดาห์ที่ ${unit.week_no})`:""}</div><div>ขอความร่วมมือคณะครูระดับปฐมวัยร่วมดูแลเด็กและดำเนินกิจกรรมตามหน่วยการจัดประสบการณ์ในวันที่ระบุ</div></div><table class="ps-doc-table"><thead><tr><th style="width:10mm">ที่</th><th>รายชื่อครูอนุบาลผู้รับฝาก</th><th style="width:30mm">สถานะ</th><th style="width:48mm">ลายมือชื่อ</th></tr></thead><tbody>${members.length?members.map((m,i)=>`<tr><td style="text-align:center">${i+1}</td><td>${escapeHtml(m.teacher_name)}</td><td style="text-align:center">${!m.is_available?"ลา":m.acknowledged_at?"รับทราบแล้ว":"รอลงชื่อ"}</td><td style="height:12mm">${m.acknowledged_at?`<span class="ps-sign-date">รับทราบในระบบ ${thaiDateOnly(m.acknowledged_at.slice(0,10))}</span>`:""}</td></tr>`).join(""):`<tr><td colspan="4">ยังไม่พบรายชื่อครูปฐมวัย กรุณากำหนดหน้าที่ครูในระบบ</td></tr>`}</tbody></table><div class="ps-doc-sign-block">${preschoolCoverWetSignature("ผู้ฝากดูแลชั้นเรียน",g.absent_teacher_name)}${preschoolCoverWetSignature("หัวหน้าช่วงชั้นปฐมวัย",assets.signers?.stage_head_name)}${preschoolCoverWetSignature("หัวหน้ากลุ่มงานบริหารงานวิชาการ",assets.signers?.academic_head_name)}${preschoolCoverWetSignature("ผู้อำนวยการโรงเรียน",assets.signers?.director_name)}</div><div class="ps-doc-foot">หมายเหตุ: ผู้รับฝากสามารถลงลายมือชื่อบนเอกสารฉบับพิมพ์ได้ ส่วนสถานะ “รับทราบแล้ว” คือการยืนยันในระบบพร้อมวันเวลา ไม่ใช่ลายเซ็นภาพ</div></div></article>`;
+  return `<article class="a4-document"><div class="a4-document-inner"><header class="ps-doc-title">${assets.schoolLogo?`<img class="a4-school-logo" src="${assets.schoolLogo}" style="height:19mm" alt="ตราโรงเรียน">`:""}<div>${escapeHtml(schoolName())}</div><h1>บันทึกการฝากดูแลและจัดประสบการณ์ระดับปฐมวัย</h1><div>ระบบจัดการสอนแทน · ภาคเรียนที่ ${g.semester} ปีการศึกษา ${g.academic_year}</div></header><div class="ps-doc-summary"><div>ผู้ฝาก: <strong>${escapeHtml(g.absent_teacher_name)}</strong> &nbsp; ชั้นเรียน: <strong>${escapeHtml(g.class_label)}</strong></div><div>วันที่ฝากดูแล: <strong>${thaiDateOnly(g.leave_date)}</strong></div><div>หน่วยการจัดประสบการณ์: <strong>${escapeHtml(unit?.unit_title||"ยังไม่กำหนดหน่วย")}</strong>${unit?` (สัปดาห์ที่ ${unit.week_no})`:""}</div><div>ขอความร่วมมือคณะครูระดับปฐมวัยร่วมดูแลเด็กและดำเนินกิจกรรมตามหน่วยการจัดประสบการณ์ในวันที่ระบุ</div></div><table class="ps-doc-table"><thead><tr><th style="width:10mm">ที่</th><th>รายชื่อครูอนุบาลผู้รับฝาก</th><th style="width:30mm">สถานะ</th><th style="width:48mm">ลายมือชื่อ</th></tr></thead><tbody>${members.length?members.map((m,i)=>`<tr><td style="text-align:center">${i+1}</td><td>${escapeHtml(m.teacher_name)}</td><td style="text-align:center">${!m.is_available?"ลา":m.acknowledged_at?"รับทราบแล้ว":"รอลงชื่อ"}</td><td style="height:12mm">${m.acknowledged_at?`${assets.signatureByTeacher?.[m.teacher_id]?.image
+ ?`<img class="ps-sign-image" src="${escapeHtml(assets.signatureByTeacher[m.teacher_id].image)}" alt="ลายเซ็นผู้รับฝาก">
+    <span class="ps-sign-note">${assets.signatureByTeacher[m.teacher_id].source_kind==="profile_current"?"ภาพลายเซ็นจากโปรไฟล์ ณ วันที่พิมพ์":"ลงนามอิเล็กทรอนิกส์"}</span>`:""}
+ <span class="ps-sign-date">รับทราบในระบบ ${thaiDateOnly(m.acknowledged_at.slice(0,10))}</span>`:""}</td></tr>`).join(""):`<tr><td colspan="4">ยังไม่พบรายชื่อครูปฐมวัย กรุณากำหนดหน้าที่ครูในระบบ</td></tr>`}</tbody></table><div class="ps-doc-sign-block">${preschoolCoverWetSignature("ผู้ฝากดูแลชั้นเรียน",g.absent_teacher_name)}${preschoolCoverWetSignature("หัวหน้าช่วงชั้นปฐมวัย",assets.signers?.stage_head_name)}${preschoolCoverWetSignature("หัวหน้ากลุ่มงานบริหารงานวิชาการ",assets.signers?.academic_head_name)}${preschoolCoverWetSignature("ผู้อำนวยการโรงเรียน",assets.signers?.director_name)}</div><div class="ps-doc-foot">หมายเหตุ: “รับทราบแล้ว” บันทึกเวลาเดิม ภาพจากโปรไฟล์ที่เพิ่มภายหลังไม่ใช่การลงนามย้อนหลัง · ช่องผู้บริหารเว้นไว้จนกว่าจะมีหลักฐานการลงนามในเอกสารฉบับนี้</div></div></article>`;
 }
 async function preschoolCoverPdfPreview(id){
   const g=state.preschoolCovers.find(x=>x.id===id);if(!g)return toast("ไม่พบข้อมูล","","error");
-  const [schoolLogo,signers]=await Promise.all([schoolLogoDataUrl(),preschoolCoverDocumentSigners(g)]);
-  const body=buildPreschoolCoverDocument(g,{schoolLogo,signers}),css=preschoolCoverDocStyles();
+  const [schoolLogo,signers,assetResult]=await Promise.all([
+    schoolLogoDataUrl(),preschoolCoverDocumentSigners(g),
+    supabase.rpc("get_preschool_cover_signature_assets",{p_cover_id:id})
+  ]);
+  if(assetResult.error)return toast("เปิด PDF ไม่สำเร็จ",assetResult.error.message,"error");
+  const entries=Array.isArray(assetResult.data)?assetResult.data:[];
+  const resolved=await Promise.all(entries.map(async ref=>{
+    if(!ref.storage_path)return ref;
+    const dl=await supabase.storage.from(ref.bucket_id||"signatures").download(ref.storage_path);
+    if(dl.error||!dl.data){console.warn("Unable to download preschool signature",dl.error);return ref;}
+    return {...ref,image:await blobToDataUrl(dl.data)};
+  }));
+  const signatureByTeacher=Object.fromEntries(resolved.map(ref=>[ref.teacher_id,ref]));
+  const body=buildPreschoolCoverDocument(g,{schoolLogo,signers,signatureByTeacher}),css=preschoolCoverDocStyles();
   const modal=document.createElement("div");modal.className="modal-backdrop a4-preview-backdrop";
   modal.innerHTML=`<div class="a4-preview-shell"><div class="a4-preview-toolbar"><div><strong>ใบฝากดูแลระดับปฐมวัย ${escapeHtml(g.class_label)}</strong><span>A4 แนวตั้ง · TH SarabunIT๙ · รายชื่อคณะครูทุกคนที่มีหน้าที่ระดับปฐมวัย</span></div><div class="a4-preview-actions"><button class="btn btn-ghost" id="ps-close">ปิด</button><button class="btn btn-primary" id="ps-print">พิมพ์ / บันทึก PDF</button></div></div><div class="a4-preview-scroll"><style>${css}</style>${body}</div></div>`;
   document.body.appendChild(modal);modal.querySelector("#ps-close").onclick=()=>modal.remove();
