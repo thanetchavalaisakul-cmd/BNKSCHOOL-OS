@@ -1,0 +1,34 @@
+name: Final guardian name column alignment
+on:
+  push:
+    branches: [fix/guardian-original-import-alignment-20261102]
+permissions:
+  contents: write
+jobs:
+  verify-and-build:
+    if: "!contains(github.event.head_commit.message, '[guardian-built]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Align guardian given and surname columns for future imports
+        run: python3 changes/guardian_parent_alignment_followup_20261102.py
+      - name: Verify whole application
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify
+          node --check app.js
+          git diff --check
+      - name: Record verified release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js app.min.js index.html tests/certificate-preparer-schoolwide.test.mjs tests/preschool-cover-signature-retro-20261102.test.mjs tests/academic-parent-fields-pdf-20261102.test.mjs
+          git commit -m "fix: finish guardian name mapping from original roster [guardian-built]"
+          git push origin HEAD:fix/guardian-original-import-alignment-20261102
