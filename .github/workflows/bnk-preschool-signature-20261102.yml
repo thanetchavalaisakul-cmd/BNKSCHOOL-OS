@@ -1,0 +1,47 @@
+name: BNK preschool acknowledgements central signature and PDF verification
+on:
+  push:
+    branches: [fix/preschool-cover-signature-retro-20261102]
+permissions:
+  contents: write
+concurrency:
+  group: bnk-preschool-ack-signature-20261102
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: "!contains(github.event.head_commit.message, '[ps-sign-built]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply preschool signature UI changes
+        run: |
+          python3 changes/preschool-cover-signature-retro-20261102.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("tests/certificate-preparer-schoolwide.test.mjs")
+          txt=p.read_text()
+          old=r'app\.min\.js\?v=5\.12\.9\.60'
+          new=r'app\.min\.js\?v=5\.12\.9\.61'
+          assert txt.count(old)==1
+          p.write_text(txt.replace(old,new))
+          PY
+      - name: Validate entire school OS
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify
+          node --check app.js
+          git diff --check
+      - name: Save audited app and optimized bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js app.min.js index.html tests/certificate-preparer-schoolwide.test.mjs
+          git commit -m "feat: display acknowledged preschool staff signatures from central profile [ps-sign-built]"
+          git push origin HEAD:fix/preschool-cover-signature-retro-20261102
