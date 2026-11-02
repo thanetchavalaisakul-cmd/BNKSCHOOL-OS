@@ -156,7 +156,7 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
   return '<section class="panel"><h3>กำหนดประเภทและรอบการจัดเก็บ · ปีการศึกษา '+e(F.year)+'</h3>'+
    '<p class="helper">แต่ละประเภทเลือกรายปีหรือรายภาคเรียนได้เอง ตั้งจำนวนเงินตามรอบที่เลือก และเปิดรายการเก็บเงินแยกแต่ละเทอมด้านล่าง</p>'+
    '<form id="edufee-settings-rates" class="edufee-plan-form">'+cats.map(([k,name])=>{
-    const cycle=cycleOf(k),locked=F.payments.some(p=>p.category===k);
+    const cycle=cycleOf(k),locked=k==="deposit"||k==="water"||F.payments.some(p=>p.category===k);
     return '<div class="edufee-plan"><div class="edufee-plan-head"><h4>'+name+'</h4>'+
       '<label>รอบจัดเก็บ<select name="cycle_'+k+'" data-fee-cycle="'+k+'" '+(locked?"disabled":"")+'>'+
       sc("annual","รายปีการศึกษา",cycle)+sc("semester","รายภาคเรียน",cycle)+'</select></label></div>'+
@@ -184,13 +184,17 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
  }
  const rerender=()=>renderDashboard();
  function exportCSV(){
-  const columns=["รหัสนักเรียน","ชื่อ-นามสกุล","ห้อง","ค่าบำรุงต้องชำระ","ค่าบำรุงรับแล้ว","ค่าประกันต้องชำระ","ค่าประกันรับแล้ว","ค่าน้ำต้องชำระ","ค่าน้ำรับแล้ว","รวมต้องชำระ","รับแล้ว","คงค้าง"];
+  const columns=["รหัสนักเรียน","ชื่อ-นามสกุล","ห้อง","ค่าเทอมต้องชำระ","ค่าเทอมรับแล้ว","สมัครใจทำประกันรายปี","ค่าประกันรายปีต้องชำระ","ค่าประกันรายปีรับแล้ว","ค่าน้ำรายปีต้องชำระ","ค่าน้ำรายปีรับแล้ว","รวมเฉพาะรอบที่เลือกต้องชำระ","รับแล้วเฉพาะรอบที่เลือก","คงค้างเฉพาะรอบที่เลือก"];
   const safe=v=>{const x=String(v??"");return '"'+(/^[=+@\-\t\r]/.test(x)?"'"+x:x).replace(/"/g,'""')+'"';};
-  const rows=rosterFiltered().map(s=>[s.student_code,s.full_name,s.class_name,bill(s,"tuition").due,bill(s,"tuition").paid,bill(s,"deposit").due,bill(s,"deposit").paid,bill(s,"water").due,bill(s,"water").paid,totals(s).due,totals(s).paid,totals(s).balance]);
+  const rows=rosterFiltered().map(s=>[s.student_code,s.full_name,s.class_name,bill(s,"tuition").due,bill(s,"tuition").paid,depositSelected(s.student_id)?"ทำ":"ไม่ทำ",bill(s,"deposit").due,bill(s,"deposit").paid,bill(s,"water").due,bill(s,"water").paid,totals(s).due,totals(s).paid,totals(s).balance]);
   const blob=new Blob(["\ufeff"+[columns,...rows].map(row=>row.map(safe).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"});
   const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="BNK_education_fees_"+F.year+"_term_"+F.semester+".csv";a.click();URL.revokeObjectURL(url);
  }
  const printOpts=()=>({fontsCss:officialPdfFontFaceCss(),ensureFont:ensureOfficialPdfFont,toast});
+ function depositPdf(){
+  const rows=rosterFiltered().map(st=>({student:st,opted_in:depositSelected(st.student_id),...bill(st,"deposit")}));
+  educationPrint({type:"deposit",data:{rows,year:F.year,scope:scopeName(),schoolName:state.systemSettings?.school_name_th},...printOpts()});
+ }
  function reportPdf(){
   const rows=rosterFiltered().map(totals);
   const isIndividual=rows.length===1&&Boolean(F.studentFilter||(F.tab==="person"&&F.historyStudent));
@@ -220,6 +224,16 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
   document.querySelector("#edufee-grade")?.addEventListener("change",ev=>{F.receiveGrade=ev.target.value;F.receiveClass="";F.receiveStudent="";rerender()});
   document.querySelector("#edufee-room")?.addEventListener("change",ev=>{F.receiveClass=ev.target.value;F.receiveStudent="";rerender()});
   document.querySelector("#edufee-student")?.addEventListener("change",ev=>{F.receiveStudent=ev.target.value;rerender()});
+   document.querySelectorAll("[data-fee-insurance-option]").forEach(box=>box.addEventListener("change",async ev=>{
+    const id=ev.currentTarget.dataset.feeInsuranceOption,st=F.roster.find(x=>x.student_id===id);
+    if(!st||!canCollect(st.class_id)){rerender();return;}
+    const chosen=ev.currentTarget.checked;
+    if(!confirm("ยืนยัน"+(chosen?"สมัครใจทำประกัน":"ยกเลิกการเลือกทำประกัน")+" รายปีของ "+st.full_name+"?")){rerender();return;}
+    ev.currentTarget.disabled=true;
+    const {error}=await supabase.rpc("edufee_set_deposit_choice",{p_student:id,p_year:F.year,p_opted_in:chosen});
+    if(error){rerender();return toast("เปลี่ยนสถานะค่าประกันไม่สำเร็จ",error.message,"error");}
+    await load();rerender();toast("บันทึกการเลือกทำประกันรายปีแล้ว","","success");
+   }));
   document.querySelector("#edufee-history-student")?.addEventListener("change",ev=>{F.historyStudent=ev.target.value;rerender()});
   document.querySelector("#edufee-history-term")?.addEventListener("change",ev=>{F.historyTerm=ev.target.value;rerender()});
   document.querySelector("#edufee-history-order")?.addEventListener("change",ev=>{F.historyOrder=ev.target.value;rerender()});
@@ -231,6 +245,7 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
    });
   }));
   document.querySelector("#edufee-csv")?.addEventListener("click",exportCSV);
+   document.querySelector("#edufee-deposit-pdf")?.addEventListener("click",depositPdf);
   document.querySelector("#edufee-print-report")?.addEventListener("click",reportPdf);
   document.querySelector("#edufee-person-pdf")?.addEventListener("click",()=>{
    const s=F.roster.find(s=>s.student_id===F.historyStudent);
