@@ -139,10 +139,10 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
       '<label>รอบจัดเก็บ<select name="cycle_'+k+'" data-fee-cycle="'+k+'" '+(locked?"disabled":"")+'>'+
       sc("annual","รายปีการศึกษา",cycle)+sc("semester","รายภาคเรียน",cycle)+'</select></label></div>'+
       (locked?'<p class="edufee-locked">มีประวัติรับเงินจริงแล้ว จึงล็อกรอบจัดเก็บของปีนี้เพื่อคุ้มครองยอดที่บันทึกไว้ (ยังปรับอัตราได้โดยไม่ต่ำกว่ายอดรับจริง)</p>':'')+
-      '<div class="edufee-plan-amounts"><label data-fee-cycle-amount="'+k+'_0" '+(cycle==="semester"?"hidden":"")+' >อัตรารายปี (บาท)<input name="rate_'+k+'_0" type="number" min="0" max="1000000" step="0.01" required value="'+rateFor(k,0)+'"></label>'+
-      '<label data-fee-cycle-amount="'+k+'_1" '+(cycle==="annual"?"hidden":"")+' >อัตราภาคเรียนที่ 1 (บาท)<input name="rate_'+k+'_1" type="number" min="0" max="1000000" step="0.01" required value="'+rateFor(k,1)+'"></label>'+
-      '<label data-fee-cycle-amount="'+k+'_2" '+(cycle==="annual"?"hidden":"")+' >อัตราภาคเรียนที่ 2 (บาท)<input name="rate_'+k+'_2" type="number" min="0" max="1000000" step="0.01" required value="'+rateFor(k,2)+'"></label></div></div>';
-   }).join("")+'<button class="btn btn-primary">บันทึกอัตราและรอบจัดเก็บ</button></form></section>'+
+      '<div class="edufee-plan-amounts"><label data-fee-cycle-amount="'+k+'_0" '+(cycle==="semester"?"hidden":"")+' >อัตรารายปี (บาท)<input name="rate_'+k+'_0" type="number" min="0" max="1000000" step="0.01" value="'+rateFor(k,0)+'"></label>'+
+      '<label data-fee-cycle-amount="'+k+'_1" '+(cycle==="annual"?"hidden":"")+' >อัตราภาคเรียนที่ 1 (บาท)<input name="rate_'+k+'_1" type="number" min="0" max="1000000" step="0.01" value="'+rateFor(k,1)+'"></label>'+
+      '<label data-fee-cycle-amount="'+k+'_2" '+(cycle==="annual"?"hidden":"")+' >อัตราภาคเรียนที่ 2 (บาท)<input name="rate_'+k+'_2" type="number" min="0" max="1000000" step="0.01" value="'+rateFor(k,2)+'"></label></div></div>';
+   }).join("")+'<button type="submit" class="btn btn-primary">บันทึกอัตราและรอบจัดเก็บ</button></form></section>'+
   '<section class="panel"><h3>เปิด / ปิดการจัดเก็บรายเทอม</h3><p class="helper">รายการรายปีจ่ายครั้งเดียวในปีการศึกษา โดยเลือกเทอมที่อนุญาตให้รับเงินได้ ไม่คิดยอดซ้ำเมื่อชำระแล้ว</p><form id="edufee-settings-windows"><div class="edufee-windowgrid">'+
   [1,2].map(sem=>'<div><h4>ภาคเรียนที่ '+sem+'</h4>'+cats.map(([k,name])=>'<label class="edufee-switch"><input type="checkbox" name="window_'+sem+'_'+k+'" '+(activeWindow(F.year,sem,k)?"checked":"")+'> '+name+'</label>').join("")+'</div>').join("")+
   '</div><button class="btn btn-primary">บันทึกการเปิด / ปิด</button></form></section>'+
@@ -244,7 +244,18 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
   });
   document.querySelector("#edufee-settings-rates")?.addEventListener("submit",async ev=>{
     ev.preventDefault();if(!F.manager)return;
-    const fd=new FormData(ev.currentTarget);const btn=ev.currentTarget.querySelector("[type=submit]");
+    const form=ev.currentTarget,fd=new FormData(form),btn=ev.submitter||form.querySelector('button[type="submit"]');
+    // A rate of 0 is valid; hidden fields for the inactive billing cycle are optional.
+    for(const [k,name] of cats){
+     const cycle=String(fd.get("cycle_"+k)||cycleOf(k));
+     for(const period of (cycle==="annual"?[0]:[1,2])){
+      const field=form.elements.namedItem("rate_"+k+"_"+period),value=String(field?.value??"").trim();
+      if(!value||!Number.isFinite(Number(value))||Number(value)<0||Number(value)>1000000){
+       return toast("อัตราจัดเก็บไม่ถูกต้อง",name+" · กรุณาระบุจำนวนเงิน 0–1,000,000 บาท","error");
+      }
+     }
+    }
+    if(!btn)return toast("ไม่พบปุ่มบันทึก","กรุณาเปิดหน้าตั้งค่าการจัดเก็บอีกครั้ง","error");
     btn.disabled=true;
     try{
      for(const [k] of cats){
