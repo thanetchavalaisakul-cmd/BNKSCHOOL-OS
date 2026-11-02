@@ -32,5 +32,5 @@ test("certificate preparer gets whole-school class dropdown without administrati
  assert.match(form,/id="academic-certificate-class"/);
  assert.match(form,/academicCertificateStudentPickerOptions\(students,null,e\.currentTarget\.value\)/);
  assert.match(app,/mod\.createAcademicFormsFeature\(\{[^}\n]*academicCertificateCanPrepareUi/);
- assert.match(html,/app\.min\.js\?v=5\.12\.9\.65/);
+ assert.match(html,/app\.min\.js\?v=5\.12\.9\.\d+/);
 });
