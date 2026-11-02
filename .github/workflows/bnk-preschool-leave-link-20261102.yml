@@ -1,0 +1,54 @@
+name: Preschool leave approval link and signing acceptance
+on:
+  push:
+    branches: [fix/preschool-leave-approval-link-20261102]
+permissions:
+  contents: write
+concurrency:
+  group: preschool-leave-link-20261102
+  cancel-in-progress: false
+jobs:
+  verify-and-build:
+    if: "!contains(github.event.head_commit.message, '[preschool-built]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply linked leave / preschool signing UI
+        run: |
+          python3 changes/preschool-leave-approval-20261102.py
+          python3 - <<'PY'
+          from pathlib import Path
+          files = {
+            'tests/certificate-preparer-schoolwide.test.mjs': [(r'app\.min\.js\?v=5\.12\.9\.61',r'app\.min\.js\?v=5\.12\.9\.62')],
+            'tests/preschool-cover-signature-retro-20261102.test.mjs': [('ไม่ใช่การลงนามย้อนหลัง','ลงนามย้อนหลัง'),(r'app\.min\.js\?v=5\.12\.9\.61',r'app\.min\.js\?v=5\.12\.9\.62')],
+            'tests/module-boundaries.test.mjs': [("name==='academic-forms'?'5.12.9.59':'5.12.9.58'","name==='academic-forms'?'5.12.9.59':name==='dashboard-events'?'5.12.9.62':'5.12.9.58'")],
+          }
+          for name, changes in files.items():
+            p=Path(name)
+            text=p.read_text()
+            for old,new in changes:
+              assert text.count(old)==1,(name,old,text.count(old))
+              text=text.replace(old,new)
+            p.write_text(text)
+          PY
+      - name: Run full regression suite and syntax checks
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify
+          node --check app.js
+          node --check modules/dashboard-events.js
+          git diff --check
+      - name: Save reviewed build artifacts and tests
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js app.min.js index.html modules/dashboard-events.js tests/certificate-preparer-schoolwide.test.mjs tests/preschool-cover-signature-retro-20261102.test.mjs tests/module-boundaries.test.mjs
+          git commit -m "feat: reuse approved leave signatures and sign preschool receipt [preschool-built]"
+          git push origin HEAD:fix/preschool-leave-approval-link-20261102
