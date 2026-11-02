@@ -48,7 +48,7 @@ function receipt(d){
 function summary(d){
  const rows=d.rows||[],overall=rows.reduce((a,s)=>a+s.due,0),paid=rows.reduce((a,s)=>a+s.paid,0);
  return heading(d.schoolName,"รายงานสรุปการจัดเก็บค่าบำรุงการศึกษา")+
- `<p class="subhead">ปีการศึกษา ${th(d.year)} ภาคเรียนที่ ${th(d.semester)} · ${th(d.scope)}</p>
+ `<p class="subhead">ปีการศึกษา ${th(d.year)} ภาคเรียนที่ ${th(d.semester)} · ${th(d.scope)}${Number(d.semester)===2?" · เฉพาะค่าเทอมภาคเรียนที่ ๒ (ค่าน้ำ/ค่าประกันรายปีแยกต่างหาก)":""}</p>
  <div class="meta"><p><strong>นักเรียน:</strong> ${th(rows.length)} คน</p><p><strong>จำนวนเงินที่ต้องจัดเก็บ:</strong> ${money(overall)} บาท</p>
  <p><strong>ชำระแล้ว:</strong> ${money(paid)} บาท</p><p><strong>คงค้าง:</strong> ${money(Math.max(0,overall-paid))} บาท</p></div>
  <table><thead><tr><th style="width:9%">ที่</th><th style="width:37%">ชื่อ–นามสกุล</th><th style="width:14%">ชั้น</th><th class="num" style="width:14%">ต้องชำระ</th><th class="num" style="width:13%">ชำระแล้ว</th><th class="num" style="width:13%">ค้าง</th></tr></thead>
@@ -57,19 +57,43 @@ function summary(d){
  <div class="footer">${d.importedFromSheet?"ข้อมูลจาก Google Sheets เป็นยอดสะสมเดิม ไม่ใช่ใบเสร็จรับเงินย้อนหลัง และแสดงเฉพาะรายการที่ยืนยันได้":"จัดทำจากระบบ BNK SCHOOL OS ณ "+date(new Date().toISOString())+" · จำนวนเงินคำนวณจากอัตราและรายการรับเงินที่บันทึกจริง"}</div>`;
 }
 
+function depositReport(d){
+ const rows=d.rows||[],chosen=rows.filter(x=>x.opted_in);
+ const due=chosen.reduce((n,x)=>n+Number(x.due||0),0);
+ const paid=chosen.reduce((n,x)=>n+Number(x.paid||0),0);
+ const outstanding=chosen.reduce((n,x)=>n+Number(x.balance||0),0);
+ return heading(d.schoolName,"รายงานค่าประกันการศึกษา · สมัครใจรายปี")+
+  '<p class="subhead">ปีการศึกษา '+th(d.year)+' · '+th(d.scope||"ทั้งโรงเรียน")+' · ไม่ใช่ค่าบำรุงรายภาคเรียนหรือค่าน้ำ</p>'+
+  '<div class="meta"><p><strong>นักเรียนทั้งหมด:</strong> '+th(rows.length)+' คน</p>'+
+  '<p><strong>เลือกทำประกัน:</strong> '+th(chosen.length)+' คน</p>'+
+  '<p><strong>ต้องชำระเฉพาะผู้สมัครใจ:</strong> '+money(due)+' บาท</p>'+
+  '<p><strong>ชำระแล้ว:</strong> '+money(paid)+' บาท</p>'+
+  '<p><strong>คงค้างเฉพาะผู้สมัครใจ:</strong> '+money(outstanding)+' บาท</p></div>'+
+  '<table><thead><tr><th style="width:7%">ที่</th><th style="width:31%">ชื่อ–นามสกุล</th>'+
+  '<th style="width:11%">ห้อง</th><th style="width:17%">ทำประกัน</th>'+
+  '<th class="num" style="width:12%">กำหนด</th><th class="num" style="width:11%">รับแล้ว</th><th class="num" style="width:11%">ค้าง</th></tr></thead><tbody>'+
+  rows.map((x,i)=>'<tr><td>'+th(i+1)+'</td><td>'+th(x.student?.full_name||"—")+'</td>'+
+   '<td>'+th(x.student?.class_name||"—")+'</td><td>'+(x.opted_in?"สมัครใจทำ":"ไม่เลือกทำ")+'</td>'+
+   '<td class="num">'+money(x.due)+'</td><td class="num">'+money(x.paid)+'</td><td class="num">'+money(x.balance)+'</td></tr>').join("")+
+  '<tr class="total"><td colspan="4">รวมเฉพาะผู้สมัครใจ</td><td class="num">'+money(due)+'</td>'+
+  '<td class="num">'+money(paid)+'</td><td class="num">'+money(outstanding)+'</td></tr></tbody></table>'+
+  '<div class="footer">รายงานค่าประกันรายปีแยกจากค่าเทอม ๑ และ ๒ และค่าน้ำรายปี · ผู้ที่ไม่เลือกทำประกันไม่ถูกคิดหนี้ค่าประกัน</div>';
+}
 function individual(d){
  const st=d.student||{},rows=d.categoryRows||[],payments=(d.payments||[]).slice()
  .sort((a,b)=>String(a.paid_on||"").localeCompare(String(b.paid_on||""))||Number(a.sequence_no||0)-Number(b.sequence_no||0));
- const due=rows.reduce((n,x)=>n+Number(x.due||0),0);
- const paid=rows.reduce((n,x)=>n+Number(x.paid||0),0);
+ const termRows=Number(d.semester)===2?rows.filter(x=>x.cycle!=="annual"):rows;
+ const due=termRows.reduce((n,x)=>n+Number(x.due||0),0);
+ const paid=termRows.reduce((n,x)=>n+Number(x.paid||0),0);
  return heading(d.schoolName,"รายงานการชำระเงินรายบุคคล")+
  `<p class="subhead">ปีการศึกษา ${th(d.year)} ภาคเรียนที่ ${th(d.semester)}</p>
  <div class="meta"><p><strong>นักเรียน:</strong> ${th(st.full_name||"—")}</p><p><strong>ชั้น / ห้อง:</strong> ${th(st.class_name||"—")}</p>
  <p><strong>เลขประจำตัวนักเรียน:</strong> ${th(st.student_code||"—")}</p><p><strong>ผู้ปกครอง:</strong> ${th(st.guardian_name||"—")}</p></div>
  <h3>สรุปยอดตามประเภทเงิน</h3>
  <table><thead><tr><th style="width:38%">รายการ</th><th style="width:18%">รอบเก็บ</th><th class="num" style="width:15%">ต้องชำระ</th><th class="num" style="width:15%">ชำระแล้ว</th><th class="num" style="width:14%">คงค้าง</th></tr></thead><tbody>
- ${rows.map(x=>`<tr><td>${th(x.name)}</td><td>${x.cycle==="annual"?"รายปี":"รายภาคเรียน"}</td><td class="num">${money(x.due)}</td><td class="num">${money(x.paid)}</td><td class="num">${money(x.balance)}</td></tr>`).join("")}
+ ${termRows.map(x=>`<tr><td>${th(x.name)}</td><td>${x.cycle==="annual"?"รายปี":"รายภาคเรียน"}</td><td class="num">${money(x.due)}</td><td class="num">${money(x.paid)}</td><td class="num">${money(x.balance)}</td></tr>`).join("")}
  <tr class="total"><td colspan="2">รวม</td><td class="num">${money(due)}</td><td class="num">${money(paid)}</td><td class="num">${money(Math.max(0,due-paid))}</td></tr></tbody></table>
+ ${Number(d.semester)===2?'<h3>รายการรายปี (แสดงแยก ไม่ใช่หนี้ภาคเรียนที่ ๒)</h3><table><thead><tr><th>รายการ</th><th class="num">ต้องชำระรายปี</th><th class="num">รับแล้วรายปี</th><th class="num">คงค้างรายปี</th></tr></thead><tbody>'+rows.filter(x=>x.cycle==="annual").map(x=>'<tr><td>'+th(x.name)+'</td><td class="num">'+money(x.due)+'</td><td class="num">'+money(x.paid)+'</td><td class="num">'+money(x.balance)+'</td></tr>').join("")+'</tbody></table>':""}
  <h3>ประวัติรายการรับเงินในปีการศึกษา</h3>
  <table><thead><tr><th style="width:12%">อ้างอิง</th><th style="width:26%">วันที่รับ</th><th style="width:26%">ประเภท</th><th style="width:17%">ภาคเรียน</th><th class="num" style="width:19%">จำนวน (บาท)</th></tr></thead><tbody>
  ${payments.map(x=>`<tr><td>${th(x.sequence_no)}</td><td>${date(x.paid_on)}</td><td>${th(labels[x.category]||x.category)}${x.voided_at?" (ยกเลิก)":""}</td><td>${th(x.semester)}</td><td class="num">${money(x.amount)}</td></tr>`).join("")||'<tr><td colspan="5">ยังไม่มีประวัติรับเงิน</td></tr>'}</tbody></table>
@@ -79,7 +103,7 @@ export async function educationPrint({type,data,fontsCss,ensureFont,toast,opened
  const win=openedWindow||window.open("","_blank");
  if(!win){toast("เปิดหน้าต่างไม่ได้","อนุญาตป๊อปอัปแล้วลองใหม่","error");return false}
  try{
-  win.document.open();win.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><base href="${location.origin}/"><title>BNK SCHOOL OS · รายงานรับเงิน</title><style>${documentCss(fontsCss)}</style></head><body><div class="actions"><span>A4 · TH Sarabun IT๙ · เลขไทย</span><button onclick="window.print()">พิมพ์ / บันทึก PDF</button></div><main class="paper">${type==="receipt"?receipt(data):type==="individual"?individual(data):summary(data)}</main></body></html>`);
+  win.document.open();win.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><base href="${location.origin}/"><title>BNK SCHOOL OS · รายงานรับเงิน</title><style>${documentCss(fontsCss)}</style></head><body><div class="actions"><span>A4 · TH Sarabun IT๙ · เลขไทย</span><button onclick="window.print()">พิมพ์ / บันทึก PDF</button></div><main class="paper">${type==="receipt"?receipt(data):type==="individual"?individual(data):type==="deposit"?depositReport(data):summary(data)}</main></body></html>`);
   win.document.close();await ensureFont("16pt",win.document);
   await Promise.all(Array.from(win.document.images).map(img=>img.decode().catch(()=>null)));
   win.focus();return true;
