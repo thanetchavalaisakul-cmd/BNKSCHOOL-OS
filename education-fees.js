@@ -1,9 +1,10 @@
 
 import { educationPrint } from "./education-fee-print.js?v=4";
-import { createEducationFeeLegacy } from "./education-fee-legacy.js?v=2";
+import { createEducationFeeLegacy } from "./education-fee-legacy.js?v=3";
+import { feeStudentMatches } from "./education-fee-search.js?v=1";
 export function createEducationFeeFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont}){
  const F={tab:"dashboard",year:"2569",semester:2,loaded:false,loading:false,error:"",access:false,manager:false,admin:false,
- roster:[],payments:[],rates:[],windows:[],cycles:[],depositChoices:[],staff:[],people:[],collectibleClassIds:[],classFilter:"all",gradeFilter:"",studentFilter:"",historyTerm:"all",historyOrder:"newest",
+ roster:[],payments:[],rates:[],windows:[],cycles:[],depositChoices:[],staff:[],people:[],collectibleClassIds:[],classFilter:"all",gradeFilter:"",studentFilter:"",searchText:"",historyTerm:"all",historyOrder:"newest",
  receiveGrade:"",receiveClass:"",receiveStudent:"",historyStudent:"",pending:false};
  const e=v=>escapeHtml(String(v??""));
  const cats=[["tuition","ค่าบำรุงการศึกษา (รายภาคเรียน)"],["deposit","ค่าประกัน (สมัครใจ รายปี)"],["water","ค่าน้ำ (รายปี)"]];
@@ -36,13 +37,13 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
   return {student:s,due:x.reduce((n,b)=>n+b.due,0),paid:x.reduce((n,b)=>n+b.paid,0),balance:x.reduce((n,b)=>n+b.balance,0)};};
  const gradeOf=name=>String(name||"").replace(/\/[^/]*$/,"");
  const rosterFiltered=()=>F.roster.filter(s=>(!F.gradeFilter||gradeOf(s.class_name)===F.gradeFilter)
- &&(F.classFilter==="all"||s.class_id===F.classFilter)&&(!F.studentFilter||s.student_id===F.studentFilter));
+ &&(F.classFilter==="all"||s.class_id===F.classFilter)&&(!F.studentFilter||s.student_id===F.studentFilter)&&feeStudentMatches(s,F.searchText));
  const scopeClasses=()=>allClasses().filter(c=>!F.gradeFilter||gradeOf(c.name)===F.gradeFilter);
  const scopeStudents=()=>F.roster.filter(s=>(!F.gradeFilter||gradeOf(s.class_name)===F.gradeFilter)
- &&(F.classFilter==="all"||s.class_id===F.classFilter)).sort((a,b)=>String(a.class_name).localeCompare(String(b.class_name),"th",{numeric:true})||Number(a.student_number||0)-Number(b.student_number||0));
+ &&(F.classFilter==="all"||s.class_id===F.classFilter)&&feeStudentMatches(s,F.searchText)).sort((a,b)=>String(a.class_name).localeCompare(String(b.class_name),"th",{numeric:true})||Number(a.student_number||0)-Number(b.student_number||0));
  const scopeName=()=>F.studentFilter?"นักเรียน "+(F.roster.find(s=>s.student_id===F.studentFilter)?.full_name||""):
  F.classFilter!=="all"?"ห้องเรียน "+(allClasses().find(c=>c.id===F.classFilter)?.name||""):
- F.gradeFilter?"ระดับชั้น "+F.gradeFilter:"ทุกห้องที่มีสิทธิ์";
+ F.gradeFilter?"ระดับชั้น "+F.gradeFilter:F.searchText.trim()?"ผลค้นหา "+F.searchText.trim():"ทุกห้องที่มีสิทธิ์";
  const sc=(v,t,selected)=>'<option value="'+e(v)+'" '+(String(v)===String(selected)?"selected":"")+'>'+e(t)+'</option>';
  const legacy=createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,toast,renderDashboard,educationPrint,printOpts:()=>printOpts()});
  async function allPayments(){
@@ -77,12 +78,37 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
    if(F.receiveClass&&!F.roster.some(s=>s.class_id===F.receiveClass))F.receiveClass="";
   }catch(err){F.error=err.message||String(err)}finally{F.loaded=true;F.loading=false}
  }
+ function feeSearchResults(){
+  const term=F.searchText.trim();if(!term)return "";
+  const roomOk=st=>(!F.gradeFilter||gradeOf(st.class_name)===F.gradeFilter)&&
+   (F.classFilter==="all"||st.class_id===F.classFilter);
+  const current=F.roster.filter(st=>roomOk(st)&&feeStudentMatches(st,term));
+  const availableIds=new Set(F.roster.map(st=>st.student_id));
+  const historical=F.legacyRows.filter(st=>feeStudentMatches(st,term)&&
+   (F.year==="2568"||!st.student_id||!availableIds.has(st.student_id))&&
+   (!F.legacyClassFilter||st.class_name===F.legacyClassFilter));
+  const limit=15,items=[
+   ...current.map(st=>({kind:"current",record:st})),
+   ...historical.map(st=>({kind:"legacy",record:st}))
+  ],shown=items.slice(0,limit);
+  return '<section class="panel" aria-label="ผลการค้นหานักเรียน"><h3>ผลการค้นหา · '+e(F.year)+
+   ' ('+items.length.toLocaleString("th-TH")+' รายการ)</h3>'+
+   (shown.length?'<div class="edufee-search-results">'+shown.map(({kind,record:st})=>
+    '<div class="edufee-room"><b>'+e(st.full_name)+'</b><span>เลขประจำตัว '+e(st.student_code||"ไม่ระบุ")+
+    ' · '+e(st.class_name||"ไม่ระบุห้อง")+'</span><span>'+
+    (kind==="current"?'<button class="btn btn-ghost btn-sm" data-fee-search-detail="'+e(st.student_id)+'">ดูรายละเอียด</button>'+
+    (canCollect(st.class_id)?'<button class="btn btn-primary btn-sm" data-fee-search-collect="'+e(st.student_id)+'">บันทึกรับเงิน</button>':""):
+    '<button class="btn btn-ghost btn-sm" data-fee-search-legacy="'+e(st.id)+'">ดูยอดจากชีต</button>')+
+    '</span></div>').join("")+'</div>':'<p class="edufee-empty">ไม่พบชื่อนักเรียนหรือเลขประจำตัวที่ค้นหาในปีการศึกษานี้</p>')+
+   (items.length>limit?'<p class="helper">แสดง '+limit+' รายการแรก กรุณาพิมพ์ชื่อหรือรหัสเพิ่มเพื่อจำกัดผลลัพธ์</p>':"")+'</section>';
+ }
  const scope=()=>'<div class="edufee-filter"><label>ปีการศึกษา <select id="edufee-year">'+
   [F.year,"2568","2569",...(state.academicTerms||[]).map(x=>String(x.academic_year))].filter((x,i,a)=>a.indexOf(x)===i).map(x=>sc(x,x,F.year)).join("")+
   '</select></label><label>ภาคเรียน <select id="edufee-sem">'+sc("1","ภาคเรียนที่ 1",F.semester)+sc("2","ภาคเรียนที่ 2",F.semester)+'</select></label>'+
   '<label>ระดับชั้น <select id="edufee-scope-grade">'+sc("","ทุกระดับชั้น",F.gradeFilter)+grades().map(g=>sc(g,g,F.gradeFilter)).join("")+'</select></label>'+
   '<label>ห้องเรียน <select id="edufee-class">'+sc("all","ทุกห้อง",F.classFilter)+scopeClasses().map(x=>sc(x.id,x.name,F.classFilter)).join("")+'</select></label>'+
-  '<label>นักเรียน <select id="edufee-scope-student">'+sc("","นักเรียนทุกคน",F.studentFilter)+scopeStudents().map(x=>sc(x.student_id,x.full_name+" · "+x.class_name,F.studentFilter)).join("")+'</select></label></div><p class="helper">ค่าน้ำและค่าประกันเป็นยอดรายปี ไม่ใช่เงินค่าเทอม 2 · ค่าประกันคิดเฉพาะผู้สมัครใจเท่านั้น</p>';
+  '<label>นักเรียน <select id="edufee-scope-student">'+sc("","นักเรียนทุกคน",F.studentFilter)+scopeStudents().map(x=>sc(x.student_id,x.full_name+" · "+x.class_name,F.studentFilter)).join("")+'</select></label></div><div class="edufee-filter"><label style="flex:1">ค้นหานักเรียนทุกปีการศึกษา (ชื่อ–นามสกุล / เลขประจำตัว)'+
+  '<input class="input" id="edufee-search" type="search" autocomplete="off" aria-label="ค้นหาชื่อนักเรียนหรือเลขประจำตัว" placeholder="พิมพ์ชื่อ–นามสกุล หรือเลขประจำตัวนักเรียน" value="'+e(F.searchText)+'"></label></div><p class="helper">ค่าน้ำและค่าประกันเป็นยอดรายปี ไม่ใช่เงินค่าเทอม 2 · ค่าประกันคิดเฉพาะผู้สมัครใจเท่านั้น</p>';
  const stats=()=>{const all=rosterFiltered().map(totals),due=all.reduce((n,x)=>n+x.due,0),got=all.reduce((n,x)=>n+x.paid,0),rest=all.reduce((n,x)=>n+x.balance,0),complete=all.filter(x=>x.balance===0&&x.due>0).length;return {all,due,got,rest,complete}};
  const status=row=>row.due<=0?"ยังไม่เปิดเก็บ":row.balance<=0?"ชำระครบ":row.paid>0?"ชำระบางส่วน":"ยังไม่ชำระ";
  function feeRows(s){return cats.map(([k,name])=>{const b=bill(s,k);
@@ -180,9 +206,27 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
   if(!F.access)return hero+'<section class="panel"><h3>ยังไม่ได้รับสิทธิ์ใช้งาน</h3><p>กรุณาให้ Super Admin แต่งตั้งผู้รับผิดชอบการเงิน หรือใช้บัญชีผู้บริหารที่ได้รับสิทธิ์ดูรายงาน</p></section>';
   const contents=F.tab==="legacy"||(F.year==="2568"&&F.tab!=="settings")?legacy.view():F.tab==="dashboard"?dashboard():F.tab==="collect"?collect():F.tab==="registry"?register():F.tab==="person"?person():F.tab==="history"?history():F.tab==="settings"?settings():
    '<section class="panel"><h3>รายงานสรุปทั้งโรงเรียน รายชั้น รายห้อง และรายบุคคล</h3><p>เลือกปีการศึกษา ภาคเรียน ระดับชั้น ห้องเรียน หรือชื่อผู้เรียนจากตัวกรอง แล้วส่งออกเอกสาร</p><div class="edufee-actions"><button class="btn btn-primary" id="edufee-print-report">พิมพ์รายงาน A4 / PDF</button><button class="btn btn-ghost" id="edufee-csv">ส่งออก Excel (CSV)</button></div>'+rosterTable(rosterFiltered().map(totals))+'</section>';
-  return hero+tabs()+scope()+contents;
+  return hero+tabs()+scope()+'<div id="edufee-search-pane">'+feeSearchResults()+contents+'</div>';
  }
  const rerender=()=>renderDashboard();
+ // Local search must not trigger the global dashboard's expensive fee reload,
+ // metrics RPC or unrelated module rebinds on every Thai character.
+ let rebindingSearchPane=false;
+ function renderSearchLocally(){
+  const pane=document.querySelector("#edufee-search-pane");
+  if(!pane)return rerender();
+  // Preserve the original search input node and Android keyboard while updating the results.
+  const temp=document.createElement("div");temp.innerHTML=view();
+  const fresh=temp.querySelector("#edufee-search-pane");
+  if(!fresh)return rerender();
+  pane.innerHTML=fresh.innerHTML;
+  const picker=document.querySelector("#edufee-scope-student");
+  if(picker)picker.innerHTML=sc("","นักเรียนทุกคน",F.studentFilter)+
+   scopeStudents().map(st=>sc(st.student_id,st.full_name+" · "+st.class_name,F.studentFilter)).join("");
+  rebindingSearchPane=true;
+  try{bind();}finally{rebindingSearchPane=false;}
+ }
+
  function exportCSV(){
   const columns=["รหัสนักเรียน","ชื่อ-นามสกุล","ห้อง","ค่าเทอมต้องชำระ","ค่าเทอมรับแล้ว","สมัครใจทำประกันรายปี","ค่าประกันรายปีต้องชำระ","ค่าประกันรายปีรับแล้ว","ค่าน้ำรายปีต้องชำระ","ค่าน้ำรายปีรับแล้ว","รวมเฉพาะรอบที่เลือกต้องชำระ","รับแล้วเฉพาะรอบที่เลือก","คงค้างเฉพาะรอบที่เลือก"];
   const safe=v=>{const x=String(v??"");return '"'+(/^[=+@\-\t\r]/.test(x)?"'"+x:x).replace(/"/g,'""')+'"';};
@@ -211,13 +255,39 @@ export function createEducationFeeFeature({supabase,state,escapeHtml,toast,rende
   educationPrint({type:"receipt",data:{payment:p,student:s,schoolName:state.systemSettings?.school_name_th,collectorName:collector},...printOpts()});
  }
  function bind(){
+  if(!rebindingSearchPane){
   document.querySelector("#edufee-reload")?.addEventListener("click",async()=>{await load();rerender()});
   document.querySelectorAll("[data-fee-tab]").forEach(b=>b.addEventListener("click",()=>{F.tab=b.dataset.feeTab;F.historyStudent="";rerender()}));
-  document.querySelector("#edufee-year")?.addEventListener("change",async ev=>{F.year=ev.target.value;F.tab="dashboard";F.legacyClassFilter="";F.legacyStatusFilter="all";F.legacySearch="";F.gradeFilter="";F.classFilter="all";F.studentFilter="";F.receiveGrade=F.receiveClass=F.receiveStudent="";await load();rerender()});
+  document.querySelector("#edufee-year")?.addEventListener("change",async ev=>{F.year=ev.target.value;F.tab="dashboard";F.legacyClassFilter="";F.legacyStatusFilter="all";F.legacySearch="";F.searchText="";F.gradeFilter="";F.classFilter="all";F.studentFilter="";F.receiveGrade=F.receiveClass=F.receiveStudent="";await load();rerender()});
   document.querySelector("#edufee-sem")?.addEventListener("change",async ev=>{F.semester=Number(ev.target.value);F.gradeFilter="";F.classFilter="all";F.studentFilter="";F.receiveGrade=F.receiveClass=F.receiveStudent="";await load();rerender()});
+  const updateSearch=ev=>{
+   if(ev.isComposing)return;
+   const source=ev.currentTarget,term=source.value;
+   if(F.searchText===term)return;
+   const start=source.selectionStart,end=source.selectionEnd;
+   F.searchText=term;renderSearchLocally();
+   const next=document.querySelector("#edufee-search");
+   if(next){next.focus();if(start!==null&&end!==null)next.setSelectionRange(start,end);}
+  };
+  document.querySelector("#edufee-search")?.addEventListener("input",updateSearch);
+  document.querySelector("#edufee-search")?.addEventListener("compositionend",updateSearch);
   document.querySelector("#edufee-scope-grade")?.addEventListener("change",ev=>{F.gradeFilter=ev.target.value;F.classFilter="all";F.studentFilter="";F.historyStudent="";rerender()});
   document.querySelector("#edufee-class")?.addEventListener("change",ev=>{F.classFilter=ev.target.value;F.studentFilter="";F.historyStudent="";rerender()});
   document.querySelector("#edufee-scope-student")?.addEventListener("change",ev=>{F.studentFilter=ev.target.value;F.historyStudent="";rerender()});
+
+  }
+  document.querySelectorAll("[data-fee-search-detail]").forEach(b=>b.addEventListener("click",()=>{
+   F.historyStudent=b.dataset.feeSearchDetail;F.tab="person";rerender();
+  }));
+  document.querySelectorAll("[data-fee-search-collect]").forEach(b=>b.addEventListener("click",()=>{
+   const st=F.roster.find(x=>x.student_id===b.dataset.feeSearchCollect);
+   if(!st||!canCollect(st.class_id))return;
+   F.tab="collect";F.receiveGrade=gradeOf(st.class_name);F.receiveClass=st.class_id;F.receiveStudent=st.student_id;rerender();
+  }));
+  document.querySelectorAll("[data-fee-search-legacy]").forEach(b=>b.addEventListener("click",()=>{
+   const st=F.legacyRows.find(x=>x.id===b.dataset.feeSearchLegacy);if(!st)return;
+   F.tab="legacy";F.legacyClassFilter=st.class_name;F.legacyStatusFilter="all";rerender();
+  }));
   document.querySelectorAll("[data-fee-room]").forEach(b=>b.onclick=()=>{F.classFilter=b.dataset.feeRoom;F.gradeFilter=gradeOf(allClasses().find(c=>c.id===F.classFilter)?.name);F.studentFilter="";F.tab="registry";rerender()});
   document.querySelectorAll("[data-fee-person]").forEach(b=>b.onclick=()=>{F.historyStudent=b.dataset.feePerson;F.tab="person";rerender()});
   document.querySelector("#edufee-person-back")?.addEventListener("click",()=>{F.historyStudent="";F.tab="registry";rerender()});

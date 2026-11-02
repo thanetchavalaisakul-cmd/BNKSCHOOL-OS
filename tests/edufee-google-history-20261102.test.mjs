@@ -31,8 +31,8 @@ test("manager receipt workflow has exact idempotency, remaining balance and void
  assert.match(reconcile,/voided_at=clock_timestamp/);
 });
 test("frontend includes imported credits, historical PDF and CSV and updated module versions",()=>{
- assert.match(app,/education-fees\.js\?v=5/);
- assert.match(fee,/education-fee-legacy\.js\?v=2/);
+ assert.match(app,/education-fees\.js\?v=6/);
+ assert.match(fee,/education-fee-legacy\.js\?v=3/);
  assert.match(fee,/legacy\.importedPaid\(sid,cat,sem\)/);
  assert.match(fee,/await legacy\.load\(\)/);
  assert.match(fee,/legacy\.bind\(\)/);
