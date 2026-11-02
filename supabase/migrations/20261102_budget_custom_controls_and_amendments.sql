@@ -108,8 +108,7 @@ begin
   if new.status='paid' and (tg_op='INSERT' or old.status is distinct from new.status) then new.paid_at:=now(); end if;
   return new;
 end;
-$function$
-
+$function$;
 
 CREATE TABLE IF NOT EXISTS public.budget_disbursement_amendments (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
