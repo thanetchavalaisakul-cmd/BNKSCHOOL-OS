@@ -28,6 +28,8 @@ jobs:
       - name: Chrome real-PDF print and one-page landscape verification
         run: |
           command -v google-chrome || command -v chromium
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
           command -v pdfinfo
           command -v pdftotext
           node scripts/pdf-render-smoke-20261102.mjs
