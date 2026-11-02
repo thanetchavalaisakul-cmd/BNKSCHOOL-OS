@@ -99,6 +99,5 @@ drop trigger if exists edufee_annual_cycles_guard on public.edufee_cycles;
 create trigger edufee_annual_cycles_guard before insert or update of cycle,category
  on public.edufee_cycles for each row execute function public.edufee_enforce_annual_fee_cycles();
 
--- Allow opted-in pupils to pay the insurance once in term one; term two is untouched.
-update public.edufee_windows set enabled=true,updated_at=clock_timestamp()
-where academic_year='2569' and semester=1 and category='deposit' and enabled=false;
+-- IMPORTANT: Do not open the optional insurance collection window until the new
+-- opt-in-aware frontend has been deployed and verified. 2569/2 remains untouched.
