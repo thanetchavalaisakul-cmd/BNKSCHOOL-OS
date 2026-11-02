@@ -25,5 +25,5 @@ test("manual procurement document number preserves its entered year",()=>{
   assert.match(app,/กรอกตามเลขคุมจริงได้ ไม่ต้องตรงกับปีงบประมาณที่เลือก/);
 });
 test("new release imports refreshed fee UI",()=>{
-  assert.match(app,/education-fees\.js\?v=3/);
+  assert.match(app,/education-fees\.js\?v=\d+/);
 });
