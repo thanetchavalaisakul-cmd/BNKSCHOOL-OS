@@ -1,6 +1,6 @@
 
 import { educationPrint } from "./education-fee-print.js?v=4";
-import { createEducationFeeLegacy } from "./education-fee-legacy.js?v=1";
+import { createEducationFeeLegacy } from "./education-fee-legacy.js?v=2";
 export function createEducationFeeFeature({supabase,state,escapeHtml,toast,renderDashboard,currentAcademicPeriod,officialPdfFontFaceCss,ensureOfficialPdfFont}){
  const F={tab:"dashboard",year:"2569",semester:2,loaded:false,loading:false,error:"",access:false,manager:false,admin:false,
  roster:[],payments:[],rates:[],windows:[],cycles:[],depositChoices:[],staff:[],people:[],collectibleClassIds:[],classFilter:"all",gradeFilter:"",studentFilter:"",historyTerm:"all",historyOrder:"newest",
