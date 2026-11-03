@@ -6183,3 +6183,24 @@ body.procurement-master-open{overflow:hidden!important}
   line-height:1.12!important;
   margin:.4mm 0 0!important;
 }
+
+
+/* 2026-11-03: ปพ.7 physical A4 centering; keep official text left-aligned as a single block. */
+.academic-certificate-result-page .cert-result-body{
+  display:flex!important;
+  justify-content:center!important;
+  margin:0!important;
+}
+.academic-certificate-result-page .cert-result-body-block{
+  width:148mm!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+  margin:0 auto!important;
+  padding-left:9mm!important;
+  padding-right:0!important;
+  transform:translateX(-3.5mm)!important;
+  text-align:left!important;
+}
+.academic-certificate-result-page .cert-result-body-block p{
+  text-align:left!important;
+}
