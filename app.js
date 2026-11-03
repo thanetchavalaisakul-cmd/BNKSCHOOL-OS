@@ -41,7 +41,7 @@ function loadPDFDocument(){
 let bnkGeneralStudentRosterFeaturePromise=null;
 let generalStudentRosterFeature=null;
 async function loadGeneralStudentRosterFeature(){
-  bnkGeneralStudentRosterFeaturePromise??=import("./modules/general-student-roster.js?v=20261103.1").then(mod=>{
+  bnkGeneralStudentRosterFeaturePromise??=import("./modules/general-student-roster.js?v=20261103.2").then(mod=>{
     generalStudentRosterFeature=mod.createGeneralStudentRosterFeature({state,supabase,currentAcademicPeriod,escapeHtml,toast,buttonLoading,isSuperAdminUser,formatDate,studentPdfBase,xlsxDownloadFromRows,renderDashboard});
     return generalStudentRosterFeature;
   }).catch(error=>{bnkGeneralStudentRosterFeaturePromise=null;throw error;});

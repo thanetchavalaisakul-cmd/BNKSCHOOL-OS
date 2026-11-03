@@ -37,3 +37,14 @@ test("operational roster and PDF/Excel export default to active learners, with a
   assert.match(roster, /นักเรียนกำลังศึกษา/);
   assert.match(roster, /ทะเบียนภาคเรียนนี้/);
 });
+
+test("academic registry current student list excludes transferred learners in source and compiled bundle", () => {
+  const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+  const min = readFileSync(new URL("../app.min.js", import.meta.url), "utf8");
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(app, /function studentVisibleEnrollments\(\)[\s\S]*?studentRegistryEnrollments\.filter\(e=>e\.enrollment_status==="active"&&String\(e\.academic_year\)/);
+  assert.match(min, /studentRegistryEnrollments\.filter\(r=>r\.enrollment_status==="active"&&String\(r\.academic_year\)/);
+  assert.match(app, /import\("\.\/modules\/general-student-roster\.js\?v=20261103\.2"\)/);
+  assert.match(min, /import\("\.\/modules\/general-student-roster\.js\?v=20261103\.2"\)/);
+  assert.match(html, /app\.min\.js\?v=5\.12\.9\.78\.1/);
+});
