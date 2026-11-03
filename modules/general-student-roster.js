@@ -1,13 +1,14 @@
 // BNK SCHOOL OS lazy module: general-student-roster.
 // Uses the shared student/enrollment master. No duplicate roster storage is created.
 export function createGeneralStudentRosterFeature(ctx){
-  const {state,supabase,currentAcademicPeriod,escapeHtml,toast,buttonLoading,isSuperAdminUser,formatDate,studentPdfBase,xlsxDownloadFromRows,renderDashboard}=ctx;
+  const {state,supabase,currentAcademicPeriod,escapeHtml,toast,isSuperAdminUser,studentPdfBase,xlsxDownloadFromRows,renderDashboard}=ctx;
+  const buttonLoading=(el,busy,label)=>{if(!el)return;el.disabled=!!busy;if(label&&busy)el.dataset.gsrOriginalLabel=el.textContent,el.textContent=label;else if(!busy&&el.dataset.gsrOriginalLabel){el.textContent=el.dataset.gsrOriginalLabel;delete el.dataset.gsrOriginalLabel;}};
   const access=()=>state.generalStudentRosterAccess||{};
   const canView=()=>!!(isSuperAdminUser()||access().can_view);
   const canManageTransfers=()=>!!(isSuperAdminUser()||access().can_manage_transfers);
   const canAddStudents=()=>!!(isSuperAdminUser()||access().can_add_students);
   const canExport=()=>!!(isSuperAdminUser()||access().can_export);
-  const thaiDate=v=>v?formatDate(v):"—";
+  const thaiDate=v=>{if(!v)return "—";const d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleDateString("th-TH",{day:"numeric",month:"short",year:"numeric"});};
   const name=r=>[r?.prefix,r?.first_name,r?.last_name].filter(Boolean).join(" ").replace(/\s+/g," ").trim();
   const statusLabel=v=>({active:"กำลังเรียน",transferred_out:"ย้ายออก",inactive:"พ้นสภาพ",graduated:"จบการศึกษา"}[v]||v||"—");
   const eventLabel=v=>({student_added:"เพิ่มนักเรียนใหม่",transfer_in:"รับย้ายเข้า",transfer_out:"ย้ายออก"}[v]||v||"—");
