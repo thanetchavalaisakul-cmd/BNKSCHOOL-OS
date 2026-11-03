@@ -36,7 +36,7 @@ CREATE POLICY general_student_roster_permissions_admin_delete
 
 CREATE TABLE IF NOT EXISTS public.general_student_roster_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_type text NOT NULL CHECK (event_type IN ('student_added','transfer_out')),
+  event_type text NOT NULL CHECK (event_type IN ('student_added','transfer_in','transfer_out')),
   student_id uuid NOT NULL REFERENCES public.students(id) ON DELETE RESTRICT,
   enrollment_id uuid REFERENCES public.student_enrollments(id) ON DELETE SET NULL,
   transfer_request_id uuid REFERENCES public.academic_transfer_requests(id) ON DELETE SET NULL,
@@ -390,7 +390,9 @@ CREATE OR REPLACE FUNCTION public.general_student_roster_create_student(
   p_gender text,
   p_class_id uuid,
   p_academic_year text,
-  p_semester integer
+  p_semester integer,
+  p_entry_type text DEFAULT 'transfer_in',
+  p_source_school text DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -420,6 +422,9 @@ BEGIN
   IF p_gender IS NOT NULL AND p_gender NOT IN ('ชาย','หญิง') THEN
     RAISE EXCEPTION 'เพศไม่ถูกต้อง';
   END IF;
+  IF p_entry_type NOT IN ('student_added','transfer_in') THEN
+    RAISE EXCEPTION 'ประเภทการรับนักเรียนไม่ถูกต้อง';
+  END IF;
   SELECT * INTO c FROM public.school_classes
   WHERE id=p_class_id AND academic_year=p_academic_year
     AND semester=p_semester AND is_active=true;
@@ -447,9 +452,9 @@ BEGIN
     event_type,student_id,actor_user_id,student_code,student_name,class_label,
     academic_year,semester,details
   ) VALUES (
-    'student_added',s.id,auth.uid(),s.student_code,v_full_name,
+    p_entry_type,s.id,auth.uid(),s.student_code,v_full_name,
     c.level_name||'/'||c.room_name,p_academic_year,p_semester,
-    jsonb_build_object('gender',s.gender,'birth_date',s.birth_date)
+    jsonb_build_object('gender',s.gender,'birth_date',s.birth_date,'source_school',nullif(btrim(p_source_school),''))
   );
   RETURN jsonb_build_object(
     'ok',true,'student_id',s.id,'student_code',s.student_code,
@@ -534,7 +539,7 @@ REVOKE ALL ON FUNCTION public.general_student_roster_list(text,integer) FROM PUB
 REVOKE ALL ON FUNCTION public.general_student_roster_transfer_queue() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.general_student_roster_event_history(integer) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.general_student_roster_finalize_transfer(uuid) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.general_student_roster_create_student(text,text,text,text,text,date,text,uuid,text,integer) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.general_student_roster_create_student(text,text,text,text,text,date,text,uuid,text,integer,text,text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_general_student_roster_access() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.general_student_roster_list(text,integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.general_student_roster_transfer_queue() TO authenticated;
