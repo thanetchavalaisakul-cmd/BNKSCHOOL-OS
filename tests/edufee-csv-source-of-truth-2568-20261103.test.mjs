@@ -66,8 +66,8 @@ test("CSV provenance is exported without inventing a student ID",()=>{
 });
 
 test("corrected history copy is loaded by the versioned browser bundle",()=>{
- assert.match(moduleFile,/education-fee-legacy\.js\?v=5/);
- assert.match(app,/education-fees\.js\?v=8/);
- assert.match(bundle,/education-fees\.js\?v=8/);
- assert.match(page,/app\.min\.js\?v=5\.12\.9\.75/);
+ assert.match(moduleFile,/education-fee-legacy\.js\?v=6/);
+ assert.match(app,/education-fees\.js\?v=9/);
+ assert.match(bundle,/education-fees\.js\?v=9/);
+ assert.match(page,/app\.min\.js\?v=5\.12\.9\.76/);
 });

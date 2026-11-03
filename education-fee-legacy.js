@@ -1,5 +1,11 @@
 
 import { feeStudentMatches } from "./education-fee-search.js?v=1";
+
+// Keep raw CSV source unchanged; school-verified values override calculations only.
+export function effectiveImportedPaid(row,category,semester){
+ const part=category==="water"?"water":Number(semester)===1?"term1":"term2";
+ return Number(row["confirmed_paid_"+part]??row["source_paid_"+part]??0);
+}
 // The student registry is authoritative. Source-sheet identity is retained separately
 // for audit; amounts, source notes, and review decisions are never rewritten.
 export function canonicalizeFeeImportRows(rows,roster){
@@ -30,7 +36,7 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
  const legacyReceipts=id=>F.legacyReceipts.filter(x=>x.import_row_id===id&&!x.voided_at);
  function legacyComponent(r,cat,sem){
   const due=cat==="water"?Number(r.expected_water):sem===1?Number(r.expected_term1):Number(r.expected_term2);
-  const source=cat==="water"?Number(r.source_paid_water):sem===1?Number(r.source_paid_term1):Number(r.source_paid_term2);
+  const source=effectiveImportedPaid(r,cat,sem);
   const additional=legacyReceipts(r.id).filter(x=>x.category===cat&&(cat==="water"||Number(x.semester)===sem))
     .reduce((n,x)=>n+Number(x.amount),0);
   const native=F.payments.filter(x=>r.student_id&&x.student_id===r.student_id&&x.academic_year===r.academic_year&&
@@ -39,8 +45,7 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
  }
  function importedPaid(studentId,cat,semester){
   const rows=F.legacyRows.filter(r=>r.student_id===studentId&&r.review_status==="ready");
-  return rows.reduce((n,r)=>n+(cat==="water"?Number(r.source_paid_water):cat==="tuition"?
-    (Number(semester)===1?Number(r.source_paid_term1):Number(r.source_paid_term2)):0),0)+
+  return rows.reduce((n,r)=>n+(cat==="tuition"||cat==="water"?effectiveImportedPaid(r,cat,semester):0),0)+
    F.legacyReceipts.filter(x=>!x.voided_at&&x.category===cat&&(cat==="water"||Number(x.semester)===Number(semester))&&
       rows.some(r=>r.id===x.import_row_id)).reduce((n,x)=>n+Number(x.amount),0);
  }
@@ -74,9 +79,10 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
    ["ยอดค้างของรายการที่ยืนยัน",htmlMoney(balance)]]
    .map(x=>'<article class="edufee-stat"><span>'+e(x[0])+'</span><strong>'+e(x[1])+'</strong></article>').join("")+'</div>';
   const hint='<p class="helper">'+(csv2568?
-    "ปี 2568: ยึดชื่อ ห้องเรียน และยอดเงินจาก CSV ฝ่ายการเงินย้อนหลัง ไม่บังคับเทียบทะเบียนปีปัจจุบัน; แยกเทอม 1 เทอม 2 และค่าน้ำรายปีตามช่องในไฟล์":
+    "ปี 2568: ยึดชื่อและห้องจาก CSV ฝ่ายการเงินย้อนหลัง ไม่บังคับเทียบทะเบียนปีปัจจุบัน; แยกเทอม 1 เทอม 2 และค่าน้ำรายปี โดยใช้ยอดที่ผู้ดูแลยืนยันเฉพาะรายการที่ตรวจแล้ว (ยังเก็บยอดใน CSV ต้นฉบับ)":
     "ปี 2569: ยึดทะเบียนนักเรียน BNK SCHOOL OS เป็นหลัก; นำเข้าเฉพาะเทอม 1 และค่าน้ำ ไม่แตะเทอม 2")+'</p>'+
-   (csv2568&&countNeedsReview?'<p class="helper">ยอดชำระตามช่อง CSV ทั้งหมดรวม '+countNeedsReview+' รายการที่ยังต้องตรวจสอบด้วย; ยอดที่ยืนยันและยอดค้างที่ยืนยันด้านบนยังไม่รวมรายการเหล่านี้</p>':"")+
+   (csv2568&&all.some(r=>r.confirmed_at)?'<p class="helper">รายการที่ผู้ดูแลยืนยันแล้ว '+all.filter(r=>r.confirmed_at).length+' รายการ ใช้ยอดยืนยันในการคำนวณรับชำระและยอดค้าง โดยเก็บยอด CSV เดิมแยกไว้ครบถ้วน</p>':"")+
+    (csv2568&&countNeedsReview?'<p class="helper">ยอดชำระตามช่อง CSV ทั้งหมดรวม '+countNeedsReview+' รายการที่ยังต้องตรวจสอบด้วย; ยอดที่ยืนยันและยอดค้างที่ยืนยันด้านบนยังไม่รวมรายการเหล่านี้</p>':"")+
    (unmatchedReady?'<p class="helper">ข้อมูลปี 2569 ยังไม่จับคู่ทะเบียน '+unmatchedReady+' รายการ: แสดงเพื่อรอตรวจสอบ แต่ไม่รวมยอดค้างที่ยืนยันแล้วและไม่รับเงินเพิ่มเติมผ่านแถวเหล่านี้</p>':"")+
    (countNeedsReview?'<p class="helper">มีอีก '+countNeedsReview+' รายการที่ไม่คิดเป็นยอดค้างจนกว่าจะตรวจสอบ/ยืนยันข้อมูล</p>':"");
   const controls='<div class="edufee-filter"><label>ห้อง<select id="edufee-legacy-class">'+sc("","ทุกห้อง",F.legacyClassFilter)+
@@ -104,7 +110,8 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
      '<td class="num">'+fmt(water.paid)+' / '+fmt(water.due)+'</td><td class="num">'+
      (r.review_status==="ready"?fmt(sum.balance):"—")+'</td><td>'+e(status)+
      (r.source_note?'<small> · '+e(r.source_note)+'</small>':"")+
-     (r.review_status==="review"&&r.review_note?'<small> · '+e(r.review_note)+'</small>':"")+
+     (r.confirmed_at?'<small> · ตรวจยืนยันยอดแล้ว: '+e(r.confirmed_note||"ผู้ดูแลยืนยันยอด")+'</small>':"")+
+      (r.review_status==="review"&&r.review_note?'<small> · '+e(r.review_note)+'</small>':"")+
      (r.academic_year==="2569"&&!r.student_id?'<small> · ต้องตรวจสอบตัวตนก่อนรับเงินเพิ่ม</small>':"")+'</td><td>'+button+'</td></tr>';
    }).join("")+'</tbody></table></div>';
   const tail=rows.length>show.length?'<p class="helper">แสดง '+show.length+' จาก '+rows.length+' รายการ ใช้ตัวกรองหรือ CSV เพื่อดูทั้งหมด</p>':
@@ -122,20 +129,20 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
  }
  const csvCell=v=>{const x=String(v??"");return '"'+(/^[=+@\-\t\r]/.test(x)?"'"+x:x).replace(/"/g,'""')+'"';};
  function csv(){
-  const head=["ปี","ห้องทะเบียนหลัก","รหัสทะเบียนหลัก","ชื่อทะเบียนหลัก","สถานะ","กำหนดเทอม1","รับเทอม1","กำหนดเทอม2","รับเทอม2","กำหนดค่าน้ำ","รับค่าน้ำ","ค้าง","หมายเหตุ","ชื่อจากชีต","รหัสจากชีต","ห้องจากชีต","ยืนยันตัวตน","รวมใน CSV ต้นฉบับ","บรรทัด CSV ต้นฉบับ","ข้อสังเกตที่ต้องตรวจสอบ"];
+  const head=["ปี","ห้องทะเบียนหลัก","รหัสทะเบียนหลัก","ชื่อทะเบียนหลัก","สถานะ","กำหนดเทอม1","รับเทอม1","กำหนดเทอม2","รับเทอม2","กำหนดค่าน้ำ","รับค่าน้ำ","ค้าง","หมายเหตุ","ชื่อจากชีต","รหัสจากชีต","ห้องจากชีต","ยืนยันตัวตน","รวมใน CSV ต้นฉบับ","บรรทัด CSV ต้นฉบับ","ข้อสังเกตที่ต้องตรวจสอบ","รวมที่โรงเรียนยืนยัน","รายละเอียดการยืนยัน","วันเวลายืนยัน","รับเทอม1 ใน CSV เดิม","รับเทอม2 ใน CSV เดิม","รับค่าน้ำใน CSV เดิม"];
   const values=filtered().map(r=>{const a=legacyComponent(r,"tuition",1),b=legacyComponent(r,"tuition",2),c=legacyComponent(r,"water",1);
    return [r.academic_year,r.class_name,r.student_code,r.full_name,r.review_status,a.due,a.paid,r.academic_year==="2568"?b.due:0,
     r.academic_year==="2568"?b.paid:0,c.due,c.paid,r.review_status==="ready"&&(r.academic_year!=="2569"||r.student_id)?legacyTotals(r).balance:"",r.source_note,
     r.sheet_full_name||r.full_name,r.sheet_student_code||r.student_code,r.sheet_class_name||r.class_name,
     r.student_id?"เชื่อมทะเบียนแล้ว":"ข้อมูลย้อนหลังไม่บังคับเชื่อมทะเบียน",
-    r.source_csv_combined??"",r.source_csv_line??"",r.review_note||""];});
+    r.source_csv_combined??"",r.source_csv_line??"",r.review_note||"",r.confirmed_total??"",r.confirmed_note||"",r.confirmed_at||"",r.source_paid_term1,r.source_paid_term2,r.source_paid_water];});
   const blob=new Blob(["\ufeff"+[head,...values].map(row=>row.map(csvCell).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download="BNK_fees_import_"+F.year+".csv";a.click();URL.revokeObjectURL(url);
  }
  function pdf(){
   const rows=filtered().filter(r=>r.review_status==="ready"&&(F.year!=="2569"||!!r.student_id)).map(legacyTotals);
   educationPrint({type:"summary",data:{rows,year:F.year,semester:F.year==="2568"?"1–2":"1",
-   scope:(F.year==="2568"?"ยอดจาก CSV ฝ่ายการเงินปี 2568":"ข้อมูลนำเข้าจาก Google Sheets")+
+   scope:(F.year==="2568"?"ยอดจาก CSV ฝ่ายการเงินปี 2568 พร้อมยอดที่โรงเรียนตรวจยืนยัน":"ข้อมูลนำเข้าจาก Google Sheets")+
     " · ไม่รวมรายการที่รอตรวจสอบ",
    importedFromSheet:true,schoolName:state.systemSettings?.school_name_th},...printOpts()});
  }
