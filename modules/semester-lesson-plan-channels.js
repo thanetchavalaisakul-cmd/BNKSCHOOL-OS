@@ -77,6 +77,7 @@ export function installSemesterLessonChannelControls({state,supabase}){
   }
 
   function openSettings(){
+    if(document.querySelector(".semester-channel-modal"))return;
     if(!canManage()){
       window.alert("เฉพาะแอดมินหลักหรือหัวหน้าวิชาการเท่านั้นที่ตั้งค่าการส่งแผนได้");
       return;
@@ -174,11 +175,18 @@ export function installSemesterLessonChannelControls({state,supabase}){
     const term=form.querySelector('[name="semester"]')?.value;
     const expected=key(year,term);
     const hint=modal.querySelector(".semester-channel-form-hint");
+    const requestId=String(Number(form.dataset.semesterChannelRequest||"0")+1);
+    form.dataset.semesterChannelRequest=requestId;
     if(hint)hint.textContent="กำลังตรวจช่องทางรับแผน...";
     form.dataset.semesterChannelReady="0";
+    // Do not briefly expose both channels while checking the actual term policy.
+    modal.querySelectorAll("[data-attachment-method]").forEach(btn=>{
+      btn.hidden=true;btn.disabled=true;btn.style.display="none";
+    });
     try{
       const mode=await getMode(year,term,force);
-      if(!form.isConnected||key(form.querySelector('[name="academic_year"]').value,form.querySelector('[name="semester"]').value)!==expected)return;
+      if(!form.isConnected||form.dataset.semesterChannelRequest!==requestId||key(form.querySelector('[name="academic_year"]').value,form.querySelector('[name="semester"]').value)!==expected)return;
+      form.dataset.semesterChannelPeriod=expected;
       form.dataset.semesterChannelMode=mode;
       form.dataset.semesterChannelReady="1";
       const pdfAllowed=mode!=="drive_only",driveAllowed=mode!=="pdf_only";
@@ -188,19 +196,28 @@ export function installSemesterLessonChannelControls({state,supabase}){
       });
       const selected=modal.dataset.attachmentMethod;
       if((selected==="pdf"&&!pdfAllowed)||(selected==="google_drive"&&!driveAllowed)){
-        modal.querySelector('[data-attachment-method="'+(pdfAllowed?"pdf":"google_drive")+'"]')?.click();
+        const target=pdfAllowed?"pdf":"google_drive";
+        modal.querySelector('[data-attachment-method="'+target+'"]')?.click();
+        if(modal.dataset.attachmentMethod!==target)modal.dataset.attachmentMethod=target;
       }
       if(hint)hint.textContent="ปี "+year+" ภาคเรียน "+term+" — "+labels[mode]+
         (mode==="both"?" เลือกอย่างใดอย่างหนึ่งได้":" (ตามที่ฝ่ายวิชาการกำหนด)");
     }catch(e){
+      if(form.dataset.semesterChannelRequest!==requestId)return;
       form.dataset.semesterChannelReady="0";
-      if(hint)hint.textContent="โหลดสิทธิ์การแนบเอกสารไม่สำเร็จ: "+(e.message||e);
+      if(hint)hint.textContent="โหลดสิทธิ์การแนบเอกสารไม่สำเร็จ: "+(e.message||e)+" — กรุณาเปิดหน้านี้ใหม่";
     }
   }
 
   function mountedForm(){
     const form=findSemesterForm(document);
-    if(!form||form.dataset.semesterChannelBound==="1")return;
+    if(!form)return;
+    if(form.dataset.semesterChannelBound==="1"){
+      const current=key(form.querySelector('[name="academic_year"]')?.value,form.querySelector('[name="semester"]')?.value);
+      if(form.dataset.semesterChannelPeriod!==current&&form.dataset.semesterChannelReady!=="0")
+        void syncForm(form.closest(".modal-backdrop"),true);
+      return;
+    }
     form.dataset.semesterChannelBound="1";
     const modal=form.closest(".modal-backdrop");
     const box=form.querySelector(".attachment-field");
@@ -267,7 +284,34 @@ export function installSemesterLessonChannelControls({state,supabase}){
     scanPending=true;
     queueMicrotask(scan);
   };
+  // Installed controller stays active on long-lived tabs. Own the settings click
+  // before older app-build handlers can leave a permanent loading button.
+  function handleSettingsClick(event){
+    const button=event.target?.closest?.("#semester-channel-settings-button");
+    if(!button||state.lessonPlanMode!=="semester")return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    button.disabled=false;
+    button.textContent="⚙ กำหนดวิธีส่งแผน";
+    openSettings();
+  }
+  function resumeSemesterSettings(){
+    if(document.visibilityState==="hidden")return;
+    cache.clear();
+    const button=document.getElementById("semester-channel-settings-button");
+    if(button&&canManage()){
+      button.disabled=false;
+      button.textContent="⚙ กำหนดวิธีส่งแผน";
+    }
+    const form=findSemesterForm(document);
+    if(form)void syncForm(form.closest(".modal-backdrop"),true);
+    scheduleScan();
+  }
   stylesheet();
+  document.addEventListener("click",handleSettingsClick,true);
+  document.addEventListener("visibilitychange",resumeSemesterSettings);
+  window.addEventListener?.("pageshow",resumeSemesterSettings);
+  window.addEventListener?.("focus",resumeSemesterSettings);
   const observer=new MutationObserver(scheduleScan);
   observer.observe(document.body,{childList:true,subtree:true});
   document.addEventListener("click",guardDetailSubmission,true);
