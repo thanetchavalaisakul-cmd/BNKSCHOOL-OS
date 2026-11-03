@@ -6284,3 +6284,11 @@ body.procurement-master-open{overflow:hidden!important}
 .gsr-modal-period{padding-top:2px}
 @media(max-width:900px){.gsr-hero{grid-template-columns:1fr}.gsr-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.gsr-hero{padding:15px}.gsr-stats{gap:7px}.gsr-stats article{padding:10px}.gsr-stats article strong{font-size:21px}.gsr-filter,.gsr-card{padding:11px}.gsr-filter-grid{grid-template-columns:1fr 1fr;gap:8px}.gsr-filter-actions{flex-direction:column}.gsr-card-head{flex-direction:column}.gsr-toolbar{justify-content:flex-start}.gsr-transfer-row{align-items:flex-start;flex-direction:column}.gsr-transfer-action{justify-content:flex-start}.gsr-add-modal .form-row{grid-template-columns:1fr}}
+
+/* BNK 2026-11-03: ปพ.7 official certificate starts below a full 1.5-inch (38.1mm) top blank. */
+/* Only the issued official certificate: leave request forms and other government documents unchanged.
+   With the A4 page's border-box sizing, Garuda starts at physical y=38.1mm;
+   the paired document numbers retain their existing matching 9mm offsets. */
+.academic-certificate-result-page {
+  padding-top:38.1mm!important;
+}
