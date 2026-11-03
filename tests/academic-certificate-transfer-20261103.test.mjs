@@ -62,3 +62,18 @@ test("Finance reviewer still signs each approval change via atomic four-method f
   assert.match(modal, /p_finance_status:financeStatus/);
   assert.match(modal, /academicRegistrationSavedSignaturePicker/);
 });
+
+test("The ปพ.7 issued-on date is centered on physical A4, not the indented text column", () => {
+  const selector = ".academic-certificate-result-page .cert-result-body-block p.cert-result-issue{";
+  const start = css.lastIndexOf(selector);
+  assert.ok(start >= 0, "missing issue date-only override");
+  const rule = css.slice(start, css.indexOf("}", start));
+  assert.match(rule, /width:calc\(100% \+ 9mm\)!important/);
+  assert.match(rule, /margin-left:-9mm!important/);
+  assert.match(rule, /text-align:center!important/);
+  // Other certification lines must keep their existing left alignment.
+  const other = css.slice(css.lastIndexOf(".academic-certificate-result-page .cert-result-body-block p{"));
+  assert.match(other, /text-align:left!important/);
+  const result = functionBody("function academicCertificateResultHtml(", "async function academicCertificateBuildResultPdf(");
+  assert.match(result, /class="cert-result-issue">ออกให้ ณ วันที่/);
+});
