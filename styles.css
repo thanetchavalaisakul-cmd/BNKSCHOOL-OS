@@ -6204,3 +6204,16 @@ body.procurement-master-open{overflow:hidden!important}
 .academic-certificate-result-page .cert-result-body-block p{
   text-align:left!important;
 }
+
+
+/* ปพ.7: "ออกให้ ณ วันที่" centers on the physical A4 page, not merely the indented text column.
+   The 9mm negative margin cancels the text block's 9mm left padding; all preceding lines remain left-aligned. */
+.academic-certificate-result-page .cert-result-body-block p.cert-result-issue{
+  width:calc(100% + 9mm)!important;
+  max-width:none!important;
+  box-sizing:border-box!important;
+  margin-left:-9mm!important;
+  margin-right:0!important;
+  text-align:center!important;
+  text-indent:0!important;
+}
