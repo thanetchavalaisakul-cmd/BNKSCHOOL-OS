@@ -545,4 +545,4 @@ GRANT EXECUTE ON FUNCTION public.general_student_roster_list(text,integer) TO au
 GRANT EXECUTE ON FUNCTION public.general_student_roster_transfer_queue() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.general_student_roster_event_history(integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.general_student_roster_finalize_transfer(uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.general_student_roster_create_student(text,text,text,text,text,date,text,uuid,text,integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.general_student_roster_create_student(text,text,text,text,text,date,text,uuid,text,integer,text,text) TO authenticated;
