@@ -96,5 +96,5 @@ test("live input handles composition and direct navigation without new RPC or mu
  assert.match(fee,/data-fee-search-detail/);
  assert.match(fee,/data-fee-search-collect/);
  assert.match(fee,/data-fee-search-legacy/);
- assert.match(legacy,/feeStudentMatches\(r,F\.searchText\)/);
+ assert.match(legacy,/matches\(r,F\.searchText\)/);
 });
