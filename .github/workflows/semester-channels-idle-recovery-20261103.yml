@@ -1,0 +1,22 @@
+name: Semester plan idle-tab regression
+on:
+  pull_request:
+    paths:
+      - 'modules/semester-lesson-plan-channels.js'
+      - 'tests/semester-channel-*.test.mjs'
+      - 'tests/semester-lesson-plan-channels-20261103.test.mjs'
+      - 'index.html'
+      - '.github/workflows/semester-channels-idle-recovery-20261103.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
