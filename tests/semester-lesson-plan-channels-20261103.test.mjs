@@ -42,7 +42,9 @@ test("database prevents forbidden new attachment formats and enforces permitted 
 test("new settings appear for authorized users and constrain the existing modal without replacing weekly plans",()=>{
   assert.match(feature,/state\.lessonPlanMode!=="semester"/);
   assert.match(feature,/semester-channel-settings-button/);
-  assert.match(feature,/data-plan-type="semester"/);
+  assert.match(feature,/findSemesterForm\(root=document\)/);
+  assert.match(feature,/state\.lessonPlanMode==="semester"/);
+  assert.doesNotMatch(feature,/#lesson-form\[data-plan-type="semester"\]/);
   assert.match(feature,/const pdfAllowed=mode!=="drive_only",driveAllowed=mode!=="pdf_only"/);
   assert.match(feature,/btn\.hidden=!allowed;btn\.disabled=!allowed/);
   assert.match(feature,/form\.dataset\.semesterChannelReady/);
@@ -57,7 +59,7 @@ test("the installed feature is loaded by source and deployed minified entry with
   assert.match(min,/modules\/semester-lesson-plan-channels\.js\?v=20261103\.3/);
   assert.match(app,/installSemesterLessonChannelControls\(\{state,supabase\}\)/);
   assert.match(min,/installSemesterLessonChannelControls:e/);
-  assert.match(html,/app\.min\.js\?v=5\.12\.9\.786/);
+  assert.match(html,/app\.min\.js\?v=5\.12\.9\.787/);
 });
 
 test("authorized managers get a visible button from the semester hero renderer",()=>{

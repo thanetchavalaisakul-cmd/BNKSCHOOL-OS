@@ -7,5 +7,5 @@ test("production bundle boot remains syntactically valid before loading optional
   const html=readFileSync(new URL("../index.html",import.meta.url),"utf8");
   assert.doesNotMatch(app,/,let bnkSemesterSettingsOpening/);
   assert.match(app,/กำลังเปิดการตั้งค่า/);
-  assert.match(html,/app\.min\.js\?v=5\.12\.9\.786/);
+  assert.match(html,/app\.min\.js\?v=5\.12\.9\.787/);
 });

@@ -32,6 +32,17 @@ export function installSemesterLessonChannelControls({state,supabase}){
     return mode;
   }
 
+  // The legacy lesson-plan modal has no data-plan-type marker in some builds.
+  // Use the active lesson-plan workspace as fallback, never applying semester
+  // restrictions to a weekly-plan form.
+  function findSemesterForm(root=document){
+    const form=root?.querySelector?.("#lesson-form");
+    if(!form)return null;
+    const explicitType=form.dataset?.planType;
+    if(explicitType)return explicitType==="semester"?form:null;
+    return state.lessonPlanMode==="semester"?form:null;
+  }
+
   function periodDefault(){
     const term=(state.academicTerms||[]).find(t=>t.is_current)||
       (state.academicTerms||[]).find(t=>String(t.academic_year)==="2569")||null;
@@ -137,7 +148,7 @@ export function installSemesterLessonChannelControls({state,supabase}){
       if(button)button.title="บันทึกแล้ว: "+labels[mode];
       close();
       window.alert("บันทึกสำเร็จ: ปีการศึกษา "+payload.academic_year+" ภาคเรียนที่ "+payload.semester+" — "+labels[mode]);
-      const planForm=document.querySelector('#lesson-form[data-plan-type="semester"]');
+      const planForm=findSemesterForm(document);
       if(planForm)void syncForm(planForm.closest(".modal-backdrop"),true);
     });
     void refresh();
@@ -157,7 +168,7 @@ export function installSemesterLessonChannelControls({state,supabase}){
   }
 
   async function syncForm(modal,force=false){
-    const form=modal?.querySelector('#lesson-form[data-plan-type="semester"]');
+    const form=findSemesterForm(modal);
     if(!form)return;
     const year=form.querySelector('[name="academic_year"]')?.value?.trim();
     const term=form.querySelector('[name="semester"]')?.value;
@@ -188,7 +199,7 @@ export function installSemesterLessonChannelControls({state,supabase}){
   }
 
   function mountedForm(){
-    const form=document.querySelector('#lesson-form[data-plan-type="semester"]');
+    const form=findSemesterForm(document);
     if(!form||form.dataset.semesterChannelBound==="1")return;
     form.dataset.semesterChannelBound="1";
     const modal=form.closest(".modal-backdrop");
