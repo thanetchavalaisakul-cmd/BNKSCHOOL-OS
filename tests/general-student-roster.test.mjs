@@ -49,7 +49,7 @@ test("approved transfer workflow uses separate roster processing timestamp and p
   assert.match(transferMigration, /ADD COLUMN IF NOT EXISTS roster_processed_at/);
   assert.match(transferMigration, /WHERE r\.status='approved' AND r\.roster_processed_at IS NULL/);
   assert.match(transferMigration, /SET roster_processed_at=clock_timestamp\(\),roster_processed_by=auth\.uid\(\)/);
-  assert.match(transferMigration, /r\.finalized_at/);
+  assert.doesNotMatch(transferMigration, /\bSET\s+finalized_at\s*=/i);
   assert.match(feature, /general_student_roster_transfer_queue/);
   assert.match(feature, /general_student_roster_finalize_transfer/);
   assert.match(feature, /has_active_enrollment/);
