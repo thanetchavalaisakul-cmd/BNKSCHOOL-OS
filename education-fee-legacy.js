@@ -70,7 +70,7 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
    [csv2568?"นักเรียนใน CSV":"นักเรียนในชีต",all.length.toLocaleString("th-TH")+" รายการ"],
    ...(csv2568?[["ยอดชำระตามช่อง CSV ทั้งหมด",htmlMoney(originalCsvPaid)]]:[]),
    ["ยอดต้องชำระของรายการที่ยืนยัน",htmlMoney(due)],
-   ["ยอดชำระของรายการที่ยืนยัน",htmlMoney(paid)],
+   [csv2568?"ยอดชำระของรายการที่ยืนยัน":"ยอดชำระเดิมและเพิ่มเติม",htmlMoney(paid)],
    ["ยอดค้างของรายการที่ยืนยัน",htmlMoney(balance)]]
    .map(x=>'<article class="edufee-stat"><span>'+e(x[0])+'</span><strong>'+e(x[1])+'</strong></article>').join("")+'</div>';
   const hint='<p class="helper">'+(csv2568?
