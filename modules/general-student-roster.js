@@ -95,6 +95,7 @@ export function createGeneralStudentRosterFeature(ctx){
   }
   function view(){
     if(!canView())return '<section class="panel"><div class="empty"><strong>ไม่มีสิทธิ์เข้าถึงระบบนี้</strong><span>กรุณาติดต่อแอดมินเพื่อขอรับสิทธิ์ระบบจัดการรายชื่อนักเรียน</span></div></section>';
+    if(state.generalStudentRosterError)return '<section class="panel"><div class="empty"><strong>โหลดข้อมูลระบบรายชื่อนักเรียนไม่สำเร็จ</strong><span>'+esc(state.generalStudentRosterError)+'</span><button class="btn btn-secondary" id="gsr-refresh">ลองอีกครั้ง</button></div></section>';
     const tab=state.generalStudentRosterTab||"roster";
     const body=tab==="transfers"?transfersView():tab==="history"?historyView():tab==="permissions"?permissionsView():rosterView();
     return '<div class="general-student-roster">'+hero()+tabs()+(tab==="permissions"?"":filters())+body+'</div>';
