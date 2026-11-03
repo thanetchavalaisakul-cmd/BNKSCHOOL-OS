@@ -53,9 +53,18 @@ test("new settings appear for authorized users and constrain the existing modal 
 });
 
 test("the installed feature is loaded by source and deployed minified entry with new cache key",()=>{
-  assert.match(app,/modules\/semester-lesson-plan-channels\.js\?v=20261103\.1/);
-  assert.match(min,/modules\/semester-lesson-plan-channels\.js\?v=20261103\.1/);
+  assert.match(app,/modules\/semester-lesson-plan-channels\.js\?v=20261103\.2/);
+  assert.match(min,/modules\/semester-lesson-plan-channels\.js\?v=20261103\.2/);
   assert.match(app,/installSemesterLessonChannelControls\(\{state,supabase\}\)/);
   assert.match(min,/installSemesterLessonChannelControls:e/);
-  assert.match(html,/app\.min\.js\?v=5\.12\.9\.783/);
+  assert.match(html,/app\.min\.js\?v=5\.12\.9\.784/);
+});
+
+test("authorized managers get a visible button from the semester hero renderer",()=>{
+  assert.match(app,/academicHead \|\| role === "super_admin"/);
+  assert.match(app,/id="semester-channel-settings-button"/);
+  assert.match(min,/s\.lessonPlanMode==="semester"/);
+  assert.match(min,/id="semester-channel-settings-button"/);
+  assert.match(feature,/event\.target\.closest\?\.\("#semester-channel-settings-button"\)/);
+  assert.match(feature,/if\(canManage\(\)\)openSettings\(\)/);
 });

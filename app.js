@@ -2795,7 +2795,7 @@ function lessonWorkspaceHtml(module) {
 
   const reviewerTools = canTrackLessonPlansByTeacher() ? lessonTeacherViewTabs() : "";
 
-  const hero = `<section class="lesson-hero"><div><button class="type-back-link" id="change-plan-mode">← เปลี่ยนประเภทแผน</button><span class="eyebrow dark">Academic Workflow</span><h2>${escapeHtml(lessonPlanTypeLabel(state.lessonPlanMode))}</h2><p>${escapeHtml(roleCopy)}</p></div><div class="lesson-hero-actions">${teachingUser ? `<button class="btn btn-primary" id="new-lesson-plan">＋ สร้าง${lessonPlanTypeLabel(state.lessonPlanMode)}ใหม่</button>` : ""}${canReviewLessonPlans() ? `<button class="btn btn-secondary" id="manage-signatures">✍ ลายเซ็นของฉัน</button>` : ""}</div></section>`;
+  const hero = `<section class="lesson-hero"><div><button class="type-back-link" id="change-plan-mode">← เปลี่ยนประเภทแผน</button><span class="eyebrow dark">Academic Workflow</span><h2>${escapeHtml(lessonPlanTypeLabel(state.lessonPlanMode))}</h2><p>${escapeHtml(roleCopy)}</p></div><div class="lesson-hero-actions">${teachingUser ? `<button class="btn btn-primary" id="new-lesson-plan">＋ สร้าง${lessonPlanTypeLabel(state.lessonPlanMode)}ใหม่</button>` : ""}${canReviewLessonPlans() ? `<button class="btn btn-secondary" id="manage-signatures">✍ ลายเซ็นของฉัน</button>` : ""}${state.lessonPlanMode === "semester" && (academicHead || role === "super_admin") ? `<button type="button" class="btn btn-secondary" id="semester-channel-settings-button">⚙ กำหนดวิธีส่งแผน</button>` : ""}</div></section>`;
 
   if (canTrackLessonPlansByTeacher() && state.lessonTeacherView === "teachers") {
     return `${hero}${reviewerTools}${lessonTeacherDirectoryHtml()}`;
@@ -15534,6 +15534,6 @@ if (state.user) realtimeChannel = subscribeRealtime();
 
 /* BNK 2026-11-03 — term-specific semester lesson-plan PDF / Google Drive channels.
    Keep existing lesson-plan workflows and stored documents unchanged. */
-void import("./modules/semester-lesson-plan-channels.js?v=20261103.1")
+void import("./modules/semester-lesson-plan-channels.js?v=20261103.2")
   .then(({installSemesterLessonChannelControls})=>installSemesterLessonChannelControls({state,supabase}))
   .catch(error=>console.error("Semester lesson plan channels:",error));

@@ -148,7 +148,8 @@ export function installSemesterLessonChannelControls({state,supabase}){
     btn.id="semester-channel-settings-button";btn.type="button";btn.className="btn btn-secondary";
     btn.textContent="⚙ กำหนดวิธีส่งแผน";
     btn.title="เลือกรับ PDF เท่านั้น, Google Drive เท่านั้น หรือทั้งสองแบบ";
-    btn.addEventListener("click",openSettings);
+    // The main application renders the button directly; retain this for older app builds.
+    // One delegated click handler serves both without duplicate modal openings.
     actions.appendChild(btn);
   }
 
@@ -255,6 +256,13 @@ export function installSemesterLessonChannelControls({state,supabase}){
   stylesheet();
   const observer=new MutationObserver(scheduleScan);
   observer.observe(document.body,{childList:true,subtree:true});
+  document.addEventListener("click",event=>{
+    const button=event.target.closest?.("#semester-channel-settings-button");
+    if(!button)return;
+    event.preventDefault();
+    if(canManage())openSettings();
+    else window.alert("เฉพาะแอดมินหลักหรือหัวหน้าวิชาการเท่านั้นที่ตั้งค่านี้ได้");
+  },true);
   document.addEventListener("click",guardDetailSubmission,true);
   scheduleScan();
 }
