@@ -15531,3 +15531,9 @@ if (state.user) realtimeChannel = subscribeRealtime();
 
 
 // BNK v5.1.5 — release control numbers from soft-deleted procurement cases while preserving audit history.
+
+/* BNK 2026-11-03 — term-specific semester lesson-plan PDF / Google Drive channels.
+   Keep existing lesson-plan workflows and stored documents unchanged. */
+void import("./modules/semester-lesson-plan-channels.js?v=20261103.1")
+  .then(({installSemesterLessonChannelControls})=>installSemesterLessonChannelControls({state,supabase}))
+  .catch(error=>console.error("Semester lesson plan channels:",error));
