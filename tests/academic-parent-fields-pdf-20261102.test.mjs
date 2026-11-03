@@ -56,7 +56,7 @@ test("certificate request PDF has three vertically contained signature panels",(
  assert.match(css,/\.cert-request-page \.cert-approval-box\{[^}]*display:flex!important/s);
  assert.match(css,/\.cert-request-page \.cert-approval-signature\{[^}]*margin:0!important/s);
  assert.match(css,/\.cert-request-page \.cert-sign-name,/);
- assert.match(html,/styles\.css\?v=5\.12\.9\.64/);
+ assert.match(html,/styles\.css\?v=5\.12\.9\.65/);
  assert.match(html,/app\.min\.js\?v=5\.12\.9\.\d+/);
 });
 
