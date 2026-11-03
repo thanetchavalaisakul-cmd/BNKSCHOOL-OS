@@ -192,9 +192,9 @@ export function createGeneralStudentRosterFeature(ctx){
     }));
     document.querySelector("#gsr-year")?.addEventListener("change",async e=>{state.generalStudentRosterYear=e.currentTarget.value;state.generalStudentRosterClassId="";try{await load();await renderDashboard();}catch(err){toast("โหลดข้อมูลไม่สำเร็จ",err.message||String(err),"error");}});
     document.querySelector("#gsr-semester")?.addEventListener("change",async e=>{state.generalStudentRosterSemester=Number(e.currentTarget.value);state.generalStudentRosterClassId="";try{await load();await renderDashboard();}catch(err){toast("โหลดข้อมูลไม่สำเร็จ",err.message||String(err),"error");}});
-    document.querySelector("#gsr-class")?.addEventListener("change",e=>{state.generalStudentRosterClassId=e.currentTarget.value||"";renderDashboard();});
-    document.querySelector("#gsr-status")?.addEventListener("change",e=>{state.generalStudentRosterStatus=e.currentTarget.value;renderDashboard();});
-    document.querySelector("#gsr-search")?.addEventListener("input",e=>{state.generalStudentRosterSearch=e.currentTarget.value;const pos=e.currentTarget.selectionStart;renderDashboard().then(()=>{const input=document.querySelector("#gsr-search");if(input){input.focus();input.setSelectionRange(pos,pos);}});});
+    document.querySelector("#gsr-class")?.addEventListener("change",e=>{state.generalStudentRosterClassId=e.currentTarget.value||"";state.generalStudentRosterSkipNextLoad=true;renderDashboard();});
+    document.querySelector("#gsr-status")?.addEventListener("change",e=>{state.generalStudentRosterStatus=e.currentTarget.value;state.generalStudentRosterSkipNextLoad=true;renderDashboard();});
+    document.querySelector("#gsr-search")?.addEventListener("input",e=>{state.generalStudentRosterSearch=e.currentTarget.value;state.generalStudentRosterSkipNextLoad=true;const pos=e.currentTarget.selectionStart;renderDashboard().then(()=>{const input=document.querySelector("#gsr-search");if(input){input.focus();input.setSelectionRange(pos,pos);}});});
     document.querySelector("#gsr-refresh")?.addEventListener("click",async()=>{try{await load();await renderDashboard();}catch(err){toast("รีเฟรชไม่สำเร็จ",err.message||String(err),"error");}});
     document.querySelector("#gsr-add-student")?.addEventListener("click",()=>addStudentModal());
     document.querySelector("#gsr-export-xlsx")?.addEventListener("click",()=>exportXlsx());
