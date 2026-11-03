@@ -41,7 +41,7 @@ function loadPDFDocument(){
 let bnkGeneralStudentRosterFeaturePromise=null;
 let generalStudentRosterFeature=null;
 async function loadGeneralStudentRosterFeature(){
-  bnkGeneralStudentRosterFeaturePromise??=import("./modules/general-student-roster.js?v=20261103.1").then(mod=>{
+  bnkGeneralStudentRosterFeaturePromise??=import("./modules/general-student-roster.js?v=20261103.2").then(mod=>{
     generalStudentRosterFeature=mod.createGeneralStudentRosterFeature({state,supabase,currentAcademicPeriod,escapeHtml,toast,buttonLoading,isSuperAdminUser,formatDate,studentPdfBase,xlsxDownloadFromRows,renderDashboard});
     return generalStudentRosterFeature;
   }).catch(error=>{bnkGeneralStudentRosterFeaturePromise=null;throw error;});
@@ -8105,7 +8105,7 @@ function studentVisibleEnrollments(){
   const p=studentRegistryCurrentPeriod(),q=String(state.studentRegistrySearch||"").trim().toLowerCase();
   const scoped=["students","promotion"].includes(state.studentRegistryView)&&(state.studentRegistryView==="promotion"?!canManageStudentMasterUi():!canViewAllStudentDataUi());
   const ownClassId=scoped?state.studentRegistryOwnClassId:null;
-  return state.studentRegistryEnrollments.filter(e=>String(e.academic_year)===p.academicYear&&Number(e.semester)===p.semester).filter(e=>{
+  return state.studentRegistryEnrollments.filter(e=>e.enrollment_status==="active"&&String(e.academic_year)===p.academicYear&&Number(e.semester)===p.semester).filter(e=>{
     const c=studentEnrollmentClass(e),s=studentById(e.student_id);if(!c||!s)return false;
     if(scoped&&(!ownClassId||e.class_id!==ownClassId))return false;
     if(!scoped&&state.studentRegistryStageCode!=="all"&&c.stage_code!==state.studentRegistryStageCode)return false;

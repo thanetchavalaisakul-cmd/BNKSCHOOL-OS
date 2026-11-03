@@ -15,8 +15,8 @@ const index = read("index.html");
 
 test("general roster is registered under General Administration and loaded as a lazy feature", () => {
   assert.match(migration, /'general_student_roster','ระบบจัดการรายชื่อนักเรียน'/);
-  assert.match(app, /import\("\.\/modules\/general-student-roster\.js\?v=20261103\.1"\)/);
-  assert.match(min, /import\("\.\/modules\/general-student-roster\.js\?v=20261103\.1"\)/);
+  assert.match(app, /import\("\.\/modules\/general-student-roster\.js\?v=20261103\.2"\)/);
+  assert.match(min, /import\("\.\/modules\/general-student-roster\.js\?v=20261103\.2"\)/);
   assert.match(app, /code === "general_student_roster"/);
   assert.match(min, /e==="general_student_roster"/);
   assert.match(index, /styles\.css\?v=5\.12\.9\.66/);

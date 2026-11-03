@@ -2,6 +2,11 @@
 // Uses the shared student/enrollment master. No duplicate roster storage is created.
 export function createGeneralStudentRosterFeature(ctx){
   const {state,supabase,currentAcademicPeriod,escapeHtml,toast,isSuperAdminUser,studentPdfBase,xlsxDownloadFromRows,renderDashboard}=ctx;
+  // Operational lists/exports show current students by default; history remains available via "ทุกสถานะ".
+  if(!state.generalStudentRosterDefaultStatusSet){
+    state.generalStudentRosterStatus="active";
+    state.generalStudentRosterDefaultStatusSet=true;
+  }
   const buttonLoading=(el,busy,label)=>{if(!el)return;el.disabled=!!busy;if(label&&busy)el.dataset.gsrOriginalLabel=el.textContent,el.textContent=label;else if(!busy&&el.dataset.gsrOriginalLabel){el.textContent=el.dataset.gsrOriginalLabel;delete el.dataset.gsrOriginalLabel;}};
   const access=()=>state.generalStudentRosterAccess||{};
   const canView=()=>!!(isSuperAdminUser()||access().can_view);
@@ -60,7 +65,7 @@ export function createGeneralStudentRosterFeature(ctx){
   function hero(){
     const rows=state.generalStudentRosterRows||[],active=rows.filter(r=>r.enrollment_status==="active").length,
       moved=rows.filter(r=>r.enrollment_status==="transferred_out").length,pending=(state.generalStudentRosterTransfers||[]).length;
-    return '<section class="gsr-hero"><div class="gsr-hero-copy"><span class="gsr-kicker">ฝ่ายบริหารงานทั่วไป · GENERAL ADMINISTRATION</span><h2>ระบบจัดการรายชื่อนักเรียน</h2><p>บัญชีรายชื่อกลาง เชื่อมโยงทะเบียนวิชาการ พร้อมติดตามการย้ายเข้าและย้ายออก</p><div class="gsr-period">ปีการศึกษา <strong>'+esc(period().year)+'</strong> · ภาคเรียนที่ <strong>'+period().semester+'</strong></div></div><div class="gsr-stats"><article><span>นักเรียนในภาคเรียนนี้</span><strong>'+rows.length+'</strong><small>รายชื่อทั้งหมด</small></article><article><span>กำลังศึกษา</span><strong>'+active+'</strong><small>คน</small></article><article><span>ใบย้ายรอดำเนินการ</span><strong>'+pending+'</strong><small>รายการ</small></article><article><span>ย้ายออกแล้ว</span><strong>'+moved+'</strong><small>คน</small></article></div></section>';
+    return '<section class="gsr-hero"><div class="gsr-hero-copy"><span class="gsr-kicker">ฝ่ายบริหารงานทั่วไป · GENERAL ADMINISTRATION</span><h2>ระบบจัดการรายชื่อนักเรียน</h2><p>บัญชีรายชื่อกลาง เชื่อมโยงทะเบียนวิชาการ พร้อมติดตามการย้ายเข้าและย้ายออก</p><div class="gsr-period">ปีการศึกษา <strong>'+esc(period().year)+'</strong> · ภาคเรียนที่ <strong>'+period().semester+'</strong></div></div><div class="gsr-stats"><article><span>นักเรียนกำลังศึกษา</span><strong>'+active+'</strong><small>คน</small></article><article><span>ทะเบียนภาคเรียนนี้</span><strong>'+rows.length+'</strong><small>รวมประวัติทุกสถานะ</small></article><article><span>ใบย้ายรอดำเนินการ</span><strong>'+pending+'</strong><small>รายการ</small></article><article><span>ย้ายออกแล้ว</span><strong>'+moved+'</strong><small>คน</small></article></div></section>';
   }
   function tabs(){
     const items=[["roster","บัญชีรายชื่อ",null],["transfers","ใบย้ายที่อนุมัติแล้ว",(state.generalStudentRosterTransfers||[]).length],["history","ประวัติการย้ายเข้า–ออก",null]];
