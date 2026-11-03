@@ -46,5 +46,5 @@ test("academic registry current student list excludes transferred learners in so
   assert.match(min, /studentRegistryEnrollments\.filter\(r=>r\.enrollment_status==="active"&&String\(r\.academic_year\)/);
   assert.match(app, /import\("\.\/modules\/general-student-roster\.js\?v=20261103\.2"\)/);
   assert.match(min, /import\("\.\/modules\/general-student-roster\.js\?v=20261103\.2"\)/);
-  assert.match(html, /app\.min\.js\?v=5\.12\.9\.78\.1/);
+  assert.match(html, /app\.min\.js\?v=5\.12\.9\.781/);
 });
