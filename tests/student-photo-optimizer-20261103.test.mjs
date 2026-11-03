@@ -58,7 +58,8 @@ test("both existing upload routes use the prepared image and preserve card downl
   const html=readFileSync(new URL("../index.html",import.meta.url),"utf8");
   assert.match(src,/import \{optimizeStudentPhotoForCard\} from "\.\/modules\/student-photo-optimizer\.js\?v=20261103\.1"/);
   assert.equal((src.match(/await optimizeStudentPhotoForCard\(original\)/g)||[]).length,2);
-  assert.equal((min.match(/await optimizeStudentPhotoForCard\(/g)||[]).length,2);
+  assert.match(min,/student-photo-optimizer\.js\?v=20261103\.1/);
+  assert.equal((min.match(/เตรียมรูปนักเรียนไม่สำเร็จ/g)||[]).length,2);
   assert.match(src,/studentPhotoDataUrl\(student\)/);
   assert.match(src,/supabase\.rpc\(["']set_student_photo["']/);
   assert.match(src,/if\(s\.photo_path&&s\.photo_path!==path\)/);
