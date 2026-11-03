@@ -1593,7 +1593,8 @@ async function renderDashboard() {
     await loadStudentRegistryWorkspace();
   }
   if (state.currentView === "module:general_student_roster" && state.generalStudentRosterAccess?.can_view) {
-    try {
+    if(state.generalStudentRosterSkipNextLoad)state.generalStudentRosterSkipNextLoad=false;
+    else try {
       await loadGeneralStudentRosterFeature();
       await generalStudentRosterFeature.load();
     } catch(error) {
