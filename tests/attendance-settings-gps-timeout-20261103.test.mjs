@@ -37,7 +37,7 @@ function harness(source,minified){
   navigator:{geolocation:{getCurrentPosition(success,error,options){calls.push({success,error,options});}}},
   window:{isSecureContext:true},
   toast:(...args)=>notices.push(args),g:(...args)=>notices.push(args),
-  buttonLoading:loading,w:loading,
+  buttonLoading:loading,w:loading,$:loading,
   setTimeout(fn,delay){const t={fn,delay,cancelled:false};timers.push(t);return t;},
   clearTimeout(t){t.cancelled=true;},
   Math,Number
