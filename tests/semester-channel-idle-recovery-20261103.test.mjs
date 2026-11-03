@@ -32,7 +32,7 @@ test("an idle semester tab can open settings again without the legacy loading ha
     getElementById(id){return id==="semester-channel-settings-button"?button:null;},
     querySelector(sel){return sel===".semester-channel-modal"&&modal.isConnected?modal:null;},
     createElement(tag){return tag==="style"?{id:"",textContent:""}:modal;},
-    addEventListener(type,cb){handlers[type]=cb;}
+    addEventListener(type,cb){handlers[type]??=cb;}
   };
   globalThis.window={alert(){},addEventListener(type,cb){windowHandlers[type]=cb;}};
   globalThis.MutationObserver=class{observe(){}};
@@ -63,6 +63,7 @@ test("an idle semester tab can open settings again without the legacy loading ha
       preventDefault(){},stopImmediatePropagation(){}
     });
     assert.equal(opened,1,"do not duplicate the settings modal");
+    await new Promise(resolve=>setImmediate(resolve));
   }finally{
     globalThis.document=original.document;
     globalThis.window=original.window;
