@@ -1,0 +1,25 @@
+name: Verify 2026-11-03 certificate and transfer fixes
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app.js'
+      - 'styles.css'
+      - 'supabase/migrations/20261103033000_academic_transfer_reapproval_signature_gate.sql'
+      - 'tests/academic-certificate-transfer-20261103.test.mjs'
+      - '.github/workflows/bnk-certificate-transfer-20261103.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci --no-audit --no-fund
+      - run: npm run verify
+      - run: git diff --check

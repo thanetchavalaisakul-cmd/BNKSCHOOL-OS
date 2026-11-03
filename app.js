@@ -9715,7 +9715,8 @@ async function academicCertificateStudentPhotoDataUrl(requestId){
 }
 function academicCertificateResultSignBlock(slot,title,signers,sigs,extraClass=""){
   const sig=sigs[slot]||{},assigned=signers[slot]||{},name=sig.signer_name||assigned.full_name||"—";
-  return `<div class="cert-result-sign ${extraClass}">${sig.image_data_url?`<img src="${sig.image_data_url}">`:`<div class="cert-result-sign-space"></div>`}<div>(ลงชื่อ) ........................................................</div><div>( ${escapeHtml(name)} )</div><div>${escapeHtml(title)}</div></div>`;
+  // Official ปพ.7 is signed in ink, regardless of the in-system approval signature method.
+  return `<div class="cert-result-sign ${extraClass}"><div class="cert-result-sign-space" aria-hidden="true"></div><div>(ลงชื่อ) ........................................................</div><div>( ${escapeHtml(name)} )</div><div>${escapeHtml(title)}</div></div>`;
 }
 function academicCertificateResultHtml(r,signers,sigs){
   const b=academicRegThaiDateParts(r.birth_date),d=academicRegThaiDateParts(r.finalized_at||new Date().toISOString()),valid=Number(state.academicCertificateSettings?.certificate_valid_days||120);
@@ -9734,7 +9735,7 @@ async function academicCertificateBuildResultPdf(requestId){
     state.academicCertificateRequests=[r,...(state.academicCertificateRequests||[]).filter(x=>x.id!==r.id)];
     state.academicCertificateSettings={...(state.academicCertificateSettings||{}),document_number_next:Number(r.official_document_serial||0)+1,document_number_year:r.official_document_year||state.academicCertificateSettings?.document_number_year};
   }
-  const [signers,sigs]=await Promise.all([academicCertificatePdfSigners(),academicCertificatePdfSignatures(requestId)]);const host=document.createElement("div");host.className="academic-certificate-result-host";host.innerHTML=academicCertificateResultHtml(r,signers,sigs);document.body.appendChild(host);
+  const signers=await academicCertificatePdfSigners();const sigs=Object.fromEntries(academicCertificateSignaturesFor(requestId).map(s=>[s.signer_slot,s]));const host=document.createElement("div");host.className="academic-certificate-result-host";host.innerHTML=academicCertificateResultHtml(r,signers,sigs);document.body.appendChild(host);
   try{await academicRegWaitForGaruda(host);await ensureOfficialPdfFont("16pt");await Promise.race([academicTransferWaitImages(host),new Promise(res=>setTimeout(res,1000))]);const page=host.querySelector(".academic-certificate-result-page");void page.offsetHeight;const canvas=await html2canvas(page,{scale:2.4,backgroundColor:"#fff",useCORS:true,logging:false});const pdf=new (await loadJsPDF())({orientation:"portrait",unit:"mm",format:"a4",compress:true});pdf.addImage(canvas.toDataURL("image/jpeg",.98),"JPEG",0,0,210,297);return pdf.output("blob");}finally{host.remove();}
 }
 async function academicCertificateExport(requestId,result=false){
