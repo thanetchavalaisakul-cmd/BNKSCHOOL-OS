@@ -38,6 +38,16 @@ function loadPDFDocument(){
   return pdfDocumentModulePromise;
 }
 
+let bnkGeneralStudentRosterFeaturePromise=null;
+let generalStudentRosterFeature=null;
+async function loadGeneralStudentRosterFeature(){
+  bnkGeneralStudentRosterFeaturePromise??=import("./modules/general-student-roster.js?v=20261103.1").then(mod=>{
+    generalStudentRosterFeature=mod.createGeneralStudentRosterFeature({state,supabase,currentAcademicPeriod,escapeHtml,toast,buttonLoading,isSuperAdminUser,formatDate,studentPdfBase,xlsxDownloadFromRows,renderDashboard});
+    return generalStudentRosterFeature;
+  }).catch(error=>{bnkGeneralStudentRosterFeaturePromise=null;throw error;});
+  return bnkGeneralStudentRosterFeaturePromise;
+}
+
 let bnkAcademicReportPdfFeaturePromise=null;
 async function loadAcademicReportPdfFeature(){
  bnkAcademicReportPdfFeaturePromise??=import("./modules/academic-report-pdf.js?v=5.12.9.58").then(mod=>mod.createAcademicReportPdfFeature({academicSubmissionWorkflowSettings,classroomResearchOnePageData,classroomResearchPdfStyles,classroomResearchSignBlock,classroomResearchSignatureAssets,classroomResearchTypeLabel,classroomResearchWorkflow,clubActivityLines,clubActivityMembersFor,clubActivityNormalizeAttendance,clubActivityPdfSignBlock,clubActivityPdfStyles,clubActivityPhotoDataUrl,clubActivitySharedNames,clubActivitySignatureAssets,educationOffice,escapeHtml,learnerActivityActivities,learnerActivityCalcResult,learnerActivityChunk,learnerActivityGenderCounts,learnerActivityOverall,learnerActivityPdfHeader,learnerActivityPdfStyles,learnerActivityResultFor,learnerActivityResultSummary,learnerActivitySharedNames,learnerActivitySignBlock,learnerActivitySignatureAssets,learnerActivityStudentsFor,learningMediaCheck,learningMediaHeadFor,learningMediaItems,learningMediaOfficeShort,learningMediaPdfStyles,learningMediaPhotoAssets,learningMediaSchoolShort,learningMediaSignatureAssets,learningMediaThaiDate,learningMediaWorkflow,lessonUsageEffectiveMemo,lessonUsageGradePct,lessonUsageGradeTable,lessonUsageHeadFor,lessonUsageInterpretMean,lessonUsagePdfSection,lessonUsagePdfStyles,lessonUsageSatStats,lessonUsageSatTable,lessonUsageSignatureAssets,lessonUsageThaiDate,lessonUsageTopTable,lessonUsageUnitTable,lessonUsageWorkflow,money,postLessonBehaviorPageRows,postLessonPdfSection,postLessonPdfSignBlock,postLessonPdfStyles,postLessonScopeLabel,postLessonScopePdfText,postLessonSignatureAssets,schoolAddress,schoolLogoDataUrl,schoolName,sharedSignatureGridHtml,state,thaiDateTimeDocument})).catch(error=>{bnkAcademicReportPdfFeaturePromise=null;throw error;});
@@ -455,6 +465,21 @@ const state = {
   studentRegistryPromotionBatches: [],
   studentRegistryPromotionItems: [],
   studentRegistryView: "students",
+  generalStudentRosterAccess: {can_view:false,can_manage_transfers:false,can_add_students:false,can_export:false,is_super_admin:false},
+  generalStudentRosterTab: "roster",
+  generalStudentRosterYear: null,
+  generalStudentRosterSemester: null,
+  generalStudentRosterClassId: "",
+  generalStudentRosterStatus: "all",
+  generalStudentRosterSearch: "",
+  generalStudentRosterSelectedRequestId: null,
+  generalStudentRosterClasses: [],
+  generalStudentRosterRows: [],
+  generalStudentRosterTransfers: [],
+  generalStudentRosterEvents: [],
+  generalStudentRosterUsers: [],
+  generalStudentRosterPermissions: [],
+  generalStudentRosterError: "",
   studentRegistryPage: 1,
   studentRegistryAcademicYear: null,
   studentRegistrySemester: 1,
@@ -1127,7 +1152,7 @@ function renderPending() {
 async function loadActiveUserData() {
   // The initial bootstrap already loaded shared catalog data.
   if (!state.systemSettings || !state.departments.length || !state.subjectGroups.length) await loadPublicData();
-  const [departmentsRes, modulesRes, notificationsRes, personnelOwnRes, academicTermsRes, academicCalendarSettingsRes, academicSupervisionSettingsRes, academicRegistrationSettingsRes, academicCertificateSettingsRes, academicDocumentServiceSettingsRes, procurementAccessRes] = await Promise.all([
+  const [departmentsRes, modulesRes, notificationsRes, personnelOwnRes, academicTermsRes, academicCalendarSettingsRes, academicSupervisionSettingsRes, academicRegistrationSettingsRes, academicCertificateSettingsRes, academicDocumentServiceSettingsRes, procurementAccessRes, generalStudentRosterPermissionRes] = await Promise.all([
     supabase.from("departments").select("*").eq("is_active", true).order("sort_order"),
     supabase.from("modules").select("*, departments(code,name_th,name_en)").eq("is_active", true).order("sort_order"),
     supabase.from("notifications").select("*").is("dismissed_at", null).order("created_at", { ascending: false }).limit(60),
@@ -1139,10 +1164,20 @@ async function loadActiveUserData() {
     supabase.from("academic_certificate_settings").select("*").eq("id",1).maybeSingle(),
     supabase.from("academic_document_service_settings").select("*").eq("id",1).maybeSingle(),
     supabase.from("procurement_module_permissions").select("user_id,can_access_control,can_access_documents,can_access_school_lunch").eq("user_id",state.user.id).maybeSingle(),
+    supabase.from("general_student_roster_permissions").select("can_view,can_manage_transfers,can_add_students,can_export,is_active").eq("user_id",state.user.id).maybeSingle(),
   ]);
 
   state.departments = departmentsRes.data || [];
-  state.modules = modulesRes.data || [];
+  state.generalStudentRosterAccess = isSuperAdminUser()
+    ? {can_view:true,can_manage_transfers:true,can_add_students:true,can_export:true,is_super_admin:true}
+    : {
+        can_view:!!generalStudentRosterPermissionRes.data?.is_active&&!!generalStudentRosterPermissionRes.data?.can_view,
+        can_manage_transfers:!!generalStudentRosterPermissionRes.data?.is_active&&!!generalStudentRosterPermissionRes.data?.can_view&&!!generalStudentRosterPermissionRes.data?.can_manage_transfers,
+        can_add_students:!!generalStudentRosterPermissionRes.data?.is_active&&!!generalStudentRosterPermissionRes.data?.can_view&&!!generalStudentRosterPermissionRes.data?.can_add_students,
+        can_export:!!generalStudentRosterPermissionRes.data?.is_active&&!!generalStudentRosterPermissionRes.data?.can_view&&!!generalStudentRosterPermissionRes.data?.can_export,
+        is_super_admin:false
+      };
+  state.modules = (modulesRes.data || []).filter(m=>m.code!=="general_student_roster"||state.generalStudentRosterAccess.can_view);
   state.procurementPermissionError = procurementAccessRes.error ? (procurementAccessRes.error.message||String(procurementAccessRes.error)) : "";
   state.procurementAccess = isSuperAdminUser()
     ? {can_access_control:true,can_access_documents:true,can_access_school_lunch:true}
@@ -1557,6 +1592,16 @@ async function renderDashboard() {
   if (state.currentView === "module:student_registry") {
     await loadStudentRegistryWorkspace();
   }
+  if (state.currentView === "module:general_student_roster" && state.generalStudentRosterAccess?.can_view) {
+    if(state.generalStudentRosterSkipNextLoad)state.generalStudentRosterSkipNextLoad=false;
+    else try {
+      await loadGeneralStudentRosterFeature();
+      await generalStudentRosterFeature.load();
+    } catch(error) {
+      state.generalStudentRosterError=error?.message||String(error);
+      console.error("General student roster load failed",error);
+    }
+  }
   if (state.currentView === "module:student_cards") {
     await loadStudentCardWorkspace();
   }
@@ -1603,6 +1648,7 @@ async function renderDashboard() {
   document.body.classList.toggle("bnk-nav-open", !!state.sidebarOpen && window.matchMedia("(max-width: 1000px)").matches);
   enhanceResponsiveTables(document);
   await bindDashboardEvents();
+  if(state.currentView==="module:general_student_roster"&&generalStudentRosterFeature)await generalStudentRosterFeature.bind();
 }
 
 function pageTitle() {
@@ -2127,14 +2173,15 @@ function notificationList(limit = 20, category = "all") {
   const items = state.notifications.filter(n=>category==="all"||notificationCategory(n)===category).slice(0,limit);
   if (!items.length) return `<div class="empty"><strong>ไม่มีการแจ้งเตือน</strong><span>รายการใหม่จะแสดงตรงนี้</span></div>`;
   return `<div class="list">${items.map(n => `
-    <div class="list-item ${(["lesson_plan","personnel_profile","signature_profile","leave_request","substitute_batch","substitute_lesson","budget_disbursement"].includes(n.entity_type)||["central_approval_action","central_approval_result"].includes(n.type)) ? "notification-clickable" : ""}"
+    <div class="list-item ${(["lesson_plan","personnel_profile","signature_profile","leave_request","substitute_batch","substitute_lesson","budget_disbursement","general_student_transfer"].includes(n.entity_type)||["central_approval_action","central_approval_result"].includes(n.type)) ? "notification-clickable" : ""}"
       ${["central_approval_action","central_approval_result"].includes(n.type) ? `data-notification-central="${escapeHtml(n.id)}"` : ""}
       ${n.entity_type === "lesson_plan" && n.entity_id ? `data-notification-plan="${n.entity_id}"` : ""}
       ${n.entity_type === "personnel_profile" ? `data-notification-personnel="1"` : ""}
       ${n.entity_type === "signature_profile" ? `data-notification-signature="1"` : ""}
       ${n.entity_type === "leave_request" && n.entity_id ? `data-notification-leave="${n.entity_id}"` : ""}
       ${["substitute_batch","substitute_lesson"].includes(n.entity_type) ? `data-notification-substitute="${n.entity_id || ""}" data-substitute-entity="${n.entity_type}"` : ""}
-      ${n.entity_type === "budget_disbursement" && n.entity_id ? `data-notification-budget="${n.entity_id}"` : ""}>
+      ${n.entity_type === "budget_disbursement" && n.entity_id ? `data-notification-budget="${n.entity_id}"` : ""}
+      ${n.entity_type === "general_student_transfer" && n.entity_id ? `data-notification-general-roster="${n.entity_id}" data-notification-id="${n.id}"` : ""}>
       <div class="list-icon">${n.read_at ? "✓" : "●"}</div>
       <div class="list-body"><strong>${n.notification_kind==="action"?"⏳ ":""}${escapeHtml(n.title)}</strong><p>${escapeHtml(n.message)}</p></div>
       <div class="list-time">${formatDate(n.created_at)}</div>
@@ -13928,6 +13975,7 @@ function moduleView(code) {
   if (code === "project_management") return projectWorkspaceHtml(module);
   if (code === "home_visit_management") return homeVisitWorkspaceHtml(module);
   if (code === "student_registry") return studentRegistryWorkspaceHtml(module);
+  if (code === "general_student_roster") return generalStudentRosterFeature ? generalStudentRosterFeature.view(module) : `<section class="panel"><div class="empty"><strong>กำลังโหลดระบบบัญชีรายชื่อนักเรียน</strong></div></section>`;
   if (code === "student_cards") return studentCardWorkspaceHtml(module);
   return `<section class="panel"><div class="empty"><strong>${escapeHtml(module.name_th)}</strong><span>Module นี้ยังไม่มีหน้าทำงานเฉพาะ</span></div></section>`;
 }
@@ -15075,6 +15123,17 @@ function showNotificationModal(category="all") {
   document.body.appendChild(modal);
   modal.querySelectorAll("[data-notification-filter]").forEach(el=>el.addEventListener("click",()=>{modal.remove();showNotificationModal(el.dataset.notificationFilter);}));
   modal.querySelectorAll("[data-notification-central]").forEach(el=>el.addEventListener("click",()=>openCentralApprovalNotification(el.dataset.notificationCentral,modal)));
+  modal.querySelectorAll("[data-notification-general-roster]").forEach(el=>el.addEventListener("click",async()=>{
+    const requestId=el.dataset.notificationGeneralRoster,notificationId=el.dataset.notificationId;
+    const {error}=await supabase.from("notifications").update({read_at:new Date().toISOString()}).eq("id",notificationId).eq("recipient_id",state.user.id);
+    if(error){toast("เปิดแจ้งเตือนไม่สำเร็จ",error.message,"error");return;}
+    const notice=state.notifications.find(n=>n.id===notificationId);if(notice)notice.read_at=new Date().toISOString();
+    state.currentView="module:general_student_roster";
+    state.generalStudentRosterTab="transfers";
+    state.generalStudentRosterSelectedRequestId=requestId;
+    modal.remove();
+    await renderDashboard();
+  }));
   modal.querySelectorAll("[data-notification-plan]").forEach(el => el.addEventListener("click", async () => {
     const id = el.dataset.notificationPlan;
     await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("entity_id", id).eq("recipient_id", state.user.id);
@@ -15377,8 +15436,9 @@ function subscribeRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "project_activities" }, async () => { if(state.currentView==="module:project_management") queueRealtimeDashboardRefresh(); })
     .on("postgres_changes", { event: "*", schema: "public", table: "budget_disbursements" }, async () => { if(state.currentView==="module:project_management") queueRealtimeDashboardRefresh(); })
     .on("postgres_changes", { event: "*", schema: "public", table: "home_visit_records" }, async () => { if(state.currentView==="module:home_visit_management") queueRealtimeDashboardRefresh(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "students" }, async () => { if(state.studentRegistryImportInProgress)return; if(state.currentView==="module:student_registry"||state.currentView==="module:student_cards"||state.currentView==="module:home_visit_management") queueRealtimeDashboardRefresh(); })
-    .on("postgres_changes", { event: "*", schema: "public", table: "student_enrollments" }, async () => { if(state.studentRegistryImportInProgress)return; if(state.currentView==="module:student_registry"||state.currentView==="module:student_cards"||state.currentView==="module:home_visit_management") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "students" }, async () => { if(state.studentRegistryImportInProgress)return; if(state.currentView==="module:student_registry"||state.currentView==="module:student_cards"||state.currentView==="module:home_visit_management"||state.currentView==="module:general_student_roster") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "student_enrollments" }, async () => { if(state.studentRegistryImportInProgress)return; if(state.currentView==="module:student_registry"||state.currentView==="module:student_cards"||state.currentView==="module:home_visit_management"||state.currentView==="module:general_student_roster") queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "academic_transfer_requests" }, async () => { if(state.currentView==="module:general_student_roster") queueRealtimeDashboardRefresh(); })
     .on("postgres_changes", { event: "*", schema: "public", table: "academic_post_lesson_reports" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
     .on("postgres_changes", { event: "*", schema: "public", table: "academic_post_lesson_behavior_scores" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
     .on("postgres_changes", { event: "*", schema: "public", table: "academic_post_lesson_signatures" }, async () => { if(state.currentView==="module:academic_submissions") queueRealtimeDashboardRefresh(); })
