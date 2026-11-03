@@ -57,7 +57,7 @@ test("the installed feature is loaded by source and deployed minified entry with
   assert.match(min,/modules\/semester-lesson-plan-channels\.js\?v=20261103\.3/);
   assert.match(app,/installSemesterLessonChannelControls\(\{state,supabase\}\)/);
   assert.match(min,/installSemesterLessonChannelControls:e/);
-  assert.match(html,/app\.min\.js\?v=5\.12\.9\.785/);
+  assert.match(html,/app\.min\.js\?v=5\.12\.9\.786/);
 });
 
 test("authorized managers get a visible button from the semester hero renderer",()=>{
