@@ -55,10 +55,6 @@ CREATE INDEX IF NOT EXISTS general_student_roster_events_student_idx
   ON public.general_student_roster_events(student_id,created_at DESC);
 ALTER TABLE public.general_student_roster_events ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON public.general_student_roster_events TO authenticated;
-DROP POLICY IF EXISTS general_student_roster_events_select_scope ON public.general_student_roster_events;
-CREATE POLICY general_student_roster_events_select_scope
-  ON public.general_student_roster_events FOR SELECT TO authenticated
-  USING ((SELECT private.can_access_general_student_roster()));
 
 CREATE OR REPLACE FUNCTION private.can_access_general_student_roster()
 RETURNS boolean
@@ -147,6 +143,11 @@ GRANT EXECUTE ON FUNCTION private.can_access_general_student_roster() TO authent
 GRANT EXECUTE ON FUNCTION private.can_manage_general_student_transfers() TO authenticated;
 GRANT EXECUTE ON FUNCTION private.can_add_general_students() TO authenticated;
 GRANT EXECUTE ON FUNCTION private.can_export_general_student_roster() TO authenticated;
+
+DROP POLICY IF EXISTS general_student_roster_events_select_scope ON public.general_student_roster_events;
+CREATE POLICY general_student_roster_events_select_scope
+  ON public.general_student_roster_events FOR SELECT TO authenticated
+  USING ((SELECT private.can_access_general_student_roster()));
 
 CREATE OR REPLACE FUNCTION public.get_general_student_roster_access()
 RETURNS jsonb
@@ -422,7 +423,7 @@ BEGIN
   IF p_gender IS NOT NULL AND p_gender NOT IN ('ชาย','หญิง') THEN
     RAISE EXCEPTION 'เพศไม่ถูกต้อง';
   END IF;
-  IF p_entry_type NOT IN ('student_added','transfer_in') THEN
+  IF p_entry_type IS NULL OR p_entry_type NOT IN ('student_added','transfer_in') THEN
     RAISE EXCEPTION 'ประเภทการรับนักเรียนไม่ถูกต้อง';
   END IF;
   SELECT * INTO c FROM public.school_classes
