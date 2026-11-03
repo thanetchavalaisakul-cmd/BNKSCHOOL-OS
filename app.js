@@ -15534,6 +15534,32 @@ if (state.user) realtimeChannel = subscribeRealtime();
 
 /* BNK 2026-11-03 — term-specific semester lesson-plan PDF / Google Drive channels.
    Keep existing lesson-plan workflows and stored documents unchanged. */
-void import("./modules/semester-lesson-plan-channels.js?v=20261103.2")
+// Reliable settings action: open on click, and report a visible error if the module cannot load.
+let bnkSemesterSettingsOpening=false;
+document.addEventListener("click",async event=>{
+  const button=event.target.closest?.("#semester-channel-settings-button");
+  if(!button)return;
+  event.preventDefault();
+  if(bnkSemesterSettingsOpening)return;
+  bnkSemesterSettingsOpening=true;
+  const oldLabel=button.textContent;
+  button.disabled=true;
+  button.textContent="กำลังเปิดการตั้งค่า...";
+  try{
+    const {installSemesterLessonChannelControls}=await import("./modules/semester-lesson-plan-channels.js?v=20261103.3");
+    const controller=installSemesterLessonChannelControls({state,supabase});
+    if(typeof controller?.openSettings!=="function")throw new Error("ไม่พบคำสั่งเปิดหน้าต่างตั้งค่า");
+    controller.openSettings();
+  }catch(error){
+    console.error("Semester lesson channel settings:",error);
+    window.alert("เปิดการตั้งค่าการส่งแผนไม่สำเร็จ: "+(error?.message||String(error)));
+  }finally{
+    button.disabled=false;
+    button.textContent=oldLabel;
+    bnkSemesterSettingsOpening=false;
+  }
+},true);
+
+void import("./modules/semester-lesson-plan-channels.js?v=20261103.3")
   .then(({installSemesterLessonChannelControls})=>installSemesterLessonChannelControls({state,supabase}))
   .catch(error=>console.error("Semester lesson plan channels:",error));

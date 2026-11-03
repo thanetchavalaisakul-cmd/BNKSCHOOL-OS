@@ -1,8 +1,8 @@
 // Semester lesson-plan submission channels. Installed independently so that weekly
 // lesson plans, old attachments, signature workflows and approvals stay unchanged.
+let activeSemesterChannelController=null;
 export function installSemesterLessonChannelControls({state,supabase}){
-  if(document.documentElement.dataset.bnkSemesterChannelsInstalled==="1")return;
-  document.documentElement.dataset.bnkSemesterChannelsInstalled="1";
+  if(activeSemesterChannelController)return activeSemesterChannelController;
 
   const table="semester_lesson_plan_submission_settings";
   const cache=new Map();
@@ -66,7 +66,10 @@ export function installSemesterLessonChannelControls({state,supabase}){
   }
 
   function openSettings(){
-    if(!canManage())return;
+    if(!canManage()){
+      window.alert("เฉพาะแอดมินหลักหรือหัวหน้าวิชาการเท่านั้นที่ตั้งค่าการส่งแผนได้");
+      return;
+    }
     stylesheet();
     const fallback=periodDefault();
     const modal=document.createElement("div");
@@ -256,13 +259,10 @@ export function installSemesterLessonChannelControls({state,supabase}){
   stylesheet();
   const observer=new MutationObserver(scheduleScan);
   observer.observe(document.body,{childList:true,subtree:true});
-  document.addEventListener("click",event=>{
-    const button=event.target.closest?.("#semester-channel-settings-button");
-    if(!button)return;
-    event.preventDefault();
-    if(canManage())openSettings();
-    else window.alert("เฉพาะแอดมินหลักหรือหัวหน้าวิชาการเท่านั้นที่ตั้งค่านี้ได้");
-  },true);
   document.addEventListener("click",guardDetailSubmission,true);
+  const controller={openSettings};
+  activeSemesterChannelController=controller;
+  document.documentElement.dataset.bnkSemesterChannelsInstalled="1";
   scheduleScan();
+  return controller;
 }
