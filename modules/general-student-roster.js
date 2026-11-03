@@ -151,11 +151,15 @@ export function createGeneralStudentRosterFeature(ctx){
       const allOff=!values.can_view&&!values.can_manage_transfers&&!values.can_add_students&&!values.can_export;
       let result;
       if(allOff)result=await supabase.from("general_student_roster_permissions").delete().eq("user_id",id);
-      else result=await supabase.from("general_student_roster_permissions").upsert({
-        user_id:id,can_view:values.can_view,can_manage_transfers:values.can_manage_transfers,
-        can_add_students:values.can_add_students,can_export:values.can_export,
-        is_active:true,created_by:state.user.id,updated_by:state.user.id
-      },{onConflict:"user_id"});
+      else {
+        const existing=(state.generalStudentRosterPermissions||[]).find(p=>p.user_id===id);
+        const payload={can_view:values.can_view,can_manage_transfers:values.can_manage_transfers,
+          can_add_students:values.can_add_students,can_export:values.can_export,
+          is_active:true,updated_by:state.user.id};
+        result=existing
+          ? await supabase.from("general_student_roster_permissions").update(payload).eq("user_id",id)
+          : await supabase.from("general_student_roster_permissions").insert({...payload,user_id:id,created_by:state.user.id});
+      }
       if(result.error)throw result.error;
       toast("บันทึกสิทธิ์แล้ว",allOff?"ยกเลิกสิทธิ์การเข้าถึงเรียบร้อย":"อัปเดตสิทธิ์ผู้ใช้งานเรียบร้อย","success");
       await load();await renderDashboard();
