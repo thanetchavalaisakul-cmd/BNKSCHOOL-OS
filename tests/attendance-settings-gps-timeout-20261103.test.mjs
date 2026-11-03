@@ -113,7 +113,7 @@ for(const [title,source,minified] of [["source",original,false],["deployed bundl
 }
 
 test("production page uses a new cache key for the repaired bundle",()=>{
- assert.match(page,/app\.min\.js\?v=5\.12\.9\.77/);
+ assert.match(page,/app\.min\.js\?v=5\.12\.9\.78/);
 });
 test("actual employee check-in positioning remains under its original GPS policy",()=>{
  assert.match(original,/function officialAttendanceGetPrecisePosition\(\)/);
