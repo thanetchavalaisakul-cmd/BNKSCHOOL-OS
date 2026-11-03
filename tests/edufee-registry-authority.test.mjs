@@ -62,7 +62,7 @@ test("asset version uses the registry-authoritative module in both development a
  const fee=readFileSync(new URL("../education-fees.js",import.meta.url),"utf8");
  const src=readFileSync(new URL("../app.js",import.meta.url),"utf8");
  const min=readFileSync(new URL("../app.min.js",import.meta.url),"utf8");
- assert.match(fee,/education-fee-legacy\.js\?v=5/);
- assert.match(src,/education-fees\.js\?v=8/);
- assert.match(min,/education-fees\.js\?v=8/);
+ assert.match(fee,/education-fee-legacy\.js\?v=6/);
+ assert.match(src,/education-fees\.js\?v=9/);
+ assert.match(min,/education-fees\.js\?v=9/);
 });
