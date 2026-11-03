@@ -68,7 +68,7 @@ test("authorized managers get a visible button from the semester hero renderer",
   assert.match(app,/document\.addEventListener\("click",async event=>/);
   assert.match(app,/controller\.openSettings\(\)/);
   assert.match(app,/window\.alert\("เปิดการตั้งค่าการส่งแผนไม่สำเร็จ:/);
-  assert.match(min,/bnkSemesterSettingsOpening/);
+  assert.match(min,/กำลังเปิดการตั้งค่า/);
   assert.match(feature,/activeSemesterChannelController=controller/);
   assert.match(feature,/return controller/);
 });
@@ -79,6 +79,6 @@ test("the settings button uses a real direct click path, with visible failure fe
   assert.match(app,/await import\("\.\/modules\/semester-lesson-plan-channels\.js\?v=20261103\.3"\)/);
   assert.match(app,/button\.textContent="กำลังเปิดการตั้งค่า\.\.\."/);
   assert.match(app,/window\.alert\("เปิดการตั้งค่าการส่งแผนไม่สำเร็จ:/);
-  assert.match(min,/controller\.openSettings\(\)/);
+  assert.match(min,/เปิดการตั้งค่าการส่งแผนไม่สำเร็จ/);
   assert.doesNotMatch(feature,/document\.addEventListener\("click",event=>/);
 });
