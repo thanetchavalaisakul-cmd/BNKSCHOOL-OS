@@ -1,5 +1,20 @@
 
 import { feeStudentMatches } from "./education-fee-search.js?v=1";
+// The student registry is authoritative. Source-sheet identity is retained separately
+// for audit; amounts, source notes, and review decisions are never rewritten.
+export function canonicalizeFeeImportRows(rows,roster){
+ const registry=new Map((roster||[]).map(s=>[String(s.student_id),s]));
+ return (rows||[]).map(row=>{
+  const official=row.student_id&&registry.get(String(row.student_id));
+  if(!official)return {...row,identity_unlinked:row.academic_year==="2569"&&!row.student_id};
+  return {...row,
+   sheet_full_name:row.full_name,sheet_student_code:row.student_code,sheet_class_name:row.class_name,
+   full_name:official.full_name||row.full_name,
+   student_code:official.student_code||row.student_code,
+   class_name:official.class_name||row.class_name,
+   identity_from_registry:true};
+ });
+}
 export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,toast,renderDashboard,educationPrint,printOpts}){
  F.legacyRows=[];F.legacyReceipts=[];F.legacyClassFilter="";F.legacyStatusFilter="all";F.legacySearch="";
  const rerender=()=>renderDashboard();
@@ -10,7 +25,7 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
   ]);
   if(rows.error)throw new Error("ข้อมูลยอดค้างจากชีต: "+rows.error.message);
   if(receipts.error)throw new Error("รายการรับเงินย้อนหลัง: "+receipts.error.message);
-  F.legacyRows=rows.data||[];F.legacyReceipts=receipts.data||[];
+  F.legacyRows=canonicalizeFeeImportRows(rows.data||[],F.roster);F.legacyReceipts=receipts.data||[];
  }
  const legacyReceipts=id=>F.legacyReceipts.filter(x=>x.import_row_id===id&&!x.voided_at);
  function legacyComponent(r,cat,sem){
@@ -34,11 +49,13 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
   return {student:{student_id:r.student_id,student_code:r.student_code,full_name:r.full_name,class_name:r.class_name},
    due:rows.reduce((n,x)=>n+x.due,0),paid:rows.reduce((n,x)=>n+x.paid,0),balance:rows.reduce((n,x)=>n+x.balance,0)};
  }
+ const matches=(r,q)=>feeStudentMatches(r,q)||!!(r.sheet_full_name&&feeStudentMatches({full_name:r.sheet_full_name,student_code:r.sheet_student_code},q));
  const filtered=()=>F.legacyRows.filter(r=>(!F.legacyClassFilter||r.class_name===F.legacyClassFilter)&&
   (F.legacyStatusFilter==="all"||r.review_status===F.legacyStatusFilter)&&
-  feeStudentMatches(r,F.searchText)&&(!F.legacySearch||feeStudentMatches(r,F.legacySearch)));
+  matches(r,F.searchText)&&(!F.legacySearch||matches(r,F.legacySearch)));
  function view(){
-  const all=F.legacyRows,rows=filtered(),ready=all.filter(r=>r.review_status==="ready").map(legacyTotals);
+  const all=F.legacyRows,rows=filtered(),ready=all.filter(r=>r.review_status==="ready"&&(F.year!=="2569"||!!r.student_id)).map(legacyTotals);
+  const unmatchedReady=F.year==="2569"?all.filter(r=>r.review_status==="ready"&&!r.student_id).length:0;
   const due=ready.reduce((n,x)=>n+x.due,0),paid=ready.reduce((n,x)=>n+x.paid,0),
     balance=ready.reduce((n,x)=>n+x.balance,0);
   const classes=[...new Set(all.map(x=>x.class_name))].sort((a,b)=>a.localeCompare(b,"th",{numeric:true}));
@@ -51,7 +68,8 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
    ["นักเรียนในชีต",all.length.toLocaleString("th-TH")+" รายการ"],["ยอดต้องชำระที่ยืนยันแล้ว",htmlMoney(due)],
    ["ยอดชำระเดิมและเพิ่มเติม",htmlMoney(paid)],["ยอดค้างที่ยืนยันแล้ว",htmlMoney(balance)]]
    .map(x=>'<article class="edufee-stat"><span>'+e(x[0])+'</span><strong>'+e(x[1])+'</strong></article>').join("")+'</div>';
-  const hint='<p class="helper">ปี 2568: รวม 2 ภาคเรียนและค่าน้ำรายปี · ปี 2569: นำเข้าเฉพาะเทอม 1 และค่าน้ำ ไม่แตะเทอม 2</p>'+
+  const hint='<p class="helper">ยึดทะเบียนนักเรียน BNK SCHOOL OS เป็นหลักสำหรับชื่อ รหัส และห้องเรียน; เก็บข้อมูล Google Sheets เดิมไว้ตรวจสอบ · ปี 2568: รวม 2 ภาคเรียนและค่าน้ำรายปี · ปี 2569: นำเข้าเฉพาะเทอม 1 และค่าน้ำ ไม่แตะเทอม 2</p>'+
+   (unmatchedReady?'<p class="helper">ข้อมูลปี 2569 ยังไม่จับคู่ทะเบียน '+unmatchedReady+' รายการ: แสดงเพื่อรอตรวจสอบ แต่ไม่รวมยอดค้างที่ยืนยันแล้วและไม่รับเงินเพิ่มเติมผ่านแถวเหล่านี้</p>':"")+
    (countNeedsReview?'<p class="helper">มีอีก '+countNeedsReview+' รายการที่ไม่คิดเป็นยอดค้างจนกว่าจะตรวจสอบ/ยืนยันข้อมูล</p>':"");
   const controls='<div class="edufee-filter"><label>ห้อง<select id="edufee-legacy-class">'+sc("","ทุกห้อง",F.legacyClassFilter)+
    classes.map(x=>sc(x,x,F.legacyClassFilter)).join("")+'</select></label><label>สถานะ<select id="edufee-legacy-status">'+
@@ -67,7 +85,12 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
     const canUseNative=F.year==="2569"&&r.student_id&&F.roster.some(x=>x.student_id===r.student_id);
     const button=F.manager&&r.review_status==="ready"&&sum.balance>0&&(r.academic_year!=="2569"||!!r.student_id)?
      '<button class="btn btn-primary btn-sm" '+(canUseNative?'data-fee-legacy-native':'data-fee-legacy-pay')+'="'+e(r.id)+'">บันทึกรับเงิน</button>':"—";
-    return '<tr><td><strong>'+e(r.full_name)+'</strong><small> · '+e(r.student_code||"ไม่ระบุรหัส")+'</small></td>'+
+    const sheetDiff=r.identity_from_registry&&
+      (r.sheet_full_name!==r.full_name||r.sheet_student_code!==r.student_code||r.sheet_class_name!==r.class_name);
+    return '<tr><td><strong>'+e(r.full_name)+'</strong><small> · '+e(r.student_code||"ไม่ระบุรหัส")+'</small>'+
+     (r.identity_from_registry?'<small> · ตามทะเบียนหลัก</small>':"")+
+     (sheetDiff?'<small> · ชีตเดิม: '+e(r.sheet_full_name)+' / '+e(r.sheet_student_code||"ไม่ระบุรหัส")+' / '+e(r.sheet_class_name)+'</small>':"")+
+     (r.identity_unlinked?'<small> · ยังไม่ยืนยันตัวตนจากทะเบียน</small>':"")+'</td>'+
      '<td>'+e(r.class_name)+'</td><td class="num">'+fmt(one.paid)+' / '+fmt(one.due)+'</td>'+
      (F.year==="2568"?'<td class="num">'+fmt(two.paid)+' / '+fmt(two.due)+'</td>':"")+
      '<td class="num">'+fmt(water.paid)+' / '+fmt(water.due)+'</td><td class="num">'+
@@ -89,15 +112,16 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
  }
  const csvCell=v=>{const x=String(v??"");return '"'+(/^[=+@\-\t\r]/.test(x)?"'"+x:x).replace(/"/g,'""')+'"';};
  function csv(){
-  const head=["ปี","ห้อง","รหัส","ชื่อ","สถานะ","กำหนดเทอม1","รับเทอม1","กำหนดเทอม2","รับเทอม2","กำหนดค่าน้ำ","รับค่าน้ำ","ค้าง","หมายเหตุ"];
+  const head=["ปี","ห้องทะเบียนหลัก","รหัสทะเบียนหลัก","ชื่อทะเบียนหลัก","สถานะ","กำหนดเทอม1","รับเทอม1","กำหนดเทอม2","รับเทอม2","กำหนดค่าน้ำ","รับค่าน้ำ","ค้าง","หมายเหตุ","ชื่อจากชีต","รหัสจากชีต","ห้องจากชีต","ยืนยันตัวตน"];
   const values=filtered().map(r=>{const a=legacyComponent(r,"tuition",1),b=legacyComponent(r,"tuition",2),c=legacyComponent(r,"water",1);
    return [r.academic_year,r.class_name,r.student_code,r.full_name,r.review_status,a.due,a.paid,r.academic_year==="2568"?b.due:0,
-    r.academic_year==="2568"?b.paid:0,c.due,c.paid,r.review_status==="ready"?legacyTotals(r).balance:"",r.source_note];});
+    r.academic_year==="2568"?b.paid:0,c.due,c.paid,r.review_status==="ready"&&(r.academic_year!=="2569"||r.student_id)?legacyTotals(r).balance:"",r.source_note,
+    r.sheet_full_name||r.full_name,r.sheet_student_code||r.student_code,r.sheet_class_name||r.class_name,r.student_id?"เชื่อมทะเบียนแล้ว":"ยังไม่เชื่อมทะเบียน"];});
   const blob=new Blob(["\ufeff"+[head,...values].map(row=>row.map(csvCell).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download="BNK_fees_import_"+F.year+".csv";a.click();URL.revokeObjectURL(url);
  }
  function pdf(){
-  const rows=filtered().filter(r=>r.review_status==="ready").map(legacyTotals);
+  const rows=filtered().filter(r=>r.review_status==="ready"&&(F.year!=="2569"||!!r.student_id)).map(legacyTotals);
   educationPrint({type:"summary",data:{rows,year:F.year,semester:F.year==="2568"?"1–2":"1",
    scope:"ข้อมูลนำเข้าจาก Google Sheets · ไม่รวมรายการที่รอตรวจสอบ",
    importedFromSheet:true,schoolName:state.systemSettings?.school_name_th},...printOpts()});
