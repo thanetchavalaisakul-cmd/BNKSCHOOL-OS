@@ -60,15 +60,23 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
     balance=ready.reduce((n,x)=>n+x.balance,0);
   const classes=[...new Set(all.map(x=>x.class_name))].sort((a,b)=>a.localeCompare(b,"th",{numeric:true}));
   const countNeedsReview=all.filter(x=>x.review_status!=="ready").length;
-  const header='<section class="panel"><div class="edufee-head"><div><h3>ยอดย้อนหลังจาก Google Sheets · ปีการศึกษา '+e(F.year)+'</h3>'+
-   '<p class="helper">เงินที่เคยจ่ายตามชีตนำเข้าเป็นยอดสะสมเดิม ไม่สร้างวันที่รับเงินจริงหรือเลขใบเสร็จย้อนหลัง</p></div>'+
+  const csv2568=F.year==="2568";
+  const originalCsvPaid=csv2568?all.reduce((n,r)=>n+Number(r.source_paid_term1||0)+Number(r.source_paid_term2||0)+Number(r.source_paid_water||0),0):0;
+  const header='<section class="panel"><div class="edufee-head"><div><h3>'+(csv2568?"ประวัติค่าบำรุงตาม CSV ฝ่ายการเงิน":"ยอดย้อนหลังจาก Google Sheets")+' · ปีการศึกษา '+e(F.year)+'</h3>'+
+   '<p class="helper">ยอดชำระเดิมเป็นประวัติจากเอกสารต้นฉบับ ไม่สร้างวันที่รับเงินจริงหรือเลขใบเสร็จย้อนหลัง</p></div>'+
    '<div class="edufee-actions"><button class="btn btn-ghost" id="edufee-legacy-csv">ส่งออก CSV</button>'+
    '<button class="btn btn-primary" id="edufee-legacy-pdf">พิมพ์ PDF</button></div></div>';
   const stats='<div class="edufee-statgrid">'+[
-   ["นักเรียนในชีต",all.length.toLocaleString("th-TH")+" รายการ"],["ยอดต้องชำระที่ยืนยันแล้ว",htmlMoney(due)],
-   ["ยอดชำระเดิมและเพิ่มเติม",htmlMoney(paid)],["ยอดค้างที่ยืนยันแล้ว",htmlMoney(balance)]]
+   [csv2568?"นักเรียนใน CSV":"นักเรียนในชีต",all.length.toLocaleString("th-TH")+" รายการ"],
+   ...(csv2568?[["ยอดชำระตามช่อง CSV ทั้งหมด",htmlMoney(originalCsvPaid)]]:[]),
+   ["ยอดต้องชำระของรายการที่ยืนยัน",htmlMoney(due)],
+   [csv2568?"ยอดชำระของรายการที่ยืนยัน":"ยอดชำระเดิมและเพิ่มเติม",htmlMoney(paid)],
+   ["ยอดค้างของรายการที่ยืนยัน",htmlMoney(balance)]]
    .map(x=>'<article class="edufee-stat"><span>'+e(x[0])+'</span><strong>'+e(x[1])+'</strong></article>').join("")+'</div>';
-  const hint='<p class="helper">ยึดทะเบียนนักเรียน BNK SCHOOL OS เป็นหลักสำหรับชื่อ รหัส และห้องเรียน; เก็บข้อมูล Google Sheets เดิมไว้ตรวจสอบ · ปี 2568: รวม 2 ภาคเรียนและค่าน้ำรายปี · ปี 2569: นำเข้าเฉพาะเทอม 1 และค่าน้ำ ไม่แตะเทอม 2</p>'+
+  const hint='<p class="helper">'+(csv2568?
+    "ปี 2568: ยึดชื่อ ห้องเรียน และยอดเงินจาก CSV ฝ่ายการเงินย้อนหลัง ไม่บังคับเทียบทะเบียนปีปัจจุบัน; แยกเทอม 1 เทอม 2 และค่าน้ำรายปีตามช่องในไฟล์":
+    "ปี 2569: ยึดทะเบียนนักเรียน BNK SCHOOL OS เป็นหลัก; นำเข้าเฉพาะเทอม 1 และค่าน้ำ ไม่แตะเทอม 2")+'</p>'+
+   (csv2568&&countNeedsReview?'<p class="helper">ยอดชำระตามช่อง CSV ทั้งหมดรวม '+countNeedsReview+' รายการที่ยังต้องตรวจสอบด้วย; ยอดที่ยืนยันและยอดค้างที่ยืนยันด้านบนยังไม่รวมรายการเหล่านี้</p>':"")+
    (unmatchedReady?'<p class="helper">ข้อมูลปี 2569 ยังไม่จับคู่ทะเบียน '+unmatchedReady+' รายการ: แสดงเพื่อรอตรวจสอบ แต่ไม่รวมยอดค้างที่ยืนยันแล้วและไม่รับเงินเพิ่มเติมผ่านแถวเหล่านี้</p>':"")+
    (countNeedsReview?'<p class="helper">มีอีก '+countNeedsReview+' รายการที่ไม่คิดเป็นยอดค้างจนกว่าจะตรวจสอบ/ยืนยันข้อมูล</p>':"");
   const controls='<div class="edufee-filter"><label>ห้อง<select id="edufee-legacy-class">'+sc("","ทุกห้อง",F.legacyClassFilter)+
@@ -95,7 +103,9 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
      (F.year==="2568"?'<td class="num">'+fmt(two.paid)+' / '+fmt(two.due)+'</td>':"")+
      '<td class="num">'+fmt(water.paid)+' / '+fmt(water.due)+'</td><td class="num">'+
      (r.review_status==="ready"?fmt(sum.balance):"—")+'</td><td>'+e(status)+
-     (r.source_note?'<small> · '+e(r.source_note)+'</small>':"")+(r.academic_year==="2569"&&!r.student_id?'<small> · ต้องตรวจสอบตัวตนก่อนรับเงินเพิ่ม</small>':"")+'</td><td>'+button+'</td></tr>';
+     (r.source_note?'<small> · '+e(r.source_note)+'</small>':"")+
+     (r.review_status==="review"&&r.review_note?'<small> · '+e(r.review_note)+'</small>':"")+
+     (r.academic_year==="2569"&&!r.student_id?'<small> · ต้องตรวจสอบตัวตนก่อนรับเงินเพิ่ม</small>':"")+'</td><td>'+button+'</td></tr>';
    }).join("")+'</tbody></table></div>';
   const tail=rows.length>show.length?'<p class="helper">แสดง '+show.length+' จาก '+rows.length+' รายการ ใช้ตัวกรองหรือ CSV เพื่อดูทั้งหมด</p>':
    rows.length===0?'<p class="edufee-empty">ยังไม่มีข้อมูลในปีการศึกษานี้</p>':"";
@@ -112,18 +122,21 @@ export function createEducationFeeLegacy({supabase,F,state,e,fmt,htmlMoney,sc,to
  }
  const csvCell=v=>{const x=String(v??"");return '"'+(/^[=+@\-\t\r]/.test(x)?"'"+x:x).replace(/"/g,'""')+'"';};
  function csv(){
-  const head=["ปี","ห้องทะเบียนหลัก","รหัสทะเบียนหลัก","ชื่อทะเบียนหลัก","สถานะ","กำหนดเทอม1","รับเทอม1","กำหนดเทอม2","รับเทอม2","กำหนดค่าน้ำ","รับค่าน้ำ","ค้าง","หมายเหตุ","ชื่อจากชีต","รหัสจากชีต","ห้องจากชีต","ยืนยันตัวตน"];
+  const head=["ปี","ห้องทะเบียนหลัก","รหัสทะเบียนหลัก","ชื่อทะเบียนหลัก","สถานะ","กำหนดเทอม1","รับเทอม1","กำหนดเทอม2","รับเทอม2","กำหนดค่าน้ำ","รับค่าน้ำ","ค้าง","หมายเหตุ","ชื่อจากชีต","รหัสจากชีต","ห้องจากชีต","ยืนยันตัวตน","รวมใน CSV ต้นฉบับ","บรรทัด CSV ต้นฉบับ","ข้อสังเกตที่ต้องตรวจสอบ"];
   const values=filtered().map(r=>{const a=legacyComponent(r,"tuition",1),b=legacyComponent(r,"tuition",2),c=legacyComponent(r,"water",1);
    return [r.academic_year,r.class_name,r.student_code,r.full_name,r.review_status,a.due,a.paid,r.academic_year==="2568"?b.due:0,
     r.academic_year==="2568"?b.paid:0,c.due,c.paid,r.review_status==="ready"&&(r.academic_year!=="2569"||r.student_id)?legacyTotals(r).balance:"",r.source_note,
-    r.sheet_full_name||r.full_name,r.sheet_student_code||r.student_code,r.sheet_class_name||r.class_name,r.student_id?"เชื่อมทะเบียนแล้ว":"ยังไม่เชื่อมทะเบียน"];});
+    r.sheet_full_name||r.full_name,r.sheet_student_code||r.student_code,r.sheet_class_name||r.class_name,
+    r.student_id?"เชื่อมทะเบียนแล้ว":"ข้อมูลย้อนหลังไม่บังคับเชื่อมทะเบียน",
+    r.source_csv_combined??"",r.source_csv_line??"",r.review_note||""];});
   const blob=new Blob(["\ufeff"+[head,...values].map(row=>row.map(csvCell).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download="BNK_fees_import_"+F.year+".csv";a.click();URL.revokeObjectURL(url);
  }
  function pdf(){
   const rows=filtered().filter(r=>r.review_status==="ready"&&(F.year!=="2569"||!!r.student_id)).map(legacyTotals);
   educationPrint({type:"summary",data:{rows,year:F.year,semester:F.year==="2568"?"1–2":"1",
-   scope:"ข้อมูลนำเข้าจาก Google Sheets · ไม่รวมรายการที่รอตรวจสอบ",
+   scope:(F.year==="2568"?"ยอดจาก CSV ฝ่ายการเงินปี 2568":"ข้อมูลนำเข้าจาก Google Sheets")+
+    " · ไม่รวมรายการที่รอตรวจสอบ",
    importedFromSheet:true,schoolName:state.systemSettings?.school_name_th},...printOpts()});
  }
  function paymentModal(id){
