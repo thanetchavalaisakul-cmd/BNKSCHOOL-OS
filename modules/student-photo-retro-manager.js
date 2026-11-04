@@ -60,8 +60,9 @@ function openPilot(){
  const actions=el("div","bnk-retro-actions");
  const scan=el("button","btn btn-secondary","สำรวจและดูตัวอย่าง");scan.type="button";
  const commit=el("button","btn btn-primary","ยืนยันเปลี่ยน 3 รูป");commit.type="button";commit.disabled=true;
+ const bulk=el("button","btn btn-primary","บีบอัดรูปที่เหลืออัตโนมัติ");bulk.type="button";
  const close=el("button","btn btn-ghost","ปิด");close.type="button";
- actions.append(scan,commit,close);modal.append(head,hint,status,previews,actions);backdrop.appendChild(modal);document.body.appendChild(backdrop);
+ actions.append(scan,commit,bulk,close);modal.append(head,hint,status,previews,actions);backdrop.appendChild(modal);document.body.appendChild(backdrop);
  let active=false,items=[];
  const urls=[];
  function progress(s){status.textContent=s;}
@@ -121,6 +122,135 @@ function openPilot(){
   }catch(e){progress("สำรวจรูปไม่สำเร็จ: "+err(e));}
   finally{active=false;scan.disabled=false;}
  });
+
+ // Automatic one-confirmation batch. It resumes safely by re-scanning student photo paths.
+ bulk.addEventListener("click",async()=>{
+  if(active)return;
+  active=true;
+  scan.disabled=true;commit.disabled=true;bulk.disabled=true;close.disabled=true;closeX.disabled=true;
+  previews.replaceChildren();dispose();items=[];
+  let replaced=0,bytesSaved=0,skipped=0,errors=0,retainedOriginals=0,readErrors=0,failedNotes=[];
+  try{
+   if(!await isAdmin())throw new Error("กรุณาเข้าสู่ระบบด้วยบัญชีแอดมินหลัก");
+   const students=[];
+   for(let offset=0;offset<10000;offset+=500){
+    const response=await api.from("students")
+     .select("id,student_code,first_name,last_name,photo_bucket,photo_path")
+     .not("photo_path","is",null).order("id").range(offset,offset+499);
+    if(response.error)throw response.error;
+    students.push(...(response.data||[]));
+    if((response.data||[]).length<500)break;
+   }
+   const linked=students.filter(s=>s.photo_path&&(!s.photo_bucket||s.photo_bucket===bucket));
+   progress("กำลังตรวจไฟล์ภาพจริง "+linked.length+" รูป");
+   let cursor=0,checked=0;
+   const files=[];
+   async function readWorker(){
+    while(cursor<linked.length){
+     const student=linked[cursor++];
+     const downloaded=await api.storage.from(bucket).download(student.photo_path);
+     checked++;
+     if(downloaded.error||!downloaded.data){readErrors++;continue;}
+     if(downloaded.data.size>STUDENT_PHOTO_TARGET_BYTES){
+      files.push({student,blob:downloaded.data,bytes:downloaded.data.size});
+     }else skipped++;
+     if(checked%5===0||checked===linked.length)progress("อ่านรูป "+checked+"/"+linked.length+
+      " · พบที่เกิน 96 KB "+files.length+" รูป");
+    }
+   }
+   await Promise.all(Array.from({length:Math.min(4,linked.length)},()=>readWorker()));
+   files.sort((a,b)=>b.bytes-a.bytes);
+   if(!files.length){
+    progress("ตรวจเสร็จ: ไม่มีรูปที่เกิน 96 KB"+(readErrors?" · อ่านไม่ได้ "+readErrors+" รูป":""));
+    return;
+   }
+   const ok=window.confirm("พบ "+files.length+" รูปที่ใหญ่กว่า 96 KB\n"+
+    "ให้ระบบบีบอัดและตรวจสอบไฟล์ใหม่แทนรูปเดิมอัตโนมัติทั้งหมดหรือไม่?\n"+
+    "ระบบจะข้ามรูปที่ลดไม่ได้ และจะลบต้นฉบับเฉพาะเมื่อไฟล์ใหม่ตรวจสอบผ่าน");
+   if(!ok){progress("ยกเลิกก่อนแก้ไข · ไม่มีไฟล์ใดถูกเปลี่ยน");return;}
+   for(let i=0;i<files.length;i++){
+    const item=files[i],student=item.student;
+    let newPath=null,linkedNew=false;
+    try{
+     if(i%5===0&&!await isAdmin())throw new Error("หมดสิทธิ์แอดมิน กรุณาเข้าสู่ระบบใหม่");
+     progress("กำลังบีบอัด "+(i+1)+"/"+files.length+" รูป\n"+
+      "สำเร็จ "+replaced+" · ข้าม "+skipped+" · ผิดพลาด "+errors+" · ประหยัด "+size(bytesSaved));
+     const before=await api.from("students").select("photo_path,photo_bucket").eq("id",student.id).single();
+     if(before.error||before.data?.photo_path!==student.photo_path||
+        (before.data?.photo_bucket&&before.data.photo_bucket!==bucket))
+       throw new Error("รูปถูกเปลี่ยนไปแล้ว จึงไม่เขียนทับ");
+     const mime=item.blob.type||(/\.png$/i.test(student.photo_path)?"image/png":/\.webp$/i.test(student.photo_path)?"image/webp":"image/jpeg");
+     const original=new File([item.blob],"original",{type:mime});
+     const output=await optimizeStudentPhotoForCard(original);
+     if(output.size>=item.bytes||output.size>STUDENT_PHOTO_MAX_BYTES){
+      skipped++;
+      continue;
+     }
+     const latest=await api.from("students").select("photo_path").eq("id",student.id).single();
+     if(latest.error||latest.data?.photo_path!==student.photo_path)
+       throw new Error("ตรวจพบรูปเปลี่ยนระหว่างเตรียมไฟล์");
+     const ext=output.type==="image/webp"?"webp":output.type==="image/png"?"png":"jpg";
+     newPath=student.id+"/optimized-"+crypto.randomUUID()+"."+ext;
+     const upload=await api.storage.from(bucket).upload(newPath,output,{contentType:output.type,upsert:false});
+     if(upload.error)throw upload.error;
+     const saved=await api.storage.from(bucket).download(newPath);
+     if(saved.error||!saved.data||saved.data.size!==output.size||
+       saved.data.size>STUDENT_PHOTO_MAX_BYTES)throw new Error("ไฟล์ใหม่มีขนาดไม่ตรง");
+     const [expected,actual]=await Promise.all([
+      crypto.subtle.digest("SHA-256",await output.arrayBuffer()),
+      crypto.subtle.digest("SHA-256",await saved.data.arrayBuffer())
+     ]);
+     const ex=new Uint8Array(expected),ac=new Uint8Array(actual);
+     if(ex.length!==ac.length||ex.some((byte,j)=>byte!==ac[j]))
+      throw new Error("ข้อมูลไฟล์ใหม่ไม่ตรงกับต้นฉบับที่บีบอัด");
+     if(typeof createImageBitmap==="function"){
+      const bitmap=await createImageBitmap(saved.data);
+      if(bitmap.width<1||bitmap.height<1){bitmap.close();throw new Error("ไฟล์ใหม่ไม่ใช่ภาพที่อ่านได้");}
+      bitmap.close();
+     }
+     const changed=await api.rpc("set_student_photo",{p_student_id:student.id,p_photo_path:newPath});
+     if(changed.error)throw changed.error;
+     linkedNew=true;
+     const check=await api.from("students").select("photo_path").eq("id",student.id).single();
+     if(check.error||check.data?.photo_path!==newPath)
+      throw new Error("อัปเดตรูปแล้ว แต่ยังยืนยันข้อมูลอ้างอิงไม่ได้ (เก็บต้นฉบับ)");
+     const removed=await api.storage.from(bucket).remove([student.photo_path]);
+     if(removed.error){
+      retainedOriginals++;
+      throw new Error("เปลี่ยนรูปสำเร็จ แต่ยังลบไฟล์เดิมไม่ได้: "+removed.error.message);
+     }
+     replaced++;
+     bytesSaved+=item.bytes-output.size;
+    }catch(e){
+     errors++;
+     if(newPath&&!linkedNew){
+      // An RPC may have succeeded despite a network error: never remove a referenced new photo.
+      try{
+       const now=await api.from("students").select("photo_path").eq("id",student.id).single();
+       if(!now.error&&now.data?.photo_path!==newPath)
+        await api.storage.from(bucket).remove([newPath]);
+       else if(now.data?.photo_path===newPath)retainedOriginals++;
+      }catch{}
+     }
+     const message="นักเรียนรหัส "+(student.student_code||"ไม่ระบุ")+": "+err(e);
+     failedNotes.push(message);
+     console.warn("Student photo compression item requires review",message);
+    }
+   }
+   progress("ประมวลผลครบ "+files.length+" รูป\n"+
+    "บีบอัดและลบต้นฉบับสำเร็จ "+replaced+" รูป · ข้ามรวม "+skipped+" รูป · "+
+    "ผิดพลาด "+errors+" รูป · ไฟล์เดิมที่ยังเก็บไว้ "+retainedOriginals+" รูป\n"+
+    "พื้นที่ที่ประหยัดยืนยันแล้ว "+size(bytesSaved)+
+    (readErrors?"\nตรวจอ่านไฟล์ไม่ได้ "+readErrors+" รูป":"")+
+    (failedNotes.length?"\nรายการที่ต้องตรวจซ้ำ:\n"+failedNotes.slice(0,8).join("\n"):"")+
+    "\nกดปิดแล้วตรวจรูปนักเรียนในบัตรอีกครั้ง");
+  }catch(e){progress("ไม่สามารถดำเนินการอัตโนมัติ: "+err(e));}
+  finally{
+   active=false;scan.disabled=false;bulk.disabled=false;close.disabled=false;closeX.disabled=false;
+   commit.disabled=true;
+  }
+ });
+
  commit.addEventListener("click",async()=>{
   if(active||!items.length)return;
   if(!await isAdmin()){progress("กรุณาเข้าสู่ระบบแอดมินใหม่");return;}
