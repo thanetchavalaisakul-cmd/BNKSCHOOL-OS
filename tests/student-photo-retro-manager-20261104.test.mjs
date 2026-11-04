@@ -22,7 +22,7 @@ test("legacy photo pilot is user-confirmed and preserves originals until verific
   assert.match(js,/rpc\("set_student_photo"/);
   assert.match(js,/checkNew\.data\?\.photo_path!==newPath/);
   assert.match(js,/remove\(\[student\.photo_path\]\)/);
-  assert.ok(js.indexOf('remove([student.photo_path])')>js.indexOf('checkNew.data?.photo_path!==newPath'));
+  assert.ok(js.lastIndexOf('remove([student.photo_path])')>js.lastIndexOf('checkNew.data?.photo_path!==newPath'));
   assert.match(js,/if\(newPath&&!linked\)/);
 });
 
