@@ -1,0 +1,50 @@
+name: Verify and build academic certificate reservations
+
+on:
+  push:
+    branches: [feature/certificate-reservation-quantity-20261105]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'modules/academic-certificate-registry.js'
+      - 'supabase/migrations/20261105_certificate_reserved_ranges.sql'
+      - 'tests/academic-certificate-*.test.mjs'
+      - 'index.html'
+      - '.github/workflows/bnk-certificate-reservations-20261105.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bnk-certificate-reservations-20261105
+  cancel-in-progress: false
+
+jobs:
+  verify-and-build:
+    if: "!contains(github.event.head_commit.message, '[certificate-reservation-built]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify entire BNK OS test suite and optimized bundle
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify
+          node --check modules/academic-certificate-registry.js
+          git diff --check
+      - name: Commit the verified static bundle on feature branch
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.min.js
+          if ! git diff --cached --quiet; then
+            git commit -m "build(certificates): refresh verified static bundle [certificate-reservation-built]"
+            git push origin HEAD:feature/certificate-reservation-quantity-20261105
+          fi
