@@ -13915,6 +13915,7 @@ function electricityActionButtons(r){if(!r)return '';
    html+=`<button class="btn btn-ghost" data-el-delete-bill="${r.id}">ลบบิลที่กรอกผิด</button>`;
  if(manager&&['reading_submitted','reading_rejected','awaiting_payment','payment_rejected'].includes(r.status))
    html+=`<button class="btn btn-ghost" data-el-void-bill="${r.id}">ยกเลิกบิล</button>`;
+ if(r.status==='voided'&&state.electricityPeriods?.some(p=>p.id===r.period_id&&p.status==='open')) html+=`<button class="btn btn-primary" data-el-reading="${r.meter_id}" data-el-reading-period="${r.period_id}">บันทึกบิลใหม่</button>`;
  if((manager||owner)&&['payment_submitted','payment_rejected'].includes(r.status)&&r.payment_slip_path)
    html+=`<button class="btn btn-ghost" data-el-remove-slip="${r.id}">ลบสลิปที่แนบผิด</button>`;
  return html;
