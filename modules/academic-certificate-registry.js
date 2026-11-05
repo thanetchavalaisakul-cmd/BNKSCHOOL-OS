@@ -5,29 +5,39 @@
     const META_SHEET = "ข้อมูลแบบฟอร์ม";
     let academicYear = Number(state?.academicTerms?.[0]?.academic_year || new Date().getFullYear()+543);
     if (!Number.isInteger(academicYear) || academicYear<2500 || academicYear>2700) academicYear=2569;
-    let records=[],fetchError="",searchText="",template=null,pending=null,lastNotice="";
+    let reservationCount=50, records=[], stats=null, myReservations=[], fetchError="",searchText="",template=null,pending=null,lastNotice="";
     const text = x=>String(x??"").trim();
     const safe=x=>escapeHtml(String(x??""));
-    const formatNum=n=>`${n}/${academicYear}`;
+    const formatNum=(n,year=academicYear)=>`${n}/${year}`;
     function visibleRecords(){
       const term=searchText.toLocaleLowerCase("th");
       return term?records.filter(r=>[`${r.serial_no}/${r.academic_year}`,r.recipient_name,r.grade_level,r.activity,r.note].some(v=>String(v||"").toLocaleLowerCase("th").includes(term))):records;
     }
     async function load(){
       fetchError="";
-      try {
+      try{
         const result=[];
         for(let offset=0;offset<100000;offset+=1000){
           const {data,error}=await supabase.from("academic_certificate_registry")
             .select("id,academic_year,serial_no,recipient_name,grade_level,activity,note,created_at")
-            .eq("academic_year",academicYear).order("serial_no",{ascending:true})
-            .range(offset,offset+999);
+            .eq("academic_year",academicYear).order("serial_no",{ascending:true}).range(offset,offset+999);
           if(error)throw error;
           result.push(...(data||[]));
           if((data||[]).length<1000)break;
         }
         records=result;
-      }catch(error){fetchError=error?.message||String(error);}
+        const [info,mine]=await Promise.all([
+          supabase.rpc("get_academic_certificate_reservation_stats",{p_year:academicYear}),
+          supabase.rpc("get_academic_certificate_my_reservations",{p_year:academicYear})
+        ]);
+        if(info.error)throw info.error;
+        if(mine.error)throw mine.error;
+        if(!Number.isInteger(Number(info.data?.next_available)))throw new Error("เลขคุมถัดไปไม่ถูกต้อง");
+        stats=info.data;
+        myReservations=Array.isArray(mine.data)?mine.data:[];
+      }catch(error){
+        stats=null;myReservations=[];fetchError=error?.message||String(error);
+      }
     }
     function renderRows(rows=visibleRecords()){
       if(!rows.length)return '<tr><td colspan="5" style="text-align:center;padding:24px">ไม่พบรายการเลขคุมเกียรติบัตรในปีการศึกษานี้</td></tr>';
@@ -40,63 +50,62 @@
       </tr>`).join("");
     }
     function view(){
-      const last=records.reduce((m,r)=>Math.max(m,Number(r.serial_no)||0),0);
-      const matches=visibleRecords();
+      const matches=visibleRecords(),last=Number(stats?.last_recorded||0),next=Number(stats?.next_available||1);
       const pendingCount=pending?.rows?.length||0;
-      return `<section class="panel cert-ledger">
-        <div class="panel-head"><div class="panel-title-wrap">
-          <h3>ทะเบียนเลขคุมเกียรติบัตรประจำปีการศึกษา</h3>
-          <p>ทุกผู้ใช้งานโรงเรียนที่มีบัญชีใช้งานสามารถดู ดาวน์โหลดแบบฟอร์ม นำเข้า และส่งออกได้ · ใช้ Excel 5 คอลัมน์ตามไฟล์ต้นฉบับ</p>
-        </div></div>
-        <div class="cert-toolbar">
-          <label class="cert-year-field">ปีการศึกษา
-            <input class="input" id="cert-ledger-year" type="number" min="2500" max="2700" step="1" value="${academicYear}" />
-          </label>
-          <button class="btn btn-secondary" type="button" id="cert-ledger-change-year">แสดงข้อมูลปีนี้</button>
-          <button class="btn btn-secondary" type="button" id="cert-ledger-export" ${records.length?"":"disabled"}>ส่งออก Excel</button>
-        </div>
-        <div class="cert-stats">
-          <div><span>ปีการศึกษา</span><strong>${academicYear}</strong></div>
-          <div><span>รายการที่บันทึก</span><strong>${records.length.toLocaleString("th-TH")}</strong></div>
-          <div><span>เลขคุมล่าสุด</span><strong>${last?formatNum(last):"ยังไม่มี"}</strong></div>
-          <div><span>เลขถัดไป</span><strong>${formatNum(last+1)}</strong></div>
-        </div>
-        <div class="cert-upload-flow">
-          <div class="cert-flow-card">
-            <strong>1. ดาวน์โหลดแบบฟอร์มก่อนทุกครั้ง</strong>
-            <p>ระบบออกเลขคุมถัดไปอัตโนมัติ และผูกแบบฟอร์มกับปีการศึกษาและข้อมูลล่าสุด</p>
-            <button class="btn btn-primary" id="cert-ledger-download" type="button">ดาวน์โหลดแบบฟอร์ม Excel ล่าสุด</button>
-          </div>
-          <div class="cert-flow-card">
-            <strong>2. กรอกข้อมูลแล้วนำเข้า</strong>
-            <p>ใช้แบบฟอร์มที่ดาวน์โหลด หรือเลือก Excel เดิมที่มี 5 คอลัมน์หลังดาวน์โหลดแบบฟอร์มในหน้านี้แล้ว</p>
-            <input type="file" accept=".xlsx,.xls" id="cert-ledger-file" ${template?"":"disabled"} aria-label="เลือกไฟล์ Excel เพื่อนำเข้า" />
-            ${template?`<small>รับแบบฟอร์มปี ${template.academic_year} แล้ว · เริ่มเลข ${template.next_serial}/${template.academic_year}</small>`:'<small>ต้องกดดาวน์โหลดแบบฟอร์มก่อนจึงจะเลือกไฟล์ได้</small>'}
-          </div>
-        </div>
-        ${lastNotice?`<div class="cert-notice" role="status">${safe(lastNotice)}</div>`:""}
-        ${fetchError?`<div class="cert-error" role="alert">โหลดข้อมูลไม่สำเร็จ: ${safe(fetchError)}</div>`:""}
-        ${pending?`<div class="cert-preview">
-          <h4>ตรวจสอบข้อมูลก่อนบันทึก · ${pendingCount} รายการ</h4>
-          <p>เลขคุมที่เตรียมนำเข้า: <strong>${pendingCount?`${pending.rows[0].serial_no}/${academicYear} – ${pending.rows[pendingCount-1].serial_no}/${academicYear}`:"—"}</strong></p>
-          ${pending.warnings.length?`<div class="cert-warning"><strong>ข้อควรตรวจ ${pending.warnings.length} จุด</strong><ul>${pending.warnings.slice(0,12).map(w=>`<li>${safe(w)}</li>`).join("")}</ul></div>`:""}
-          <div class="cert-table-scroll"><table class="table cert-table"><thead><tr>${HEADERS.map(x=>`<th>${safe(x)}</th>`).join("")}</tr></thead><tbody>${pending.rows.slice(0,12).map(r=>`<tr><td>${r.serial_no}/${academicYear}</td><td>${safe(r.recipient_name)}</td><td>${safe(r.grade_level)}</td><td>${safe(r.activity)}</td><td>${safe(r.note)}</td></tr>`).join("")}</tbody></table></div>
-          ${pendingCount>12?`<small>แสดงตัวอย่าง 12 จาก ${pendingCount} รายการ</small>`:""}
-          <div class="cert-preview-actions">
-            <button class="btn btn-primary" id="cert-ledger-confirm" type="button">ยืนยันบันทึก ${pendingCount} รายการ</button>
-            <button class="btn btn-secondary" id="cert-ledger-cancel" type="button">ยกเลิก</button>
-          </div>
-        </div>`:""}
-        <div class="cert-list-header">
-          <div><h4>ทะเบียนเกียรติบัตร</h4><small>ไม่แก้หรือทับเลขคุมเดิม · แยกทะเบียนตามปีการศึกษา</small></div>
-          <label>ค้นหา <input class="input" id="cert-ledger-search" type="search" value="${safe(searchText)}" placeholder="เลขคุม / ชื่อ / ชั้น / รายการ" /></label>
-        </div>
-        <div class="cert-table-scroll"><table class="table cert-table">
-          <thead><tr>${HEADERS.map(x=>`<th>${safe(x)}</th>`).join("")}</tr></thead>
-          <tbody id="cert-ledger-tbody">${renderRows(matches)}</tbody>
-        </table></div>
-        <div class="cert-count" id="cert-ledger-count">แสดง ${matches.length.toLocaleString("th-TH")} จาก ${records.length.toLocaleString("th-TH")} รายการ</div>
-      </section>`;
+      const canReserve=stats?.reservation_enabled===true;
+      return '<section class="panel cert-ledger">'+
+        '<div class="panel-head"><div class="panel-title-wrap"><h3>ทะเบียนเลขคุมเกียรติบัตรประจำปีการศึกษา</h3>'+
+        '<p>เลขคุมแยกปีการศึกษา · เลือกจำนวนก่อนดาวน์โหลด · ระบบจองเลขในฐานข้อมูลเพื่อป้องกันเลขซ้ำ</p></div></div>'+
+        '<div class="cert-toolbar"><label class="cert-year-field">ปีการศึกษา '+
+        '<input class="input" id="cert-ledger-year" type="number" min="2500" max="2700" step="1" value="'+academicYear+'"></label>'+
+        '<button class="btn btn-secondary" type="button" id="cert-ledger-change-year">แสดงข้อมูลปีนี้</button>'+
+        '<button class="btn btn-secondary" type="button" id="cert-ledger-export" '+(records.length?'':'disabled')+'>ส่งออก Excel</button></div>'+
+        '<div class="cert-stats">'+
+        '<div><span>ปีการศึกษา</span><strong>'+academicYear+'</strong></div>'+
+        '<div><span>รายการที่บันทึก</span><strong>'+records.length.toLocaleString("th-TH")+'</strong></div>'+
+        '<div><span>เลขคุมล่าสุดที่บันทึก</span><strong>'+(last?formatNum(last):'ยังไม่มี')+'</strong></div>'+
+        '<div><span>เลขถัดไปที่จองได้</span><strong>'+(stats?formatNum(next):'—')+'</strong></div></div>'+
+        (stats&&!canReserve?'<div class="cert-warning" role="alert"><strong>ยังไม่เปิดจองเลขคุมปี '+academicYear+
+           '</strong><p>'+safe(stats.reservation_reason||'อยู่ระหว่างตรวจสอบทะเบียนเดิม')+'</p></div>':'')+
+        (stats&&Number(stats.unsubmitted_reservations)>0?'<div class="cert-notice">มีการจองเลขที่ยังไม่นำเข้า '+
+           safe(stats.unsubmitted_reservations)+' ชุด (เลขเหล่านี้จะไม่ถูกจองซ้ำ)</div>':'')+
+        '<div class="cert-upload-flow"><div class="cert-flow-card"><strong>1. เลือกจำนวนและดาวน์โหลดแบบฟอร์ม</strong>'+
+        '<p>เลือกจำนวนที่ต้องการ เช่น 50 ใบ ระบบจองเลขให้ 50 เลขทันที</p>'+
+        '<label>จำนวนเกียรติบัตร (1–500 ใบ) <input class="input" id="cert-ledger-reserve-count" type="number" min="1" max="500" step="1" value="'+reservationCount+'"></label>'+
+        '<button class="btn btn-primary" type="button" id="cert-ledger-download" '+(canReserve?'':'disabled')+'>จองเลขและดาวน์โหลด Excel</button></div>'+
+        '<div class="cert-flow-card"><strong>2. กรอกข้อมูลและนำเข้า</strong>'+
+        '<p>กรอกชื่อ ชั้น และรายการให้ครบตามจำนวนเลขที่จอง แล้วเลือกไฟล์ Excel เดิมที่ดาวน์โหลดไว้</p>'+
+        '<input type="file" accept=".xlsx,.xls" id="cert-ledger-file" aria-label="เลือก Excel เพื่อนำเข้า">'+
+        (template?'<small>เลขชุดที่เลือก '+formatNum(template.next_serial)+'–'+formatNum(template.last_serial)+
+          ' ('+template.reserved_count+' ใบ)</small>':'<small>ใช้ไฟล์ที่จองไว้ได้แม้เปิดหน้านี้ใหม่ภายใน 7 วัน</small>')+
+        '</div></div>'+
+        (myReservations.length?'<div class="cert-preview"><h4>แบบฟอร์มที่คุณจองไว้ (ไม่เกิน 7 วัน)</h4>'+
+          myReservations.map((item,i)=>'<div class="cert-preview-actions"><span>เลข '+
+          safe(formatNum(item.next_serial))+'–'+safe(formatNum(item.last_serial))+
+          ' ('+safe(item.reserved_count)+' ใบ)</span> '+
+          '<button class="btn btn-secondary" id="cert-ledger-recover-'+i+
+          '" type="button">ดาวน์โหลดแบบฟอร์มชุดเดิมอีกครั้ง</button></div>').join('')+'</div>':'')+
+        (lastNotice?'<div class="cert-notice" role="status">'+safe(lastNotice)+'</div>':'')+
+        (fetchError?'<div class="cert-error" role="alert">โหลดข้อมูลไม่สำเร็จ: '+safe(fetchError)+'</div>':'')+
+        (pending?'<div class="cert-preview"><h4>ตรวจสอบข้อมูลก่อนบันทึก · '+pendingCount+' รายการ</h4>'+
+          '<p>เลขคุมที่เตรียมนำเข้า: <strong>'+formatNum(pending.rows[0].serial_no)+'–'+
+          formatNum(pending.rows[pendingCount-1].serial_no)+'</strong></p>'+
+          (pending.warnings.length?'<div class="cert-warning"><strong>ข้อควรตรวจ '+
+             pending.warnings.length+' จุด</strong><ul>'+pending.warnings.slice(0,12).map(w=>'<li>'+safe(w)+'</li>').join('')+'</ul></div>':'')+
+          '<div class="cert-table-scroll"><table class="table cert-table"><thead><tr>'+
+          HEADERS.map(h=>'<th>'+safe(h)+'</th>').join('')+'</tr></thead><tbody>'+
+          pending.rows.slice(0,12).map(x=>'<tr><td>'+formatNum(x.serial_no)+'</td><td>'+safe(x.recipient_name)+
+          '</td><td>'+safe(x.grade_level)+'</td><td>'+safe(x.activity)+'</td><td>'+safe(x.note)+'</td></tr>').join('')+
+          '</tbody></table></div>'+(pendingCount>12?'<small>แสดง 12 จาก '+pendingCount+' รายการ</small>':'')+
+          '<div class="cert-preview-actions"><button class="btn btn-primary" id="cert-ledger-confirm" type="button">ยืนยันบันทึก '+
+          pendingCount+' รายการ</button><button class="btn btn-secondary" id="cert-ledger-cancel" type="button">ยกเลิกการตรวจตัวอย่าง</button></div></div>':'')+
+        '<div class="cert-list-header"><div><h4>ทะเบียนเกียรติบัตร</h4><small>ทะเบียนแยกปีและไม่แก้เลขเดิม · เลขที่จองแล้วไม่นำกลับมาใช้ซ้ำ</small></div>'+
+        '<label>ค้นหา <input class="input" id="cert-ledger-search" type="search" value="'+safe(searchText)+'" placeholder="เลขคุม / ชื่อ / ชั้น / รายการ"></label></div>'+
+        '<div class="cert-table-scroll"><table class="table cert-table"><thead><tr>'+
+          HEADERS.map(h=>'<th>'+safe(h)+'</th>').join('')+'</tr></thead>'+
+        '<tbody id="cert-ledger-tbody">'+renderRows(matches)+'</tbody></table></div>'+
+        '<div class="cert-count" id="cert-ledger-count">แสดง '+matches.length.toLocaleString("th-TH")+' จาก '+
+          records.length.toLocaleString("th-TH")+' รายการ</div></section>';
     }
     function styledSheet(XLSX,rows){
       const ws=XLSX.utils.aoa_to_sheet(rows);
@@ -107,28 +116,52 @@
       }
       return ws;
     }
-    async function downloadTemplate(){
-      const {data,error}=await supabase.rpc("issue_academic_certificate_template",{p_year:academicYear});
-      if(error)throw error;
-      if(!data?.token||!Number.isInteger(Number(data.next_serial)))throw new Error("ไม่สามารถรับข้อมูลแบบฟอร์มจากฐานข้อมูล");
-      const XLSX=await ensureXlsx();
-      const next=Number(data.next_serial),max=200;
+    async function writeReservedWorkbook(XLSX,session){
+      const first=Number(session.next_serial), count=Number(session.reserved_count),
+        last=Number(session.last_serial), year=Number(session.academic_year);
+      if(!session.token||!Number.isInteger(first)||!Number.isInteger(count)||count<1||count>500||
+        last!==first+count-1||year!==academicYear)throw new Error("รายละเอียดการจองเลขไม่ถูกต้อง");
       const table=[HEADERS];
-      for(let i=0;i<max;i++)table.push([`${next+i}/${academicYear}`,"","","",""]);
+      for(let i=0;i<count;i++)table.push([formatNum(first+i,year),"","","",""]);
       const workbook=XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook,styledSheet(XLSX,table),TEMPLATE_SHEET);
       const meta=XLSX.utils.aoa_to_sheet([
-        ["รายการ","ข้อมูลระบบ"],["ปีการศึกษา",academicYear],["เลขเริ่มต้น",next],
-        ["รหัสแบบฟอร์ม",data.token],["คำแนะนำ","กรอกเฉพาะแถวที่ต้องการใช้ แล้วอัปโหลดในระบบ ห้ามแก้เลขคุม"],
-        ["สำคัญ","แบบฟอร์มใช้ได้ 1 ครั้ง หากมีผู้บันทึกเพิ่มก่อน ต้องดาวน์โหลดใหม่"]
+        ["รายการ","ข้อมูลระบบ"],["ปีการศึกษา",year],["เลขเริ่มต้น",first],
+        ["เลขสิ้นสุด",last],["จำนวนที่จอง",count],["รหัสแบบฟอร์ม",session.token],
+        ["คำแนะนำ","กรอกชื่อ ชั้น และรายการครบทุกแถว ห้ามแก้เลขคุม"],
+        ["สำคัญ","จองเลขแล้วและใช้ได้ 1 ครั้งภายใน 7 วัน"]
       ]);
       meta["!cols"]=[{wch:22},{wch:88}];
       XLSX.utils.book_append_sheet(workbook,meta,META_SHEET);
       const bytes=XLSX.write(workbook,{bookType:"xlsx",type:"array"});
-      downloadBlob(new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),`แบบฟอร์มเลขคุมเกียรติบัตร_${academicYear}_เริ่ม${next}.xlsx`);
-      template={token:data.token,academic_year:academicYear,next_serial:next};
+      downloadBlob(new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),
+        'แบบฟอร์มเลขคุมเกียรติบัตร_'+year+'_'+first+'-'+last+'.xlsx');
+      template={token:session.token,academic_year:year,next_serial:first,last_serial:last,reserved_count:count};
+    }
+    async function downloadTemplate(){
+      const count=Number(document.getElementById("cert-ledger-reserve-count")?.value);
+      if(!Number.isInteger(count)||count<1||count>500)throw new Error("กรุณาเลือกจำนวน 1–500 ใบ");
+      reservationCount=count;
+      // Verify Excel tooling before consuming a number range.
+      const XLSX=await ensureXlsx();
+      const {data,error}=await supabase.rpc("reserve_academic_certificate_template",{p_year:academicYear,p_quantity:count});
+      if(error){
+        if((error.message||"").includes("HISTORICAL_IMPORT_REQUIRED"))
+          throw new Error("ต้องนำเข้าและตรวจทะเบียนปีการศึกษาเดิมก่อนจึงจะจองเลขต่อได้");
+        throw error;
+      }
+      // Save booking ID before creating the workbook; it stays recoverable server-side.
+      template={token:data?.token,academic_year:academicYear,next_serial:data?.next_serial,
+        last_serial:data?.last_serial,reserved_count:count};
+      await writeReservedWorkbook(XLSX,template);
       pending=null;
-      lastNotice=`ดาวน์โหลดแบบฟอร์มสำเร็จ · ใช้เลขตั้งแต่ ${next}/${academicYear} เป็นต้นไป · หลังกรอกแล้วนำเข้าจากหน้านี้`;
+      lastNotice='จองเลขสำเร็จ '+count+' ใบ · เลข '+formatNum(template.next_serial)+'–'+formatNum(template.last_serial);
+      await load();await renderDashboard();
+    }
+    async function redownloadReservation(item){
+      const XLSX=await ensureXlsx();
+      await writeReservedWorkbook(XLSX,item);
+      lastNotice='ดาวน์โหลดแบบฟอร์มชุดเดิม เลข '+formatNum(item.next_serial)+'–'+formatNum(item.last_serial)+' โดยไม่จองเลขเพิ่ม';
       await renderDashboard();
     }
     function excelNumber(value,year,serialIndex){
@@ -148,63 +181,74 @@
       return {number:Number(match[1]),converted:false};
     }
     async function parseFile(file){
-      if(!template||template.academic_year!==academicYear)throw new Error("กรุณาดาวน์โหลดแบบฟอร์มปีการศึกษานี้ก่อน");
-      if(!/\.(xlsx|xls)$/i.test(file?.name||""))throw new Error("รับเฉพาะไฟล์ Excel .xlsx หรือ .xls");
+      if(!/\.(xlsx|xls)$/i.test(file?.name||""))throw new Error("รับเฉพาะ Excel .xlsx หรือ .xls");
       if(file.size>15*1024*1024)throw new Error("ไฟล์เกิน 15 MB");
       const XLSX=await ensureXlsx();
       const workbook=XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:false,cellNF:true});
-      const dataSheet=workbook.Sheets[TEMPLATE_SHEET]||workbook.Sheets[workbook.SheetNames[0]];
+      const dataSheet=workbook.Sheets[TEMPLATE_SHEET];
+      if(!dataSheet)throw new Error("ไม่พบชีตบัญชีคุมเกียรติบัตร");
       const data=XLSX.utils.sheet_to_json(dataSheet,{header:1,raw:true,defval:"",blankrows:false});
-      if(!data.length||HEADERS.some((h,i)=>text(data[0]?.[i])!==h))throw new Error("หัวตารางไม่ตรง 5 คอลัมน์ตามแบบฟอร์ม กรุณาตรวจไฟล์");
-      if((data[0]||[]).slice(5).some(v=>text(v)))throw new Error("มีคอลัมน์เกินจาก 5 คอลัมน์ตามแบบฟอร์ม");
-      const info=workbook.Sheets[META_SHEET];
-      if(info){
-        const details=XLSX.utils.sheet_to_json(info,{header:1,defval:"",raw:true});
-        const key=new Map(details.map(r=>[text(r[0]),text(r[1])]));
-        if(key.get("รหัสแบบฟอร์ม")!==template.token||Number(key.get("ปีการศึกษา"))!==academicYear||Number(key.get("เลขเริ่มต้น"))!==template.next_serial)
-          throw new Error("แบบฟอร์มนี้ไม่ใช่ฉบับที่เพิ่งดาวน์โหลด กรุณาดาวน์โหลดแบบฟอร์มล่าสุดอีกครั้ง");
-      }
-      const rows=[],warnings=[];
-      let converted=0;
+      if(!data.length||HEADERS.some((h,i)=>text(data[0]?.[i])!==h))
+        throw new Error("หัวตารางไม่ตรงแบบฟอร์ม Excel 5 คอลัมน์");
+      if((data[0]||[]).slice(5).some(v=>text(v)))throw new Error("มีข้อมูลเกิน 5 คอลัมน์");
+      const meta=workbook.Sheets[META_SHEET];
+      if(!meta)throw new Error("ไม่พบรหัสจองเลขในแบบฟอร์ม กรุณาใช้แบบฟอร์มล่าสุดจากระบบ");
+      const details=XLSX.utils.sheet_to_json(meta,{header:1,raw:true,defval:""});
+      const kv=new Map(details.map(row=>[text(row[0]),text(row[1])]));
+      const year=Number(kv.get("ปีการศึกษา")),first=Number(kv.get("เลขเริ่มต้น")),
+        last=Number(kv.get("เลขสิ้นสุด")),count=Number(kv.get("จำนวนที่จอง")),
+        token=kv.get("รหัสแบบฟอร์ม");
+      if(year!==academicYear||!Number.isInteger(first)||first<1||
+        !Number.isInteger(count)||count<1||count>500||
+        !Number.isInteger(last)||last!==first+count-1||
+        !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(token))
+          throw new Error("ข้อมูลปีการศึกษา/เลขจองไม่ถูกต้อง กรุณาเลือกปีให้ตรงกับไฟล์");
+      // The server verifies ownership, unused status, and exact reserved range.
+      template={token,academic_year:year,next_serial:first,last_serial:last,reserved_count:count};
+      const rows=[],warnings=[];let converted=0;
       for(let i=1;i<data.length;i++){
         const cells=data[i]||[];
-        if(cells.slice(5).some(v=>text(v)))throw new Error(`แถว ${i+1} มีข้อมูลเกิน 5 คอลัมน์`);
+        if(cells.slice(5).some(v=>text(v)))throw new Error('แถว '+(i+1)+' มีข้อมูลเกิน 5 คอลัมน์');
         const fields=cells.slice(1,5).map(text);
         if(!fields.some(Boolean))continue;
-        if(!fields[0]||!fields[1]||!fields[2])throw new Error(`แถว ${i+1} กรุณากรอกชื่อ ชั้น และรายการให้ครบ`);
-        const expected=template.next_serial+rows.length;
+        if(!fields[0]||!fields[1]||!fields[2])
+          throw new Error('แถว '+(i+1)+' ต้องกรอกชื่อ ชั้น และรายการให้ครบ');
+        const expected=first+rows.length;
+        if(expected>last)throw new Error("จำนวนแถวเกินเลขที่จอง");
         const num=excelNumber(cells[0],academicYear,expected);
-        if(num.number!==expected)throw new Error(`แถว ${i+1} เลขคุมต้องต่อเนื่องเป็น ${expected}/${academicYear} แต่พบ ${num.number}/${academicYear}`);
+        if(num.number!==expected)
+          throw new Error('แถว '+(i+1)+' ต้องเป็นเลข '+formatNum(expected));
         if(num.converted)converted++;
         if(fields[0].length>500||fields[1].length>300||fields[2].length>500||fields[3].length>1000)
-          throw new Error(`แถว ${i+1} มีข้อความยาวเกินที่ระบบรองรับ`);
-        if(fields[0].includes("ห้องเรียน")&&fields[1].includes("ห้องเรียน")&&fields[0].replace(/\s+/g,"")!==fields[1].replace(/\s+/g,""))
-          warnings.push(`แถว ${i+1}: ชื่อห้องและชั้นไม่ตรงกัน (${fields[0]} / ${fields[1]})`);
-        rows.push({serial_no:expected,recipient_name:fields[0],grade_level:fields[1],activity:fields[2],note:fields[3]});
+          throw new Error('ข้อความแถว '+(i+1)+' ยาวเกินที่ระบบรองรับ');
+        rows.push({serial_no:expected,recipient_name:fields[0],grade_level:fields[1],
+          activity:fields[2],note:fields[3]});
       }
-      if(!rows.length)throw new Error("ไม่พบรายการที่กรอกข้อมูลในไฟล์");
-      if(rows.length>500)throw new Error("นำเข้าได้สูงสุด 500 รายการต่อครั้ง กรุณาแบ่งชุด");
-      if(converted)warnings.unshift(`ระบบอ่านเลขคุมที่ Excel เปลี่ยนเป็นวันที่กลับเป็นเลขคุมแล้ว ${converted} รายการ`);
+      if(rows.length!==count)throw new Error('จองเลขไว้ '+count+' ใบ ต้องกรอกครบทุกเลข (พบ '+rows.length+' ใบ)');
+      if(converted)warnings.push('แก้ไขเลขคุมที่ Excel แปลงเป็นวันที่แล้ว '+converted+' รายการ');
       pending={rows,warnings,fileName:file.name};
-      lastNotice=`อ่านไฟล์ ${file.name} แล้ว · กรุณาตรวจตัวอย่างและกดยืนยันก่อนบันทึก`;
+      lastNotice='ตรวจไฟล์ '+file.name+' แล้ว กรุณาตรวจตัวอย่างและยืนยันบันทึก';
       await renderDashboard();
     }
     async function savePending(){
-      if(!template||!pending?.rows?.length)throw new Error("ไม่พบข้อมูลรอนำเข้า");
-      const {data,error}=await supabase.rpc("import_academic_certificate_template",{p_token:template.token,p_rows:pending.rows});
+      if(!template||!pending?.rows?.length)throw new Error("ไม่พบข้อมูลรอบันทึก");
+      const {data,error}=await supabase.rpc("import_academic_certificate_template",{
+        p_token:template.token,p_rows:pending.rows
+      });
       if(error){
         const msg=error.message||"";
-        if(msg.includes("STALE_TEMPLATE"))throw new Error("มีผู้อื่นบันทึกเลขคุมเพิ่มแล้ว กรุณาดาวน์โหลดแบบฟอร์มใหม่เพื่อให้เลขต่อเนื่อง");
+        if(msg.includes("RESERVED_QUANTITY_MISMATCH"))throw new Error("จำนวนแถวไม่ตรงกับที่จอง");
         if(msg.includes("TEMPLATE_INVALID_OR_USED")||msg.includes("TEMPLATE_EXPIRED"))
-          throw new Error("แบบฟอร์มหมดอายุหรือถูกใช้ไปแล้ว กรุณาดาวน์โหลดใหม่");
+          throw new Error("แบบฟอร์มถูกใช้แล้วหรือหมดอายุ กรุณาตรวจสอบเลขที่จอง");
+        if(msg.includes("LEGACY_TEMPLATE_MUST_REDOWNLOAD"))
+          throw new Error("แบบฟอร์มรุ่นเก่าต้องดาวน์โหลดใหม่");
         throw error;
       }
       const total=Number(data?.saved)||pending.rows.length;
       pending=null;template=null;
-      lastNotice=`บันทึกสำเร็จ ${total} รายการ · เลขถัดไป ${data.next_serial}/${academicYear} · ครั้งถัดไปต้องดาวน์โหลดแบบฟอร์มใหม่`;
-      toast("บันทึกเลขคุมเกียรติบัตรแล้ว",`${total} รายการ`,"success");
-      await load();
-      await renderDashboard();
+      lastNotice='บันทึกสำเร็จ '+total+' รายการ · เลขที่จองจะไม่ถูกนำกลับมาใช้ซ้ำ';
+      toast("บันทึกเลขคุมเกียรติบัตรแล้ว",total+" รายการ","success");
+      await load();await renderDashboard();
     }
     async function exportExcel(){
       if(!records.length)return;
@@ -234,8 +278,9 @@
       });
       protect(document.getElementById("cert-ledger-download"),downloadTemplate);
       protect(document.getElementById("cert-ledger-export"),exportExcel);
+      myReservations.forEach((item,i)=>protect(document.getElementById("cert-ledger-recover-"+i),()=>redownloadReservation(item)));
       protect(document.getElementById("cert-ledger-confirm"),savePending);
-      protect(document.getElementById("cert-ledger-cancel"),async()=>{pending=null;lastNotice="ยกเลิกการนำเข้าชุดนี้แล้ว";await renderDashboard();});
+      protect(document.getElementById("cert-ledger-cancel"),async()=>{pending=null;lastNotice="ยกเลิกการตรวจตัวอย่างแล้ว แต่เลขชุดนี้ยังคงถูกจองไว้";await renderDashboard();});
       document.getElementById("cert-ledger-file")?.addEventListener("change",async event=>{
         const file=event.currentTarget.files?.[0];if(!file)return;
         try{await parseFile(file);}catch(error){const message=error?.message||String(error);toast("ตรวจ Excel ไม่ผ่าน",message,"error");pending=null;lastNotice="ไม่สามารถนำเข้า: "+message;await renderDashboard();}
