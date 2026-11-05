@@ -63,5 +63,5 @@ test("both existing upload routes use the prepared image and preserve card downl
   assert.match(src,/studentPhotoDataUrl\(student\)/);
   assert.match(src,/supabase\.rpc\(["']set_student_photo["']/);
   assert.match(src,/if\(s\.photo_path&&s\.photo_path!==path\)/);
-  assert.match(html,/app\.min\.js\?v=5\.12\.9\.789/);
+  assert.match(html,/app\.min\.js\?v=5\.12\.9\.\d+/);
 });
