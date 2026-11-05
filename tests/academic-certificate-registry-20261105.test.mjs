@@ -52,5 +52,5 @@ test("certificate ledger keeps original five Excel headers and blocks inline num
 test("source Excel-date corruption is intentionally recovered only for matching year and first day",()=>{
   assert.match(moduleText,/Date\.UTC\(1899,11,30\)/);
   assert.match(moduleText,/date\.getUTCDate\(\)===1/);
-  assert.match(moduleText,/NUMBER_SEQUENCE_INVALID|เลขคุมต้องต่อเนื่อง/);
+  assert.match(moduleText,/NUMBER_SEQUENCE_INVALID|ต้องเป็นเลข/);
 });
