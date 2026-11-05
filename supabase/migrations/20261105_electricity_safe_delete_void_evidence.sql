@@ -139,6 +139,7 @@ as $fn$
    );
 $fn$;
 revoke all on function private.electricity_can_delete_removed_slip(text) from public, anon;
+grant execute on function private.electricity_can_delete_removed_slip(text) to authenticated;
 
 drop policy if exists electricity_removed_evidence_read on storage.objects;
 create policy electricity_removed_evidence_read on storage.objects
@@ -157,3 +158,58 @@ grant execute on function public.electricity_delete_meter(uuid,text) to authenti
 grant execute on function public.electricity_delete_bill(uuid,text) to authenticated;
 grant execute on function public.electricity_void_bill(uuid,text) to authenticated;
 grant execute on function public.electricity_remove_payment_evidence(uuid,text) to authenticated;
+
+-- A manager can reissue a voided bill for the same month; the old version stays in the audit.
+CREATE OR REPLACE FUNCTION public.electricity_submit_reading(p_meter_id uuid, p_period_id uuid, p_current numeric, p_photo_path text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE v_meter public.electricity_meters%ROWTYPE;v_period public.electricity_periods%ROWTYPE;
+ v_prev numeric(12,2);v_new numeric(12,2);v_id uuid;v_status text;v_payer_name text;
+BEGIN
+ IF NOT (SELECT private.is_active_user()) THEN RAISE EXCEPTION 'Not authorized'; END IF;
+ SELECT * INTO v_meter FROM public.electricity_meters WHERE id=p_meter_id FOR UPDATE;
+ IF NOT FOUND OR NOT v_meter.is_active THEN RAISE EXCEPTION 'Meter not active'; END IF;
+ IF NOT ((SELECT private.electricity_is_manager()) OR v_meter.occupant_user_id=(SELECT auth.uid())) THEN RAISE EXCEPTION 'Not your meter'; END IF;
+ SELECT * INTO v_period FROM public.electricity_periods WHERE id=p_period_id;
+ IF NOT FOUND OR v_period.status<>'open' THEN RAISE EXCEPTION 'Billing month is not open'; END IF;
+ PERFORM private.electricity_check_uploaded(p_photo_path);
+ -- Lock all readings for a meter to serialize monthly submissions.
+ SELECT r.current_reading INTO v_prev FROM public.electricity_readings r
+ JOIN public.electricity_periods p ON p.id=r.period_id
+ WHERE r.meter_id=p_meter_id AND p.billing_month<v_period.billing_month
+ AND r.status IN ('awaiting_payment','payment_submitted','payment_rejected','paid')
+ ORDER BY p.billing_month DESC LIMIT 1;
+ v_prev:=coalesce(v_prev,v_meter.opening_reading);
+ IF EXISTS(SELECT 1 FROM public.electricity_readings r JOIN public.electricity_periods p ON p.id=r.period_id
+ WHERE r.meter_id=p_meter_id AND p.billing_month<v_period.billing_month
+ AND r.status='reading_submitted') THEN RAISE EXCEPTION 'An earlier reading is pending verification'; END IF;
+ IF EXISTS(SELECT 1 FROM public.electricity_readings r JOIN public.electricity_periods p ON p.id=r.period_id
+ WHERE r.meter_id=p_meter_id AND p.billing_month>v_period.billing_month
+ AND r.status IN ('awaiting_payment','payment_submitted','payment_rejected','paid'))
+ THEN RAISE EXCEPTION 'Later verified readings already exist'; END IF;
+ IF p_current IS NULL OR p_current<v_prev OR p_current>9999999999.99 OR p_current-v_prev>1000000 THEN
+ RAISE EXCEPTION 'Meter reading must be >= previous reading, and use cannot exceed 1,000,000 units'; END IF;
+ v_new:=round(p_current,2);
+ SELECT status INTO v_status FROM public.electricity_readings WHERE meter_id=p_meter_id AND period_id=p_period_id FOR UPDATE;
+ IF v_status IS NOT NULL AND v_status NOT IN ('reading_submitted','reading_rejected','voided') THEN
+ RAISE EXCEPTION 'Reading already approved; cannot change'; END IF;
+ SELECT coalesce(nullif(full_name,''),email,'บุคลากร') INTO v_payer_name FROM public.profiles WHERE id=v_meter.occupant_user_id;
+ INSERT INTO public.electricity_readings(meter_id,period_id,payer_user_id,payer_name_snapshot,
+ house_label_snapshot,meter_code_snapshot,previous_reading,current_reading,used_units,unit_rate,amount_due,meter_photo_path,
+ status,created_by)
+ VALUES(v_meter.id,v_period.id,v_meter.occupant_user_id,coalesce(v_payer_name,nullif(v_meter.occupant_name,''),'ผู้พักอาศัย'),
+ v_meter.house_label,v_meter.meter_code,v_prev,v_new,v_new-v_prev,v_period.unit_rate,
+ round((v_new-v_prev)*v_period.unit_rate,2),p_photo_path,'reading_submitted',(SELECT auth.uid()))
+ ON CONFLICT(meter_id,period_id) DO UPDATE SET previous_reading=excluded.previous_reading,
+ current_reading=excluded.current_reading,used_units=excluded.used_units,unit_rate=excluded.unit_rate,
+ amount_due=excluded.amount_due,meter_photo_path=excluded.meter_photo_path,status='reading_submitted',
+ payment_slip_path=NULL,payment_reviewed_by=NULL,payment_reviewed_at=NULL,paid_at=NULL,receipt_no=NULL,receipt_issued_at=NULL,
+ reading_reviewed_at=NULL,reading_reviewed_by=NULL,review_note='',updated_at=now()
+ RETURNING id INTO v_id;
+ PERFORM private.electricity_log(v_id,'reading_submitted','');
+ RETURN v_id;
+END;$function$
+;
