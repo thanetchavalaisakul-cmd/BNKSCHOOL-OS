@@ -116,7 +116,7 @@ async function loadAcademicFormsFeature(){
 let bnkAcademicCertificateRegistryPromise=null;
 let academicCertificateRegistryFeature=null;
 async function loadAcademicCertificateRegistryFeature(){
-  bnkAcademicCertificateRegistryPromise??=import("./modules/academic-certificate-registry.js?v=20261105.1")
+  bnkAcademicCertificateRegistryPromise??=import("./modules/academic-certificate-registry.js?v=20261105.reserve1?v=20261105.1")
     .then(mod=>{
       academicCertificateRegistryFeature=mod.createAcademicCertificateRegistryFeature({supabase,state,escapeHtml,ensureXlsx,downloadBlob,toast,renderDashboard});
       return academicCertificateRegistryFeature;
