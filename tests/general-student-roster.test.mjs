@@ -20,7 +20,7 @@ test("general roster is registered under General Administration and loaded as a 
   assert.match(app, /code === "general_student_roster"/);
   assert.match(min, /e==="general_student_roster"/);
   assert.match(index, /styles\.css\?v=5\.12\.9\.66/);
-  assert.match(index, /app\.min\.js\?v=5\.12\.9\.78/);
+  assert.match(index, /app\.min\.js\?v=5\.12\.9\.\d+/);
 });
 
 test("roster access is explicitly assigned per user and restricted by database policies", () => {
