@@ -7225,12 +7225,13 @@ async function substituteAllDayPdfPreview(dayId) {
   ]);
   if(signersRes.error)return toast("เตรียมชื่อผู้ลงนามไม่ได้",signersRes.error.message,"error");
   // Preserve the same header, table and signers as the per-period document.
+  // The accepted substitute_day: signature is still mirrored across lesson and duty rows.
   // Only the already-approved leave may supply a director image in this mode.
   const documentImages=wholeDayDocumentImages(images,rows,day);
   if(!linkedDirector.data?.linked)documentImages.director=null;
   const signers=signersRes.data?.[0]||{};
-  const approvedDirector={signer_name:linkedDirector.data?.signer_name||signers.director_name};
-  const body=buildSubstituteDocument(rows,signers,schoolLogo,approvedDirector,documentImages);
+  const directorSignature={signer_name:linkedDirector.data?.signer_name||signers.director_name};
+  const body=buildSubstituteDocument(rows,signers,schoolLogo,directorSignature,documentImages);
   const signStatus=day.status==="accepted"
     ?(day.signature_method==="paper"?"ตอบรับแล้ว · รอลายเซ็นจริงบนกระดาษ":"ตอบรับพร้อมลงลายเซ็นครบทุกคาบแล้ว")
     :"รอครูผู้รับมอบหมายตอบรับและเลือกวิธีลงลายเซ็น";
