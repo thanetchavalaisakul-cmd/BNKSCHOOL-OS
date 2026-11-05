@@ -19,7 +19,7 @@ test('all-day renders the original signer without second director auto-sign',()=
  assert.doesNotMatch(wholeDay,/centralAutoSignatureAsset\("substitute_teaching"/);
  assert.match(wholeDay,/signer_name:linkedDirector\.data\?\.signer_name/);
  assert.match(wholeDay,/if\(!linkedDirector\.data\?\.linked\)documentImages\.director=null/);
- assert.match(wholeDay,/buildSubstituteDocument\(rows,signers,schoolLogo,approvedDirector,documentImages\)/);
+ assert.match(wholeDay,/buildSubstituteDocument\(rows,signers,schoolLogo,directorSignature,documentImages\)/);
 });
 test('existing per-period PDF signing flow stays unchanged',()=>{
  assert.match(byPeriod,/centralAutoSignatureAsset\("substitute_teaching",leaveRequestId\)/);
