@@ -113,6 +113,17 @@ async function loadAcademicFormsFeature(){
 }
 
 
+let bnkAcademicCertificateRegistryPromise=null;
+let academicCertificateRegistryFeature=null;
+async function loadAcademicCertificateRegistryFeature(){
+  bnkAcademicCertificateRegistryPromise??=import("./modules/academic-certificate-registry.js?v=20261105.1")
+    .then(mod=>{
+      academicCertificateRegistryFeature=mod.createAcademicCertificateRegistryFeature({supabase,state,escapeHtml,ensureXlsx,downloadBlob,toast,renderDashboard});
+      return academicCertificateRegistryFeature;
+    }).catch(error=>{bnkAcademicCertificateRegistryPromise=null;throw error;});
+  return bnkAcademicCertificateRegistryPromise;
+}
+
 let bnkSchoolLunchDialogsFeaturePromise=null;
 async function loadSchoolLunchDialogsFeature(){
  bnkSchoolLunchDialogsFeaturePromise??=import("./modules/school-lunch-dialogs.js?v=5.12.9.58").then(mod=>mod.createSchoolLunchDialogsFeature({buttonLoading,escapeHtml,loadSchoolLunchWorkspace,money,renderDashboard,schoolLunchCentralControlAvailable,schoolLunchCentralControlById,schoolLunchCentralControlLabel,schoolLunchCentralControlOptions,schoolLunchCentralControls,schoolLunchDayRowHtml,schoolLunchDaysFor,schoolLunchRoundDefaultDates,schoolLunchSetting,schoolLunchSettingDefaults,schoolLunchWeekdaysBetween,state,supabase,toast})).catch(error=>{bnkSchoolLunchDialogsFeaturePromise=null;throw error;});
@@ -1537,6 +1548,14 @@ async function renderDashboard() {
   if (state.currentView === "module:exam_management") {
     await loadExamWorkspace();
   }
+  if (state.currentView === "module:academic_certificate_registry") {
+    try {
+      await loadAcademicCertificateRegistryFeature();
+      await academicCertificateRegistryFeature.load();
+    } catch(error) {
+      console.error("Certificate registry load failed",error);
+    }
+  }
   if (state.currentView === "module:learning_sources") {
     await loadLearningSourceWorkspace();
   }
@@ -1651,6 +1670,7 @@ async function renderDashboard() {
   enhanceResponsiveTables(document);
   await bindDashboardEvents();
   if(state.currentView==="module:general_student_roster"&&generalStudentRosterFeature)await generalStudentRosterFeature.bind();
+  if(state.currentView==="module:academic_certificate_registry"&&academicCertificateRegistryFeature)await academicCertificateRegistryFeature.bind();
 }
 
 function pageTitle() {
@@ -2031,7 +2051,7 @@ function dashboardModuleIcon(code){
   const icons={
     official_attendance:"◷",personnel_pa:"PA",leave_management:"L",personnel_records:"ID",
     project_management:"฿",procurement_document_control:"#",procurement_documents:"PO",school_lunch_documents:"LM",housing_electricity:"⚡",
-    academic_submissions:"✓",academic_registration:"REG",lesson_plans:"LP",exam_management:"EX",
+    academic_submissions:"✓",academic_registration:"REG",academic_certificate_registry:"CERT",lesson_plans:"LP",exam_management:"EX",
     timetable_management:"TT",substitute_teaching:"ST",home_visit_management:"HV",student_registry:"SR",student_cards:"ID"
   };
   return icons[code]||"▦";
@@ -14011,6 +14031,7 @@ function moduleView(code) {
   if (code === "academic_registration") return academicRegistrationWorkspaceHtml(module);
   if (code === "academic_submissions") return academicSubmissionWorkspaceHtml(module);
   if (code === "exam_management") return examWorkspaceHtml(module);
+  if (code === "academic_certificate_registry") return academicCertificateRegistryFeature ? academicCertificateRegistryFeature.view(module) : '<section class="panel"><div class="empty"><strong>กำลังโหลดระบบเลขคุมเกียรติบัตร</strong></div></section>';
   if (code === "learning_sources") return learningSourceWorkspaceHtml(module);
   if (code === "student_followup") return studentFollowupWorkspaceHtml(module);
   if (code === "procurement_document_control") return procurementControlWorkspaceHtml(module);
