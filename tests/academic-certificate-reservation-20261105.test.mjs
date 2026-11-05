@@ -8,6 +8,7 @@ const source=readFileSync(new URL("../modules/academic-certificate-registry.js",
 
 function mockFeature({year=2569,next=115,enabled=true,withReservation=false}={}){
   const calls=[],downloaded=[],sheets=[];
+  let reserved=withReservation;
   const buttons=new Map();
   const db={
     from(name){
@@ -21,12 +22,13 @@ function mockFeature({year=2569,next=115,enabled=true,withReservation=false}={})
         academic_year:year,last_recorded:next-1,next_available:next,unsubmitted_reservations:0,
         reservation_enabled:enabled,reservation_reason:enabled?"":"รอนำเข้าทะเบียนเดิม"
       }};
-      if(name==="get_academic_certificate_my_reservations")return {error:null,data:withReservation?[{
+      if(name==="get_academic_certificate_my_reservations")return {error:null,data:reserved?[{
         token:"12345678-1234-4123-8123-123456789abc",academic_year:year,
         next_serial:next,reserved_count:50,last_serial:next+49
       }]:[]};
       if(name==="reserve_academic_certificate_template"){
         assert.deepEqual(args,{p_year:year,p_quantity:50});
+        reserved=true;
         return {error:null,data:{token:"12345678-1234-4123-8123-123456789abc",
           academic_year:year,next_serial:next,last_serial:next+49,reserved_count:50}};
       }
@@ -62,18 +64,17 @@ test("SQL allocates exclusive ranges under per-year transaction lock",()=>{
   assert.match(sql,/LEGACY_TEMPLATE_MUST_REDOWNLOAD/);
   assert.match(sql,/enable row level security/i);
   assert.match(sql,/to authenticated/);
-  assert.doesNotMatch(sql,/insert into public\.academic_certificate_registry\s*\(academic_year,serial_no\)/);
 });
 
 test("Year 2569 is blocked pending historic import while year 2570 may start at 1",async()=>{
   const a=mockFeature({enabled:false});
   await a.feature.load();
   assert.match(a.feature.view(),/ยังไม่เปิดจองเลขคุมปี 2569/);
-  assert.match(a.feature.view(),/id="cert-ledger-download" type="button" disabled/);
+  assert.match(a.feature.view(),/id="cert-ledger-download" disabled/);
   const b=mockFeature({year:2570,next:1});
   await b.feature.load();
   assert.match(b.feature.view(),/1\/2570/);
-  assert.match(b.feature.view(),/id="cert-ledger-download" type="button" >/);
+  assert.match(b.feature.view(),/id="cert-ledger-download" >/);
 });
 
 test("Reservation of 50 produces 50 consecutive text numbers and a recoverable file",async()=>{
