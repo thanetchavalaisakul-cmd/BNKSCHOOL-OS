@@ -6292,3 +6292,37 @@ body.procurement-master-open{overflow:hidden!important}
 .academic-certificate-result-page {
   padding-top:38.1mm!important;
 }
+
+/* Academic certificate registry — five-column annual ledger */
+.cert-ledger{max-width:100%;overflow:hidden}
+.cert-ledger .cert-toolbar{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin:12px 0 16px}
+.cert-ledger .cert-year-field{display:grid;gap:5px;font-size:13px;font-weight:700}
+.cert-ledger .cert-year-field input{width:130px}
+.cert-ledger .cert-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:12px 0 20px}
+.cert-ledger .cert-stats>div{padding:15px 16px;border:1px solid #dbe4ec;border-radius:12px;background:#f8fafc;min-width:0}
+.cert-ledger .cert-stats span{display:block;font-size:12px;color:#64748b}
+.cert-ledger .cert-stats strong{display:block;font-size:20px;color:#1e3a5f;margin-top:5px;overflow-wrap:anywhere}
+.cert-ledger .cert-upload-flow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 18px}
+.cert-ledger .cert-flow-card{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px;border:1px solid #cbd5e1;background:#fff;border-radius:12px}
+.cert-ledger .cert-flow-card>strong{font-size:16px;color:#0f3556}
+.cert-ledger .cert-flow-card p,.cert-ledger .cert-flow-card small{margin:0;color:#64748b;font-size:13px}
+.cert-ledger .cert-flow-card input[type=file]{max-width:100%;font-size:13px}
+.cert-ledger .cert-notice{padding:12px 15px;margin:14px 0;background:#e8f5f0;border-radius:10px;color:#075e42;overflow-wrap:anywhere}
+.cert-ledger .cert-error{padding:12px 15px;margin:14px 0;background:#fff0f0;border-radius:10px;color:#9b1c1c}
+.cert-ledger .cert-preview{margin:18px 0;padding:16px;border:1px solid #93c5fd;border-radius:12px;background:#f8fbff}
+.cert-ledger .cert-preview h4{margin:0 0 8px}
+.cert-ledger .cert-warning{margin:12px 0;padding:12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;color:#9a3412}
+.cert-ledger .cert-warning ul{margin:8px 0 0;padding-left:24px;max-height:150px;overflow:auto}
+.cert-ledger .cert-preview-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.cert-ledger .cert-list-header{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin:20px 0 8px}
+.cert-ledger .cert-list-header h4{margin:0 0 5px}
+.cert-ledger .cert-list-header small{color:#64748b}
+.cert-ledger .cert-list-header label{display:grid;gap:5px;font-size:13px}
+.cert-ledger .cert-list-header input{min-width:220px}
+.cert-ledger .cert-table-scroll{max-width:100%;overflow:auto;-webkit-overflow-scrolling:touch}
+.cert-ledger .cert-table{width:100%;min-width:750px;border-collapse:collapse}
+.cert-ledger .cert-table th,.cert-ledger .cert-table td{padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top;white-space:normal}
+.cert-ledger .cert-table th{white-space:nowrap;background:#edf4fa}
+.cert-ledger .cert-table td:first-child{white-space:nowrap}
+.cert-ledger .cert-count{margin-top:9px;color:#64748b;font-size:13px}
+@media(max-width:760px){.cert-ledger .cert-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.cert-ledger .cert-upload-flow{grid-template-columns:1fr}.cert-ledger .cert-list-header input{min-width:0;width:100%}}

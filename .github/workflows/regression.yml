@@ -19,3 +19,7 @@ jobs:
         run: node --check app.js
       - name: Local regression tests
         run: node --test tests/performance-regression.test.mjs
+      - name: Academic certificate registry checks
+        run: |
+          node --check modules/academic-certificate-registry.js
+          node --test tests/academic-certificate-registry-20261105.test.mjs
