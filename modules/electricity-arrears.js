@@ -53,7 +53,7 @@ export function renderElectricityCarryoverHtml({period,balance,isManager,formatM
       <div class="el-stat"><span>ยอดค้างชำระรวม</span><strong>${formatMoney(totalOutstanding)}</strong><small>บาท · เฉพาะรายการที่ยังไม่ยืนยันรับเงิน</small></div>
     </section>
     <p class="helper">${currentNote}${waitingForConfirmation?` · อยู่ระหว่างตรวจสลิป ${formatMoney(waitingForConfirmation)} บาท (ไม่ต้องโอนซ้ำ)`:''}</p>
-    <div class="el-section-head"><div><h3>รายการค้างชำระก่อนหน้า</h3><p>หากยังไม่ชำระเดือนก่อน สามารถแนบสลิปของบิลเดือนนั้นได้โดยตรง</p></div></div>
+    <div class="el-section-head"><div><h3>รายการค้างชำระก่อนหน้า</h3><p>${previousRows.some(r=>r.status==='awaiting_payment'||r.status==='payment_rejected')?'หากยังไม่ชำระเดือนก่อน สามารถแนบสลิปของบิลเดือนนั้นได้โดยตรง':previousRows.length?'รายการที่ส่งสลิปแล้วอยู่ระหว่างตรวจรับเงิน ไม่จำเป็นต้องชำระซ้ำ':'ไม่มีรายการค้างชำระก่อนหน้า'}</p></div></div>
     ${previousDetails}
   </section>`;
 }
