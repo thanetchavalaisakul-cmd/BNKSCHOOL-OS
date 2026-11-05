@@ -7212,19 +7212,25 @@ async function substituteAllDayPdfPreview(dayId) {
   const lessons=substituteRowsForBatch(day.leave_request_id,day.leave_date);
   const leave=(state.leaveRequests||[]).find(r=>r.id===day.leave_request_id)||null;
   const rows=wholeDayDocumentRows(periods,lessons,day,leave);
-  const [images,schoolLogo,signersRes,directorSignature]=await Promise.all([
+  // The director already approved the linked leave. Reuse that exact approval
+  // signature (or its paper-signing choice); do not request a second signature.
+  const linkedDirector=await supabase.rpc("link_leave_director_signature_to_substitute_day",{
+    p_day_assignment_id:day.id
+  });
+  if(linkedDirector.error)return toast("เชื่อมลายเซ็น ผอ. ไม่สำเร็จ",linkedDirector.error.message,"error");
+  const [images,schoolLogo,signersRes]=await Promise.all([
     schoolDocumentSignatureImages(supabase,"substitute",day.leave_request_id,day.leave_date,toast),
     schoolLogoDataUrl(),
-    supabase.rpc("get_substitute_document_signers",{p_leave_request_id:day.leave_request_id}),
-    centralAutoSignatureAsset("substitute_teaching",day.leave_request_id)
+    supabase.rpc("get_substitute_document_signers",{p_leave_request_id:day.leave_request_id})
   ]);
   if(signersRes.error)return toast("เตรียมชื่อผู้ลงนามไม่ได้",signersRes.error.message,"error");
-  // Keep every original header/table/signer/PDF style from the per-period document.
-  // The one accepted teacher signature is shown on EVERY period, including duty-only periods.
-  // The confirmed substitute_day: slot is mirrored into each real lesson and duty-only PDF row.
+  // Preserve the same header, table and signers as the per-period document.
+  // Only the already-approved leave may supply a director image in this mode.
   const documentImages=wholeDayDocumentImages(images,rows,day);
+  if(!linkedDirector.data?.linked)documentImages.director=null;
   const signers=signersRes.data?.[0]||{};
-  const body=buildSubstituteDocument(rows,signers,schoolLogo,directorSignature,documentImages);
+  const approvedDirector={signer_name:linkedDirector.data?.signer_name||signers.director_name};
+  const body=buildSubstituteDocument(rows,signers,schoolLogo,approvedDirector,documentImages);
   const signStatus=day.status==="accepted"
     ?(day.signature_method==="paper"?"ตอบรับแล้ว · รอลายเซ็นจริงบนกระดาษ":"ตอบรับพร้อมลงลายเซ็นครบทุกคาบแล้ว")
     :"รอครูผู้รับมอบหมายตอบรับและเลือกวิธีลงลายเซ็น";
