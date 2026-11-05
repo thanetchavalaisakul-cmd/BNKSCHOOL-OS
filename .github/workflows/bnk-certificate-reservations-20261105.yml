@@ -32,6 +32,8 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Update certificate lazy import and entry asset version
+        run: python3 changes/certificate-reservation-cache-20261105.py
       - name: Verify entire BNK OS test suite and optimized bundle
         run: |
           npm ci --no-audit --no-fund
@@ -43,7 +45,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app.min.js
+          git add app.js app.min.js index.html
           if ! git diff --cached --quiet; then
             git commit -m "build(certificates): refresh verified static bundle [certificate-reservation-built]"
             git push origin HEAD:feature/certificate-reservation-quantity-20261105
