@@ -6326,3 +6326,10 @@ body.procurement-master-open{overflow:hidden!important}
 .cert-ledger .cert-table td:first-child{white-space:nowrap}
 .cert-ledger .cert-count{margin-top:9px;color:#64748b;font-size:13px}
 @media(max-width:760px){.cert-ledger .cert-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.cert-ledger .cert-upload-flow{grid-template-columns:1fr}.cert-ledger .cert-list-header input{min-width:0;width:100%}}
+
+/* ปพ.7 (2026-11-06): keep the entire date of birth together. If the citizen ID uses
+   the remaining line width, move the whole birth date to the next line, never the year alone. */
+.academic-certificate-result-page .cert-result-body-block .cert-result-birth-date{
+  display:inline-block!important;
+  white-space:nowrap!important;
+}
