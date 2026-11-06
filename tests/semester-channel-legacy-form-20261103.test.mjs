@@ -41,9 +41,9 @@ test("unmarked legacy semester form obeys database Drive-only policy",async()=>{
   globalThis.MutationObserver=class{observe(){}};
   const state={profile:{role:"teacher"},departments:[],lessonPlanMode:"semester",lessonDetail:null,lessonPlans:[]};
   const supabase={from(table){
-    assert.equal(table,"semester_lesson_plan_submission_settings");
+    assert.ok(["semester_lesson_plan_submission_settings","academic_terms"].includes(table));
     return {select(){return this;},eq(){return this;},
-      async maybeSingle(){return{data:{submission_mode:"drive_only"},error:null};}};
+      async maybeSingle(){return{data:table==="academic_terms"?{academic_year:"2569",semester:2,is_current:true}:{submission_mode:"drive_only"},error:null};}};
   }};
   try{
     installSemesterLessonChannelControls({state,supabase});

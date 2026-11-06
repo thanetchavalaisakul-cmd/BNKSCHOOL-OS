@@ -38,9 +38,9 @@ test("an idle semester tab can open settings again without the legacy loading ha
   globalThis.MutationObserver=class{observe(){}};
   const state={profile:{role:"super_admin"},departments:[],lessonPlanMode:"semester",
     academicTerms:[{academic_year:"2569",semester:2,is_current:true}],lessonPlans:[]};
-  const supabase={from(){return{
+  const supabase={from(table){return{
     select(){return this;},eq(){return this;},
-    async maybeSingle(){return{data:{submission_mode:"drive_only"},error:null};}
+    async maybeSingle(){return{data:table==="academic_terms"?{academic_year:"2569",semester:2,is_current:true}:{submission_mode:"drive_only"},error:null};}
   };}};
   try{
     installSemesterLessonChannelControls({state,supabase});

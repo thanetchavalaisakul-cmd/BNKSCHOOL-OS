@@ -1,7 +1,7 @@
 // Semester lesson-plan submission channels. Installed independently so that weekly
 // lesson plans, old attachments, signature workflows and approvals stay unchanged.
 let activeSemesterChannelController=null;
-export function installSemesterLessonChannelControls({state,supabase}){
+export function installSemesterLessonChannelControls({state,supabase,renderDashboard}){
   if(activeSemesterChannelController)return activeSemesterChannelController;
 
   const table="semester_lesson_plan_submission_settings";
@@ -23,6 +23,8 @@ export function installSemesterLessonChannelControls({state,supabase}){
   async function getMode(year,semester,force=false){
     if(!isValidPeriod(year,semester))throw new Error("กรุณาระบุปีการศึกษาและภาคเรียนที่ถูกต้อง");
     const k=key(year,semester);
+    // Every second semester is Google Drive only, even if an older setting says otherwise.
+    if(Number(semester)===2){cache.set(k,"drive_only");return "drive_only";}
     if(!force&&cache.has(k))return cache.get(k);
     const {data,error}=await supabase.from(table).select("submission_mode")
       .eq("academic_year",String(year).trim()).eq("semester",Number(semester)).maybeSingle();
@@ -44,10 +46,20 @@ export function installSemesterLessonChannelControls({state,supabase}){
   }
 
   function periodDefault(){
-    const term=(state.academicTerms||[]).find(t=>t.is_current)||
-      (state.academicTerms||[]).find(t=>String(t.academic_year)==="2569")||null;
-    const year=String(term?.academic_year||state.lessonPlans?.find(p=>p.plan_type==="semester")?.academic_year||new Date().getFullYear()+543);
-    return {year,semester:Number(term?.semester||1)};
+    const term=(state.academicTerms||[]).find(t=>t.is_current);
+    return term?{year:String(term.academic_year),semester:Number(term.semester)}:{year:"",semester:0};
+  }
+
+  // Always re-read the school-wide period so tabs left open by teachers are not stale.
+  async function refreshGlobalPeriod(){
+    const {data,error}=await supabase.from("academic_terms")
+      .select("academic_year,semester,is_current").eq("is_current",true).maybeSingle();
+    if(error)throw error;
+    if(!data?.academic_year||!data?.semester)throw new Error("ระบบหลักยังไม่ได้กำหนดปีการศึกษาและภาคเรียนปัจจุบัน");
+    const old=(state.academicTerms||[]).filter(t=>String(t.academic_year)!==String(data.academic_year)||Number(t.semester)!==Number(data.semester))
+      .map(t=>({...t,is_current:false}));
+    state.academicTerms=[...old,{...data,is_current:true}];
+    return periodDefault();
   }
 
   function stylesheet(){
@@ -70,6 +82,8 @@ export function installSemesterLessonChannelControls({state,supabase}){
       .semester-channel-note{font-size:13px;line-height:1.55;color:#37557a;background:#f1f6ff;border-radius:10px;padding:10px 12px;margin:8px 0}
       .semester-channel-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;flex-wrap:wrap}
       .semester-channel-form-hint{padding:9px 12px;border-radius:10px;border:1px solid #d9e4f3;background:#f4f8ff;color:#29456c;margin:10px 0}
+      .semester-period-display{display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:12px 14px;border:1px solid #d9e4f3;border-radius:12px;background:#f4f8ff;margin:0 0 16px}
+      .semester-period-display span{font-size:14px;color:#334155}.semester-period-display strong{font-size:18px;color:#17223b}.semester-period-display small{width:100%;font-size:12px;color:#64748b}
       .semester-channel-modal .modal-close{position:static}
       @media(max-width:520px){.semester-channel-grid{grid-template-columns:1fr 1fr}.semester-channel-actions .btn{flex:1}}
     `;
@@ -84,16 +98,19 @@ export function installSemesterLessonChannelControls({state,supabase}){
     }
     stylesheet();
     const fallback=periodDefault();
+    if(!fallback.year||!fallback.semester){window.alert("กรุณากำหนดปีการศึกษาและภาคเรียนปัจจุบันจากระบบหลักก่อน");return;}
     const modal=document.createElement("div");
     modal.className="modal-backdrop";
     modal.innerHTML=`<div class="modal semester-channel-modal">
       <div class="modal-head"><div><h3>กำหนดช่องทางส่งแผนรายภาคเรียน</h3>
-        <p>หัวหน้าวิชาการและแอดมินหลักกำหนดได้แยกตามปีการศึกษาและภาคเรียน โดยไม่ลบเอกสารที่เคยส่ง</p></div>
+        <p>ใช้ปีการศึกษาและภาคเรียนปัจจุบันจากระบบหลักโดยอัตโนมัติ ไม่ต้องเลือกภาคเรียนซ้ำ</p></div>
         <button type="button" class="modal-close" aria-label="ปิด">×</button></div>
-      <div class="semester-channel-grid">
-        <label>ปีการศึกษา<input class="input" id="semester-channel-year" inputmode="numeric" maxlength="4" value="${esc(fallback.year)}"></label>
-        <label>ภาคเรียน<select class="select" id="semester-channel-term">
-          ${[1,2,3].map(n=>`<option value="${n}" ${n===fallback.semester?"selected":""}>${n}</option>`).join("")}</select></label>
+      <div class="semester-period-display" aria-live="polite">
+        <span>ปีการศึกษา <strong id="semester-channel-year-label">${esc(fallback.year)}</strong></span>
+        <span>ภาคเรียนที่ <strong id="semester-channel-term-label">${esc(fallback.semester)}</strong></span>
+        <small>อ้างอิงค่าจากระบบหลัก — ไม่สามารถเปลี่ยนปี/ภาคเรียนจากหน้าส่งแผนได้</small>
+        <input type="hidden" id="semester-channel-year" value="${esc(fallback.year)}">
+        <input type="hidden" id="semester-channel-term" value="${esc(fallback.semester)}">
       </div>
       <div id="semester-channel-options">
         <label class="semester-channel-option"><input type="radio" name="semester-channel-mode" value="drive_only">
@@ -103,7 +120,7 @@ export function installSemesterLessonChannelControls({state,supabase}){
         <label class="semester-channel-option"><input type="radio" name="semester-channel-mode" value="both">
           <span><strong>เปิดทั้งสองช่องทาง</strong><small>ครูเลือกส่ง PDF หรือ Google Drive ได้อย่างใดอย่างหนึ่ง หรือแนบเพิ่มภายหลัง</small></span></label>
       </div>
-      <div class="semester-channel-note">การตั้งค่านี้ใช้กับแผนรายภาคเรียนเท่านั้น ไม่เปลี่ยนแผนรายสัปดาห์ และไม่ลบ PDF/ลิงก์ที่บันทึกไว้ก่อนหน้า</div>
+      <div class="semester-channel-note">ภาคเรียนที่ 2 บังคับ Google Drive Link เท่านั้นโดยอัตโนมัติ เพื่อไม่ใช้พื้นที่เก็บไฟล์ PDF · ไม่กระทบแผนรายสัปดาห์หรือเอกสารเดิม</div>
       <div class="semester-channel-feedback" hidden></div>
       <div class="semester-channel-actions">
         <button type="button" class="btn btn-secondary" id="semester-channel-cancel">ยกเลิก</button>
@@ -124,11 +141,23 @@ export function installSemesterLessonChannelControls({state,supabase}){
       [...modal.querySelectorAll('[name="semester-channel-mode"]')].forEach(x=>x.disabled=true);
       save.disabled=true;
       try{
+        const period=await refreshGlobalPeriod();
+        if(!modal.isConnected||serial!==n)return;
+        year.value=period.year;term.value=String(period.semester);
+        const yearLabel=modal.querySelector("#semester-channel-year-label");
+        const termLabel=modal.querySelector("#semester-channel-term-label");
+        if(yearLabel)yearLabel.textContent=period.year;
+        if(termLabel)termLabel.textContent=String(period.semester);
         const mode=await getMode(year.value,term.value,true);
         if(!modal.isConnected||serial!==n)return;
         const target=modal.querySelector('[name="semester-channel-mode"][value="'+mode+'"]');
         if(target)target.checked=true;
-        [...modal.querySelectorAll('[name="semester-channel-mode"]')].forEach(x=>x.disabled=false);
+        [...modal.querySelectorAll('[name="semester-channel-mode"]')].forEach(x=>{
+          const locked=Number(term.value)===2&&x.value!=="drive_only";
+          x.disabled=locked;
+          const label=x.closest?.(".semester-channel-option");
+          if(label){label.hidden=locked;label.style.display=locked?"none":"";}
+        });
         save.disabled=false;
       }catch(e){if(modal.isConnected&&serial===n)message("โหลดการตั้งค่าไม่ได้: "+(e.message||e),modal);}
     }
@@ -138,6 +167,7 @@ export function installSemesterLessonChannelControls({state,supabase}){
       if(!isValidPeriod(year.value,term.value))return message("ปีการศึกษาและภาคเรียนไม่ถูกต้อง",modal);
       const mode=modal.querySelector('[name="semester-channel-mode"]:checked')?.value;
       if(!["both","pdf_only","drive_only"].includes(mode))return message("กรุณาเลือกช่องทางส่งแผน",modal);
+      if(Number(term.value)===2&&mode!=="drive_only")return message("ภาคเรียนที่ 2 รับเฉพาะ Google Drive Link เท่านั้น",modal);
       save.disabled=true;
       const payload={academic_year:year.value.trim(),semester:Number(term.value),
         submission_mode:mode,updated_by:state.user.id,updated_at:new Date().toISOString()};
@@ -171,9 +201,9 @@ export function installSemesterLessonChannelControls({state,supabase}){
   async function syncForm(modal,force=false){
     const form=findSemesterForm(modal);
     if(!form)return;
-    const year=form.querySelector('[name="academic_year"]')?.value?.trim();
-    const term=form.querySelector('[name="semester"]')?.value;
-    const expected=key(year,term);
+    let year=form.querySelector('[name="academic_year"]')?.value?.trim();
+    let term=form.querySelector('[name="semester"]')?.value;
+    let expected=key(year,term);
     const hint=modal.querySelector(".semester-channel-form-hint");
     const requestId=String(Number(form.dataset.semesterChannelRequest||"0")+1);
     form.dataset.semesterChannelRequest=requestId;
@@ -184,6 +214,17 @@ export function installSemesterLessonChannelControls({state,supabase}){
       btn.hidden=true;btn.disabled=true;btn.style.display="none";
     });
     try{
+      if(form.dataset.semesterPlanExisting!=="1"){
+        const current=await refreshGlobalPeriod();
+        year=current.year;term=String(current.semester);expected=key(year,term);
+        const yearInput=form.querySelector('[name="academic_year"]'),termInput=form.querySelector('[name="semester"]');
+        if(yearInput)yearInput.value=year;
+        if(termInput)termInput.value=term;
+        const yearLabel=form.querySelector("#semester-period-year-label");
+        const termLabel=form.querySelector("#semester-period-term-label");
+        if(yearLabel)yearLabel.textContent=year;
+        if(termLabel)termLabel.textContent=term;
+      }
       const mode=await getMode(year,term,force);
       if(!form.isConnected||form.dataset.semesterChannelRequest!==requestId||key(form.querySelector('[name="academic_year"]').value,form.querySelector('[name="semester"]').value)!==expected)return;
       form.dataset.semesterChannelPeriod=expected;
@@ -306,7 +347,29 @@ export function installSemesterLessonChannelControls({state,supabase}){
     const form=findSemesterForm(document);
     if(form)void syncForm(form.closest(".modal-backdrop"),true);
     scheduleScan();
+    void refreshVisibleSemesterData();
   }
+
+  // Keep the teacher list/status fresh on long-lived tabs, without closing an edit modal.
+  let lastVisibleRefresh=0,visibleRefreshPending=false;
+  async function refreshVisibleSemesterData(){
+    if(!renderDashboard||visibleRefreshPending||state.currentView!=="module:lesson_plans"||
+       state.lessonPlanMode!=="semester"||document.visibilityState==="hidden"||
+       document.querySelector?.(".modal-backdrop")||Date.now()-lastVisibleRefresh<30000)return;
+    visibleRefreshPending=true;
+    try{
+      await refreshGlobalPeriod();
+      cache.clear();
+      if(state.currentView==="module:lesson_plans"&&!document.querySelector?.(".modal-backdrop"))
+        await renderDashboard();
+      lastVisibleRefresh=Date.now();
+    }catch(error){console.warn("Semester lesson-plan refresh:",error?.message||error);}
+    finally{visibleRefreshPending=false;}
+  }
+  const visibilityTimer=setInterval(()=>{
+    if(document.visibilityState!=="hidden")void refreshVisibleSemesterData();
+  },60000);
+  visibilityTimer.unref?.();
   stylesheet();
   document.addEventListener("click",handleSettingsClick,true);
   document.addEventListener("visibilitychange",resumeSemesterSettings);

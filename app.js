@@ -2812,7 +2812,9 @@ function lessonWorkspaceHtml(module) {
   const roleCopy = academicHead
     ? `ส่ง ${lessonPlanTypeLabel(state.lessonPlanMode)} ของคุณในฐานะครู และตรวจงานของครูคนอื่นในฐานะหัวหน้าวิชาการ`
     : teachingUser
-      ? `สร้าง ${lessonPlanTypeLabel(state.lessonPlanMode)} แนบ PDF หรือ Google Drive และติดตามเฉพาะแผนของคุณ`
+      ? (state.lessonPlanMode==="semester"&&currentAcademicPeriod().semester===2
+          ? `สร้าง ${lessonPlanTypeLabel(state.lessonPlanMode)} ส่งลิงก์ Google Drive และติดตามเฉพาะแผนของคุณ`
+          : `สร้าง ${lessonPlanTypeLabel(state.lessonPlanMode)} แนบ PDF หรือ Google Drive และติดตามเฉพาะแผนของคุณ`)
       : `ดู ${lessonPlanTypeLabel(state.lessonPlanMode)} ที่อยู่ในขอบเขตสิทธิ์และดำเนินการอนุมัติ`;
 
   const reviewerTools = canTrackLessonPlansByTeacher() ? lessonTeacherViewTabs() : "";
@@ -14057,10 +14059,14 @@ function lessonPlanModal(plan = null, requestedType = null) {
   const p = plan || {};
   const type = plan?.plan_type || requestedType || state.lessonPlanMode || "weekly";
   const semesterPlan = type === "semester";
+  const activeLessonPeriod=currentAcademicPeriod();
+  const lessonYear=String(semesterPlan?(plan?.academic_year||activeLessonPeriod.academicYear):(p.academic_year||"2569"));
+  const lessonSemester=Number(semesterPlan?(plan?.semester||activeLessonPeriod.semester):(p.semester||1));
+  const semesterDriveOnly=semesterPlan&&lessonSemester===2;
   const existingFiles = plan && state.lessonDetail?.plan?.id === plan.id ? (state.lessonDetail.files || []) : [];
   const modal = document.createElement("div");
   modal.className = "modal-backdrop";
-  modal.dataset.attachmentMethod = "pdf";
+  modal.dataset.attachmentMethod = semesterDriveOnly?"google_drive":"pdf";
 
   const weeklyFields = `
       <div class="form-row"><div class="field"><label>สัปดาห์ที่</label><input class="input" name="week_number" type="number" min="1" value="${escapeHtml(p.week_number || "")}"></div><div class="field"><label>วันที่ใช้สอน</label><input class="input" name="teach_date" type="date" required value="${escapeHtml(p.teach_date || "")}"></div></div>
@@ -14078,9 +14084,14 @@ function lessonPlanModal(plan = null, requestedType = null) {
       }).join("")}</div>`
     : `<div class="no-file-yet">ยังไม่มีเอกสารแนบในแผนนี้</div>`;
 
-  modal.innerHTML = `<div class="modal modal-wide"><div class="modal-head"><div><span class="form-type-badge">${escapeHtml(lessonPlanTypeLabel(type))}</span><h3>${plan ? `แก้ไข${lessonPlanTypeLabel(type)}` : `สร้าง${lessonPlanTypeLabel(type)}ใหม่`}</h3><p>${semesterPlan ? "กรอกข้อมูลรายวิชา แล้วเลือกแนบ PDF หรือ Google Drive สำหรับแผนทั้งภาคเรียน" : "บันทึกเป็นฉบับร่างก่อนส่งเข้าสู่ Workflow ได้"}</p></div><button class="modal-close">×</button></div>
-    <form id="lesson-form" class="form-grid" data-plan-type="${type}">
-      <div class="form-row"><div class="field"><label>ปีการศึกษา</label><input class="input" name="academic_year" required value="${escapeHtml(p.academic_year || "2569")}"></div><div class="field"><label>ภาคเรียน</label><select class="select" name="semester"><option value="1" ${p.semester==1?'selected':''}>1</option><option value="2" ${p.semester==2?'selected':''}>2</option><option value="3" ${p.semester==3?'selected':''}>3</option></select></div></div>
+  // Semester plan submissions inherit the central academic term; existing records keep their historical term.
+  const semesterPeriodFields=semesterPlan
+    ? `<div class="semester-period-display" aria-live="polite"><span>ปีการศึกษา <strong id="semester-period-year-label">${escapeHtml(lessonYear)}</strong></span><span>ภาคเรียนที่ <strong id="semester-period-term-label">${escapeHtml(String(lessonSemester))}</strong></span><small>${plan?"ข้อมูลภาคเรียนเดิมของแผนนี้":"อ้างอิงปีการศึกษาและภาคเรียนจากระบบหลักโดยอัตโนมัติ"}</small></div><input type="hidden" name="academic_year" value="${escapeHtml(lessonYear)}"><input type="hidden" name="semester" value="${lessonSemester}">`
+    : `<div class="form-row"><div class="field"><label>ปีการศึกษา</label><input class="input" name="academic_year" required value="${escapeHtml(p.academic_year || "2569")}"></div><div class="field"><label>ภาคเรียน</label><select class="select" name="semester"><option value="1" ${p.semester==1?'selected':''}>1</option><option value="2" ${p.semester==2?'selected':''}>2</option><option value="3" ${p.semester==3?'selected':''}>3</option></select></div></div>`;
+
+  modal.innerHTML = `<div class="modal modal-wide"><div class="modal-head"><div><span class="form-type-badge">${escapeHtml(lessonPlanTypeLabel(type))}</span><h3>${plan ? `แก้ไข${lessonPlanTypeLabel(type)}` : `สร้าง${lessonPlanTypeLabel(type)}ใหม่`}</h3><p>${semesterPlan ? (semesterDriveOnly?"กรอกข้อมูลรายวิชาและส่งลิงก์ Google Drive เท่านั้น ไม่ต้องอัปโหลด PDF":"กรอกข้อมูลรายวิชาและแนบเอกสารตามช่องทางที่ฝ่ายวิชาการกำหนด") : "บันทึกเป็นฉบับร่างก่อนส่งเข้าสู่ Workflow ได้"}</p></div><button class="modal-close">×</button></div>
+    <form id="lesson-form" class="form-grid" data-plan-type="${type}" data-semester-plan-existing="${plan?"1":"0"}">
+      ${semesterPeriodFields}
       <div class="form-row"><div class="field"><label>รหัสวิชา</label><input class="input" name="subject_code" ${semesterPlan ? "required" : ""} value="${escapeHtml(p.subject_code || "")}"></div><div class="field"><label>ชื่อวิชา</label><input class="input" name="subject_name" required value="${escapeHtml(p.subject_name || "")}"></div></div>
       <div class="field"><label>ชั้น/ระดับที่สอน</label><input class="input" name="class_level" ${semesterPlan ? "required" : ""} value="${escapeHtml(p.class_level || "")}" placeholder="เช่น ม.2/1"></div>
       ${semesterPlan ? `<div class="semester-form-note"><strong>แผนรายภาคเรียน</strong><span>ไม่ต้องระบุสัปดาห์ วันที่สอน หน่วยการเรียนรู้ เรื่อง จุดประสงค์ เนื้อหา กิจกรรม หรือการวัดผล — รายละเอียดทั้งหมดให้อยู่ในเอกสารที่แนบ</span></div>` : weeklyFields}
@@ -14089,16 +14100,16 @@ function lessonPlanModal(plan = null, requestedType = null) {
         <label>เอกสารแผนการสอน</label>
         ${existingAttachments}
         <div class="attachment-method-tabs">
-          <button type="button" class="attachment-method active" data-attachment-method="pdf"><span>PDF</span><strong>อัปโหลด PDF</strong><small>เก็บใน Supabase</small></button>
-          <button type="button" class="attachment-method" data-attachment-method="google_drive"><span>G</span><strong>Google Drive Link</strong><small>ประหยัด Storage</small></button>
+          <button type="button" class="attachment-method ${semesterDriveOnly?"":"active"}" data-attachment-method="pdf" ${semesterDriveOnly?'hidden disabled style="display:none"':""}><span>PDF</span><strong>อัปโหลด PDF</strong><small>เก็บใน Supabase</small></button>
+          <button type="button" class="attachment-method ${semesterDriveOnly?"active":""}" data-attachment-method="google_drive"><span>G</span><strong>Google Drive Link</strong><small>ประหยัด Storage</small></button>
         </div>
 
-        <div id="attachment-pdf-pane" class="attachment-pane">
+        <div id="attachment-pdf-pane" class="attachment-pane ${semesterDriveOnly?"hidden":""}">
           <label class="upload-zone"><input id="lesson-pdfs" type="file" accept="application/pdf,.pdf" multiple><strong>＋ เลือก PDF เพิ่ม</strong><span>รองรับหลายไฟล์ ไฟล์ละไม่เกิน 20 MB</span></label>
           <div id="selected-pdf-preview" class="selected-file-preview"><span>ยังไม่ได้เลือกไฟล์ใหม่</span></div>
         </div>
 
-        <div id="attachment-drive-pane" class="attachment-pane hidden">
+        <div id="attachment-drive-pane" class="attachment-pane ${semesterDriveOnly?"":"hidden"}">
           <div class="drive-link-box">
             <div class="field"><label>ลิงก์ Google Drive</label><input class="input" id="drive-url" type="url" inputmode="url" placeholder="https://drive.google.com/file/d/..."></div>
             <div class="field"><label>ชื่อเอกสาร <span class="optional">(ไม่บังคับ)</span></label><input class="input" id="drive-label" maxlength="160" placeholder="เช่น แผนการสอนรายภาคเรียน วิชาคณิตศาสตร์"></div>
@@ -14151,11 +14162,22 @@ async function saveLessonPlanFromModal(modal, existing, submitAfter, button) {
   const fd = new FormData(form);
   const type = form.dataset.planType || existing?.plan_type || "weekly";
   const semesterPlan = type === "semester";
+  // The global period must still match at save time, even when a teacher left the modal open.
+  if(semesterPlan&&!existing){
+    const {data:livePeriod,error:periodError}=await supabase.from("academic_terms").select("academic_year,semester").eq("is_current",true).maybeSingle();
+    if(periodError||!livePeriod)return toast("ตรวจสอบภาคเรียนไม่ได้",periodError?.message||"กรุณาโหลดหน้าระบบใหม่","error");
+    if(String(fd.get("academic_year"))!==String(livePeriod.academic_year)||Number(fd.get("semester"))!==Number(livePeriod.semester))
+      return toast("ภาคเรียนมีการเปลี่ยนแปลง","กรุณาเปิดแบบฟอร์มใหม่เพื่อใช้ปีการศึกษาและภาคเรียนปัจจุบัน","error");
+  }
+  const effectiveSubmissionMode=semesterPlan&&Number(fd.get("semester"))===2?"drive_only":(form.dataset.semesterChannelMode||"both");
   const attachmentMethod = modal.dataset.attachmentMethod || "pdf";
   const pdfs = attachmentMethod === "pdf" ? [...modal.querySelector("#lesson-pdfs").files] : [];
   const driveRaw = attachmentMethod === "google_drive" ? modal.querySelector("#drive-url").value : "";
   const driveUrl = driveRaw ? normalizeGoogleDriveUrl(driveRaw) : null;
   const driveLabel = String(modal.querySelector("#drive-label")?.value || "").trim();
+  if(semesterPlan&&((effectiveSubmissionMode==="drive_only"&&attachmentMethod!=="google_drive")||
+      (effectiveSubmissionMode==="pdf_only"&&attachmentMethod!=="pdf")))
+    return toast("ช่องทางส่งแผนไม่ถูกต้อง","กรุณาใช้ช่องทางที่ฝ่ายวิชาการเปิดรับสำหรับภาคเรียนนี้","error");
 
   for (const file of pdfs) {
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) return toast("ไฟล์ไม่ถูกต้อง", "อนุญาตเฉพาะ PDF", "error");
@@ -14168,17 +14190,19 @@ async function saveLessonPlanFromModal(modal, existing, submitAfter, button) {
 
   const existingAttachmentCount =
     existing && state.lessonDetail?.plan?.id === existing.id
-      ? (state.lessonDetail.files?.length || 0)
+      ? (state.lessonDetail.files||[]).filter(f=>!semesterPlan||effectiveSubmissionMode==="both"||
+        (effectiveSubmissionMode==="drive_only"&&f.attachment_type==="google_drive")||
+        (effectiveSubmissionMode==="pdf_only"&&f.attachment_type==="pdf")).length
       : 0;
 
   const newAttachmentCount = pdfs.length + (driveUrl ? 1 : 0);
   if (submitAfter && existingAttachmentCount + newAttachmentCount === 0) {
-    return toast("ยังส่งแผนไม่ได้", "กรุณาแนบ PDF หรือ Google Drive Link อย่างน้อย 1 รายการก่อนส่ง", "error");
+    return toast("ยังส่งแผนไม่ได้", semesterPlan&&effectiveSubmissionMode==="drive_only"?"กรุณาแนบ Google Drive Link อย่างน้อย 1 รายการก่อนส่ง":"กรุณาแนบเอกสารตามช่องทางที่เปิดรับอย่างน้อย 1 รายการก่อนส่ง", "error");
   }
 
   const commonPayload = {
-    academic_year: String(fd.get("academic_year")).trim(),
-    semester: Number(fd.get("semester")),
+    academic_year: semesterPlan&&existing?String(existing.academic_year):String(fd.get("academic_year")).trim(),
+    semester: semesterPlan&&existing?Number(existing.semester):Number(fd.get("semester")),
     subject_code: String(fd.get("subject_code") || "").trim() || null,
     subject_name: String(fd.get("subject_name")).trim(),
     class_level: String(fd.get("class_level") || "").trim() || null,
@@ -15619,8 +15643,8 @@ document.addEventListener("click",async event=>{
   button.disabled=true;
   button.textContent="กำลังเปิดการตั้งค่า...";
   try{
-    const {installSemesterLessonChannelControls}=await import("./modules/semester-lesson-plan-channels.js?v=20261103.3");
-    const controller=installSemesterLessonChannelControls({state,supabase});
+    const {installSemesterLessonChannelControls}=await import("./modules/semester-lesson-plan-channels.js?v=20261106.1");
+    const controller=installSemesterLessonChannelControls({state,supabase,renderDashboard});
     if(typeof controller?.openSettings!=="function")throw new Error("ไม่พบคำสั่งเปิดหน้าต่างตั้งค่า");
     controller.openSettings();
   }catch(error){
@@ -15633,6 +15657,6 @@ document.addEventListener("click",async event=>{
   }
 },true);
 
-void import("./modules/semester-lesson-plan-channels.js?v=20261103.3")
-  .then(({installSemesterLessonChannelControls})=>installSemesterLessonChannelControls({state,supabase}))
+void import("./modules/semester-lesson-plan-channels.js?v=20261106.1")
+  .then(({installSemesterLessonChannelControls})=>installSemesterLessonChannelControls({state,supabase,renderDashboard}))
   .catch(error=>console.error("Semester lesson plan channels:",error));

@@ -44,7 +44,7 @@ test("semester-plan settings button controller opens the modal and saves the cho
     let saved=null;
     const supabase={from(table){return{
       select(){return this;},eq(){return this;},
-      async maybeSingle(){return{data:{submission_mode:"both"},error:null};},
+      async maybeSingle(){return{data:table==="academic_terms"?{academic_year:"2569",semester:2,is_current:true}:{submission_mode:"both"},error:null};},
       async upsert(data){saved={table,data};return{error:null};}
     };}};
     const controller=installSemesterLessonChannelControls({state,supabase});
@@ -54,7 +54,7 @@ test("semester-plan settings button controller opens the modal and saves the cho
     await Promise.resolve();
     await Promise.resolve();
     assert.equal(modal.isConnected,true);
-    assert.equal(radios.find(r=>r.value==="both").checked,true);
+    assert.equal(radios.find(r=>r.value==="drive_only").checked,true);
     for(const r of radios)r.checked=r.value==="drive_only";
     await el("#semester-channel-save").handlers.click();
     assert.equal(saved.table,"semester_lesson_plan_submission_settings");

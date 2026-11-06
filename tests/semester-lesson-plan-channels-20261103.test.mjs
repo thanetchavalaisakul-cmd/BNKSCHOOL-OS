@@ -15,6 +15,7 @@ test("per-term submission policy supports PDF only, Drive only, both with backwa
   assert.match(migration,/COALESCE\(\([\s\S]*?'both'::text\)/);
   assert.match(migration,/ALTER TABLE public\.semester_lesson_plan_submission_settings ENABLE ROW LEVEL SECURITY/);
   assert.match(feature,/getMode\(year,semester,force=false\)/);
+  assert.match(feature,/Number\(semester\)===2/);
   assert.match(feature,/submission_mode:mode/);
 });
 
@@ -55,9 +56,9 @@ test("new settings appear for authorized users and constrain the existing modal 
 });
 
 test("the installed feature is loaded by source and deployed minified entry with new cache key",()=>{
-  assert.match(app,/modules\/semester-lesson-plan-channels\.js\?v=20261103\.3/);
-  assert.match(min,/modules\/semester-lesson-plan-channels\.js\?v=20261103\.3/);
-  assert.match(app,/installSemesterLessonChannelControls\(\{state,supabase\}\)/);
+  assert.match(app,/modules\/semester-lesson-plan-channels\.js\?v=20261106\.1/);
+  assert.match(min,/modules\/semester-lesson-plan-channels\.js\?v=20261106\.1/);
+  assert.match(app,/installSemesterLessonChannelControls\(\{state,supabase,renderDashboard\}\)/);
   assert.match(min,/installSemesterLessonChannelControls:e/);
   assert.match(html,/app\.min\.js\?v=5\.12\.9\.\d+/);
 });
@@ -78,7 +79,7 @@ test("authorized managers get a visible button from the semester hero renderer",
 
 test("the settings button uses a real direct click path, with visible failure feedback",()=>{
   assert.match(app,/const button=event\.target\.closest\?\.\("#semester-channel-settings-button"\)/);
-  assert.match(app,/await import\("\.\/modules\/semester-lesson-plan-channels\.js\?v=20261103\.3"\)/);
+  assert.match(app,/await import\("\.\/modules\/semester-lesson-plan-channels\.js\?v=20261106\.1"\)/);
   assert.match(app,/button\.textContent="กำลังเปิดการตั้งค่า\.\.\."/);
   assert.match(app,/window\.alert\("เปิดการตั้งค่าการส่งแผนไม่สำเร็จ:/);
   assert.match(min,/เปิดการตั้งค่าการส่งแผนไม่สำเร็จ/);
