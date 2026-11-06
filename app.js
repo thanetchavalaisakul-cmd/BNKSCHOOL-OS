@@ -15660,3 +15660,5 @@ document.addEventListener("click",async event=>{
 void import("./modules/semester-lesson-plan-channels.js?v=20261106.1")
   .then(({installSemesterLessonChannelControls})=>installSemesterLessonChannelControls({state,supabase,renderDashboard}))
   .catch(error=>console.error("Semester lesson plan channels:",error));
+
+// BNK 2026-11-06: optimized production bundle refresh after semester-policy verification.
