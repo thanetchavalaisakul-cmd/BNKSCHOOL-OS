@@ -51,8 +51,7 @@ test("semester-plan settings button controller opens the modal and saves the cho
     assert.equal(typeof controller.openSettings,"function");
     assert.equal(installSemesterLessonChannelControls({state,supabase}),controller);
     controller.openSettings();
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise(resolve=>setImmediate(resolve));
     assert.equal(modal.isConnected,true);
     assert.equal(radios.find(r=>r.value==="drive_only").checked,true);
     for(const r of radios)r.checked=r.value==="drive_only";
