@@ -8,6 +8,9 @@ import {
   paymentEvidenceDocumentStatusLabel,
   paymentEvidenceCanEditDocument,
   paymentEvidenceIsDirectorRole,
+  paymentEvidenceThaiDigits,
+  paymentEvidencePrintTotalsMatch,
+  paymentEvidenceApplyBulkDate,
 } from "../modules/payment-evidence-documents.js";
 
 test("payment evidence totals include selected students only", () => {
@@ -125,4 +128,55 @@ test("payment evidence migration keeps SQL function dollar quotes balanced", asy
   assert.ok(opens >= 12);
   assert.doesNotMatch(migration, /^\s*as \$\s*$/m);
   assert.doesNotMatch(migration, /^\s*\$;\s*$/m);
+});
+
+test("payment evidence print renders official Thai numerals", () => {
+  assert.equal(paymentEvidenceThaiDigits("4200.50 / 2569 / 1234567890123"), "๔๒๐๐.๕๐ / ๒๕๖๙ / ๑๒๓๔๕๖๗๘๙๐๑๒๓");
+});
+
+test("payment evidence refuses to print mismatched financial totals or student counts", () => {
+  const items = [{ amount: 2000 }, { amount: "2200.00" }];
+  assert.equal(paymentEvidencePrintTotalsMatch({ student_count: 2, total_amount: 4200 }, items), true);
+  assert.equal(paymentEvidencePrintTotalsMatch({ student_count: 2, total_amount: 4199 }, items), false);
+  assert.equal(paymentEvidencePrintTotalsMatch({ student_count: 1, total_amount: 4200 }, items), false);
+  assert.equal(paymentEvidencePrintTotalsMatch({ student_count: 2, total_amount: 4200 }, [{ amount: -1 }, { amount: 4201 }]), false);
+});
+
+test("one receipt date applies only to selected students without changing individual exceptions", () => {
+  const rows = [
+    { student_id: "a", selected: true, received_date: "" },
+    { student_id: "b", selected: false, received_date: "2026-11-01" },
+    { student_id: "c", selected: true, received_date: "2026-11-02" },
+  ];
+  const updated = paymentEvidenceApplyBulkDate(rows, "2026-11-10");
+  assert.deepEqual(updated.map((r) => r.received_date), ["2026-11-10", "2026-11-01", "2026-11-10"]);
+  assert.equal(rows[0].received_date, "");
+  assert.throws(() => paymentEvidenceApplyBulkDate(rows, ""), /วันที่รับเงิน/);
+});
+
+test("payment PDF is one naturally paginated A4 table with one final sum and repeating table headers", async () => {
+  const source = await readFile(new URL("../modules/payment-evidence-documents.js", import.meta.url), "utf8");
+  const start = source.indexOf("function pdfPageHtml(");
+  const end = source.indexOf("async function toggleFinancePermission(", start);
+  const printSource = source.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(printSource, /const pages = \[pdfPageHtml\(doc, items, 0, 1, signerImages, true\)\]/);
+  assert.doesNotMatch(printSource, /items\.slice\(pageIndex\s*\*\s*8/);
+  assert.doesNotMatch(printSource, /while\s*\(rows\.length\s*<\s*8\)/);
+  assert.match(printSource, /\.pe-pdf-table thead\{display:table-header-group\}/);
+  assert.match(printSource, /\.pe-pdf-table tr\{break-inside:avoid/);
+  assert.match(printSource, /@page\{size:A4 portrait;margin:14mm 15mm 15mm\}/);
+  assert.match(printSource, /class="pe-pdf-final"/);
+  assert.match(printSource, /font-family:"TH SarabunIT๙"/);
+  assert.match(printSource, /paymentEvidenceThaiDigits\(formatMoney\(item.amount\)\)/);
+  assert.equal((printSource.match(/class="pe-pdf-total"/g) || []).length, 1);
+});
+
+test("payment forms have rounded controls and a selected-student receipt date action", async () => {
+  const source = await readFile(new URL("../modules/payment-evidence-documents.js", import.meta.url), "utf8");
+  assert.match(source, /\.pe-field input,\.pe-field select,\.pe-field textarea\{[^}]*border-radius:12px/);
+  assert.match(source, /\.pe-roster-table input:not\(\[type=checkbox\]\)\{[^}]*border-radius:10px/);
+  assert.match(source, /id="pe-bulk-date" type="date"/);
+  assert.match(source, /#pe-apply-bulk-date/);
+  assert.match(source, /paymentEvidenceApplyBulkDate\(local\.draft\.rows, date\)/);
 });
