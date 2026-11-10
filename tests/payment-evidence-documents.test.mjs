@@ -95,10 +95,10 @@ test("database migration enforces RLS and server-side edit boundaries", async ()
   }
 
   const editFunction = migration.match(
-    /create or replace function private\\.can_edit_payment_evidence_document\\(p_document_id uuid\\)[\\s\\S]*?\\$\\$;/i,
+    /create or replace function private\.can_edit_payment_evidence_document\(p_document_id uuid\)[\s\S]*?\$\$;/i,
   )?.[0];
   assert.ok(editFunction, "edit authorization function exists");
-  assert.match(editFunction, /d\\.status in \\('draft', 'returned'\\)/i);
+  assert.match(editFunction, /d\.status in \('draft', 'returned'\)/i);
   assert.doesNotMatch(editFunction, /is_payment_evidence_finance/i);
 
   for (const functionName of [
@@ -111,4 +111,18 @@ test("database migration enforces RLS and server-side edit boundaries", async ()
       new RegExp(`revoke all on function private\\.${functionName}\\(\\) from public, anon;`, "i"),
     );
   }
+});
+
+
+test("payment evidence migration keeps SQL function dollar quotes balanced", async () => {
+  const migration = await readFile(
+    new URL("../supabase/migrations/20261110_payment_evidence_documents.sql", import.meta.url),
+    "utf8",
+  );
+  const opens = [...migration.matchAll(/^\s*as \$\$\s*$/gm)].length;
+  const closes = [...migration.matchAll(/^\s*\$\$;\s*$/gm)].length;
+  assert.equal(opens, closes);
+  assert.ok(opens >= 12);
+  assert.doesNotMatch(migration, /^\s*as \$\s*$/m);
+  assert.doesNotMatch(migration, /^\s*\$;\s*$/m);
 });
