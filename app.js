@@ -50,6 +50,16 @@ async function loadGeneralStudentRosterFeature(){
   return bnkGeneralStudentRosterFeaturePromise;
 }
 
+let bnkPaymentEvidenceFeaturePromise=null;
+let paymentEvidenceFeature=null;
+async function loadPaymentEvidenceFeature(){
+  bnkPaymentEvidenceFeaturePromise??=import("./modules/payment-evidence-documents.js?v=20261110.1").then(async mod=>{
+    paymentEvidenceFeature=await mod.createPaymentEvidenceFeature({state,supabase,currentAcademicPeriod,escapeHtml,toast,renderDashboard,withWorkflowSignature});
+    return paymentEvidenceFeature;
+  }).catch(error=>{bnkPaymentEvidenceFeaturePromise=null;throw error;});
+  return bnkPaymentEvidenceFeaturePromise;
+}
+
 let bnkAcademicReportPdfFeaturePromise=null;
 async function loadAcademicReportPdfFeature(){
  bnkAcademicReportPdfFeaturePromise??=import("./modules/academic-report-pdf.js?v=5.12.9.58").then(mod=>mod.createAcademicReportPdfFeature({academicSubmissionWorkflowSettings,classroomResearchOnePageData,classroomResearchPdfStyles,classroomResearchSignBlock,classroomResearchSignatureAssets,classroomResearchTypeLabel,classroomResearchWorkflow,clubActivityLines,clubActivityMembersFor,clubActivityNormalizeAttendance,clubActivityPdfSignBlock,clubActivityPdfStyles,clubActivityPhotoDataUrl,clubActivitySharedNames,clubActivitySignatureAssets,educationOffice,escapeHtml,learnerActivityActivities,learnerActivityCalcResult,learnerActivityChunk,learnerActivityGenderCounts,learnerActivityOverall,learnerActivityPdfHeader,learnerActivityPdfStyles,learnerActivityResultFor,learnerActivityResultSummary,learnerActivitySharedNames,learnerActivitySignBlock,learnerActivitySignatureAssets,learnerActivityStudentsFor,learningMediaCheck,learningMediaHeadFor,learningMediaItems,learningMediaOfficeShort,learningMediaPdfStyles,learningMediaPhotoAssets,learningMediaSchoolShort,learningMediaSignatureAssets,learningMediaThaiDate,learningMediaWorkflow,lessonUsageEffectiveMemo,lessonUsageGradePct,lessonUsageGradeTable,lessonUsageHeadFor,lessonUsageInterpretMean,lessonUsagePdfSection,lessonUsagePdfStyles,lessonUsageSatStats,lessonUsageSatTable,lessonUsageSignatureAssets,lessonUsageThaiDate,lessonUsageTopTable,lessonUsageUnitTable,lessonUsageWorkflow,money,postLessonBehaviorPageRows,postLessonPdfSection,postLessonPdfSignBlock,postLessonPdfStyles,postLessonScopeLabel,postLessonScopePdfText,postLessonSignatureAssets,schoolAddress,schoolLogoDataUrl,schoolName,sharedSignatureGridHtml,state,thaiDateTimeDocument})).catch(error=>{bnkAcademicReportPdfFeaturePromise=null;throw error;});
@@ -1621,6 +1631,16 @@ async function renderDashboard() {
     } catch(error) {
       state.generalStudentRosterError=error?.message||String(error);
       console.error("General student roster load failed",error);
+    }
+  }
+  if (state.currentView === "module:payment_evidence_documents") {
+    state.paymentEvidenceLoadError = null;
+    try {
+      await loadPaymentEvidenceFeature();
+      await paymentEvidenceFeature.load();
+    } catch (error) {
+      state.paymentEvidenceLoadError = error?.message || String(error);
+      console.error("Payment evidence module load failed", error);
     }
   }
   if (state.currentView === "module:student_cards") {
@@ -14028,6 +14048,9 @@ function moduleView(code) {
   const module = state.modules.find(m => m.code === code);
   if (!module) return `<div class="empty"><strong>ไม่พบระบบย่อย</strong></div>`;
   if (code === "student_behavior") return behaviorFeature.html();
+  if (code === "payment_evidence_documents") return paymentEvidenceFeature
+    ? paymentEvidenceFeature.view(module)
+    : `<section class="panel"><div class="empty"><strong>${escapeHtml(state.paymentEvidenceLoadError || "กำลังโหลดระบบหลักฐานการจ่ายเงิน")}</strong></div></section>`;
   if (code === "education_fee_collection") return educationFeeFeature.view();
   if (code === "academic_calendar") return academicCalendarWorkspaceHtml(module);
   if (code === "academic_registration") return academicRegistrationWorkspaceHtml(module);
@@ -15560,6 +15583,21 @@ function subscribeRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "student_cards" }, async () => { if(state.currentView==="module:student_cards") queueRealtimeDashboardRefresh(); })
     .on("postgres_changes", { event: "*", schema: "public", table: "home_visit_settings" }, async () => { if(state.currentView==="module:home_visit_management") queueRealtimeDashboardRefresh(); })
     .on("postgres_changes", { event: "*", schema: "public", table: "home_visit_household_members" }, async () => { if(state.currentView==="module:home_visit_management"&&state.selectedHomeVisitId) queueRealtimeDashboardRefresh(); })
+    .on("postgres_changes", { event: "*", schema: "public", table: "payment_evidence_documents" }, async () => {
+      if (state.currentView === "module:payment_evidence_documents") queueRealtimeDashboardRefresh();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "payment_evidence_items" }, async () => {
+      if (state.currentView === "module:payment_evidence_documents") queueRealtimeDashboardRefresh();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "payment_evidence_signers" }, async () => {
+      if (state.currentView === "module:payment_evidence_documents") queueRealtimeDashboardRefresh();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "payment_evidence_permissions" }, async () => {
+      if (state.currentView === "module:payment_evidence_documents") queueRealtimeDashboardRefresh();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "payment_evidence_print_settings" }, async () => {
+      if (state.currentView === "module:payment_evidence_documents") queueRealtimeDashboardRefresh();
+    })
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: state.user ? `id=eq.${state.user.id}` : undefined }, async () => {
       if (!state.user) return;
       await bootstrapApp();
