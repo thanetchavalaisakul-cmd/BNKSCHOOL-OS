@@ -1235,22 +1235,24 @@ export function createPaymentEvidenceFeature(ctx) {
       local.search = event.target.value;
       refreshList();
     });
-    root.querySelector("#pe-finance-search")?.addEventListener("input", (event) => {
+    // Delegate finance-list events on the stable root. Replacing the filtered
+    // table must not remove the input handler after the first typed character.
+    root.addEventListener("input", (event) => {
+      if (event.target?.id !== "pe-finance-search") return;
       local.financeSearch = event.target.value;
+      const cursor = event.target.selectionStart;
       const tab = root.querySelector(".pe-card:last-child");
       if (tab) tab.outerHTML = financeViewHtml();
       const newSearch = root.querySelector("#pe-finance-search");
       if (newSearch) {
         newSearch.focus();
-        newSearch.setSelectionRange(newSearch.value.length, newSearch.value.length);
+        if (cursor !== null) newSearch.setSelectionRange(cursor, cursor);
       }
-      root.querySelectorAll("[data-pe-finance-toggle]").forEach((button) => {
-        button.addEventListener("click", () => toggleFinancePermission(button.dataset.peFinanceToggle, button.dataset.active === "true"));
-      });
     });
-
-    root.querySelectorAll("[data-pe-finance-toggle]").forEach((button) => {
-      button.addEventListener("click", () => toggleFinancePermission(button.dataset.peFinanceToggle, button.dataset.active === "true"));
+    root.addEventListener("click", (event) => {
+      const button = event.target.closest?.("[data-pe-finance-toggle]");
+      if (!button || !root.contains(button)) return;
+      toggleFinancePermission(button.dataset.peFinanceToggle, button.dataset.active === "true");
     });
 
     root.querySelector('[data-pe-action="back"]')?.addEventListener("click", async () => {
