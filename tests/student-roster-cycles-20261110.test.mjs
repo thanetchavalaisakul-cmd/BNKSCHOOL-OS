@@ -60,3 +60,22 @@ test("verified exit history is visible in the general student roster event histo
   assert.match(roster, /student_exit_verified:"ยืนยันพ้นสภาพ"/);
   assert.match(roster, /resolution_note\|\|r\.details\?\.resolution_code/);
 });
+
+const access = await readFile(new URL("../supabase/migrations/20261110230030_scope_student_data_rpc_access.sql", import.meta.url), "utf8");
+
+test("class roster RPC applies the central per-student visibility rule", () => {
+  assert.match(access, /private\\.can_view_student\\(s\\.id\\)/);
+  assert.match(access, /CREATE OR REPLACE FUNCTION public\\.get_student_class_roster/);
+});
+
+test("follow-up student picker and case creation use caller RLS and per-student visibility", () => {
+  assert.match(access, /get_student_followup_student_options[\\s\\S]*?SECURITY INVOKER/);
+  assert.match(access, /add_student_followup_cases[\\s\\S]*?SECURITY INVOKER/);
+  assert.match(access, /private\\.can_view_student\\(s\\.id\\)/);
+  assert.match(access, /ไม่มีสิทธิ์เข้าถึงข้อมูลรายบุคคล/);
+});
+
+test("follow-up case read, insert, update and delete policies enforce student visibility", () => {
+  assert.equal((access.match(/private\\.can_view_student\\(student_id\\)/g) || []).length, 5);
+  assert.match(access, /mark_student_followup_case_followed[\\s\\S]*?private\\.can_view_student\\(v_case\\.student_id\\)/);
+});
