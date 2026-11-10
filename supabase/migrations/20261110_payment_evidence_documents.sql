@@ -169,7 +169,7 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $$
   select private.is_active_user()
      and exists (
        select 1
@@ -184,7 +184,7 @@ as $
            )
          )
      );
-$;
+$$;
 
 create or replace function private.can_sign_payment_evidence_document(p_document_id uuid)
 returns boolean
