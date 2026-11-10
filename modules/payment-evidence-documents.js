@@ -1100,7 +1100,7 @@ export function createPaymentEvidenceFeature(ctx) {
           ข้าพเจ้าขอรับรองว่าจะนำเงินที่ได้รับไปดำเนินการตามวัตถุประสงค์ของทางราชการ หากไม่ดำเนินการดังกล่าวข้าพเจ้ายินยอมชดใช้เงินคืนให้กับโรงเรียนต่อไป
         </div>
         <table class="pe-pdf-table">
-          <colgroup><col style="width:5%"><col style="width:27%"><col style="width:21%"><col style="width:11%"><col style="width:13%"><col style="width:14%"><col style="width:9%"></colgroup>
+          <colgroup><col style="width:5%"><col style="width:31%"><col style="width:19%"><col style="width:10%"><col style="width:13%"><col style="width:14%"><col style="width:8%"></colgroup>
           <thead><tr>
             <th>ที่</th><th>ชื่อ – สกุล</th><th>หมายเลขบัตร<br>ประชาชน ๑๓ หลัก</th><th>จำนวน<br>เงิน</th><th>วันที่รับเงิน</th><th>ลายมือชื่อ<br>ผู้ปกครอง/<br>นักเรียน</th><th>หมายเหตุ</th>
           </tr></thead>
@@ -1173,25 +1173,27 @@ export function createPaymentEvidenceFeature(ctx) {
       .pe-pdf-level{display:grid;grid-template-columns:23mm 1fr 1fr;row-gap:1mm;align-items:center;font-size:12pt;line-height:1.12;margin:2.5mm 0}
       .pe-pdf-level strong{grid-row:1 / span 2}
       .pe-pdf-declaration{font-size:12.5pt;line-height:1.18;text-align:justify;margin:3mm 0 4mm}
-      .pe-pdf-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12pt;line-height:1.07;margin:0}
+      .pe-pdf-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:11pt;line-height:1.05;margin:0}
       .pe-pdf-table thead{display:table-header-group}
       .pe-pdf-table tbody{display:table-row-group}
       .pe-pdf-table tr{break-inside:avoid;page-break-inside:avoid}
       .pe-pdf-table th,.pe-pdf-table td{border:.45pt solid #111;padding:.65mm .6mm;vertical-align:middle;overflow-wrap:anywhere}
       .pe-pdf-table th{height:12mm;text-align:center;font-weight:700;line-height:1.05}
       .pe-pdf-table td{height:6.5mm;text-align:center}
+      /* Keep the last few names with the once-only totals, not an orphan footer page. */
+      .pe-pdf-table tbody tr:nth-last-child(-n+3){break-after:avoid-page;page-break-after:avoid}
       .pe-pdf-table .pe-pdf-name{text-align:left}
-      .pe-pdf-table .pe-pdf-id{font-size:11.5pt;white-space:nowrap}
+      .pe-pdf-table .pe-pdf-id{font-size:10.5pt;white-space:nowrap}
       .pe-pdf-table .pe-pdf-money{text-align:right;white-space:nowrap}
       .pe-pdf-table .pe-pdf-note{text-align:left;font-size:10.5pt}
       .pe-pdf-final{break-inside:avoid;page-break-inside:avoid;padding-top:3mm}
       .pe-pdf-total,.pe-pdf-signatures,.pe-pdf-director{position:static}
-      .pe-pdf-total{display:flex;justify-content:flex-end;align-items:center;gap:3mm;margin-top:3.5mm;min-height:8mm;font-size:13pt;font-weight:700}
+      .pe-pdf-total{display:flex;justify-content:flex-end;align-items:center;gap:3mm;margin-top:2mm;min-height:8mm;font-size:13pt;font-weight:700}
       .pe-pdf-total strong{display:inline-block;min-width:32mm;text-align:center;border-bottom:.45pt solid #111;padding:0 2mm}
-      .pe-pdf-signatures{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin-top:5mm;font-size:12.5pt;text-align:center}
-      .pe-pdf-signature-block,.pe-pdf-director{position:relative;padding-top:9mm;line-height:1.2;min-height:21mm}
-      .pe-pdf-signature{position:absolute;left:50%!important;top:0;transform:translateX(-50%);width:27mm;height:10mm;object-fit:contain;pointer-events:none}
-      .pe-pdf-director{width:90mm;margin:3mm auto 0;text-align:center;font-size:12.5pt}
+      .pe-pdf-signatures{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin-top:3mm;font-size:12.5pt;text-align:center}
+      .pe-pdf-signature-block,.pe-pdf-director{position:relative;padding-top:8mm;line-height:1.2;min-height:19mm}
+      .pe-pdf-signature{position:absolute;left:50%!important;top:0;transform:translateX(-50%);width:27mm;height:8mm;object-fit:contain;pointer-events:none}
+      .pe-pdf-director{width:90mm;margin:2mm auto 0;text-align:center;font-size:12.5pt}
       .pe-pdf-page{display:none}
       /* Keep the final financial sum and all three signature slots together. */
       .pe-pdf-total{break-after:avoid;page-break-after:avoid}
