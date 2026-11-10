@@ -1061,9 +1061,9 @@ export function createPaymentEvidenceFeature(ctx) {
       return `<tr>
         <td>${paymentEvidenceThaiDigits(globalNumber)}</td>
         <td class="pe-pdf-name">${esc(studentName(item))}</td>
-        <td>${esc(studentCitizenId(item))}</td>
-        <td class="pe-pdf-money">${formatMoney(item.amount)}</td>
-        <td>${esc(formatDate(item.received_date))}</td>
+        <td class="pe-pdf-id">${esc(paymentEvidenceThaiDigits(studentCitizenId(item)))}</td>
+        <td class="pe-pdf-money">${paymentEvidenceThaiDigits(formatMoney(item.amount))}</td>
+        <td>${esc(paymentEvidenceThaiDigits(formatDate(item.received_date)))}</td>
         <td></td>
         <td class="pe-pdf-note">${esc(note || "")}</td>
       </tr>`;
@@ -1096,11 +1096,11 @@ export function createPaymentEvidenceFeature(ctx) {
           <span>☐ ปวช. ที่จัดโดยสถานประกอบการ ปีที่......</span>
         </div>
         <div class="pe-pdf-declaration">
-          นักเรียนจำนวนทั้งสิ้น <strong>${paymentEvidenceThaiDigits(pageItems.length)}</strong> คน ได้รับเงินจากโรงเรียนบ้านหนองเขียว สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาเชียงใหม่ เขต 3
+          นักเรียนจำนวนทั้งสิ้น <strong>${paymentEvidenceThaiDigits(pageItems.length)}</strong> คน ได้รับเงินจากโรงเรียนบ้านหนองเขียว สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาเชียงใหม่ เขต ๓
           ข้าพเจ้าขอรับรองว่าจะนำเงินที่ได้รับไปดำเนินการตามวัตถุประสงค์ของทางราชการ หากไม่ดำเนินการดังกล่าวข้าพเจ้ายินยอมชดใช้เงินคืนให้กับโรงเรียนต่อไป
         </div>
         <table class="pe-pdf-table">
-          <colgroup><col style="width:9.2mm"><col style="width:48.6mm"><col style="width:35.1mm"><col style="width:18.5mm"><col style="width:21.8mm"><col style="width:29mm"><col style="width:19mm"></colgroup>
+          <colgroup><col style="width:5%"><col style="width:27%"><col style="width:21%"><col style="width:11%"><col style="width:13%"><col style="width:14%"><col style="width:9%"></colgroup>
           <thead><tr>
             <th>ที่</th><th>ชื่อ – สกุล</th><th>หมายเลขบัตร<br>ประชาชน ๑๓ หลัก</th><th>จำนวน<br>เงิน</th><th>วันที่รับเงิน</th><th>ลายมือชื่อ<br>ผู้ปกครอง/<br>นักเรียน</th><th>หมายเหตุ</th>
           </tr></thead>
@@ -1181,6 +1181,7 @@ export function createPaymentEvidenceFeature(ctx) {
       .pe-pdf-table th{height:12mm;text-align:center;font-weight:700;line-height:1.05}
       .pe-pdf-table td{height:6.5mm;text-align:center}
       .pe-pdf-table .pe-pdf-name{text-align:left}
+      .pe-pdf-table .pe-pdf-id{font-size:11.5pt;white-space:nowrap}
       .pe-pdf-table .pe-pdf-money{text-align:right;white-space:nowrap}
       .pe-pdf-table .pe-pdf-note{text-align:left;font-size:10.5pt}
       .pe-pdf-final{break-inside:avoid;page-break-inside:avoid;padding-top:3mm}
@@ -1201,7 +1202,8 @@ export function createPaymentEvidenceFeature(ctx) {
     </style></head><body>${pages.join("")}</body></html>`);
     win.document.close();
     try {
-      if (typeof ensureOfficialPdfFont === "function") await ensureOfficialPdfFont("14pt", win.document);
+      if (typeof ensureOfficialPdfFont !== "function") throw new Error("ไม่พบฟอนต์เอกสารกลาง");
+      await ensureOfficialPdfFont("14pt", win.document);
       if (win.document.fonts?.ready) await win.document.fonts.ready;
     } catch(error) {
       win.close();
