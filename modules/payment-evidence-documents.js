@@ -1130,41 +1130,43 @@ export function createPaymentEvidenceFeature(ctx) {
     win.document.open();
     win.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>หลักฐานการจ่ายเงิน</title><style>
       ${fontCss}
-      @page{size:A4;margin:0}
+      /* A4: no fixed row quotas, natural page breaks, repeated column titles. */
+      @page{size:A4 portrait;margin:14mm 15mm 15mm}
       *{box-sizing:border-box}
       html,body{margin:0;padding:0;background:#fff;color:#111;font-family:"TH SarabunIT๙",serif}
-      .pe-pdf-page-sheet{position:relative;width:210mm;height:297mm;overflow:hidden;background:#fff;margin:0 auto;page-break-after:always;padding:0;color:#111}
-      .pe-pdf-page-sheet:last-child{page-break-after:auto}
-      .pe-pdf-title{position:absolute;top:20mm;left:0;width:100%;text-align:center;font-size:16pt;font-weight:700}
-      .pe-pdf-period{position:absolute;top:27mm;left:0;width:100%;text-align:center;font-size:14pt}
-      .pe-pdf-types{position:absolute;top:34mm;left:20mm;width:180mm;display:grid;grid-template-columns:70mm 1fr;grid-template-rows:8mm 8mm;font-size:13pt;align-items:center}
+      .pe-pdf-page-sheet{position:static;display:block;width:100%;height:auto;min-height:0;overflow:visible;margin:0 auto;padding:0;background:#fff;break-after:auto;page-break-after:auto}
+      .pe-pdf-title{text-align:center;font-size:18pt;font-weight:700;line-height:1.12;margin:0}
+      .pe-pdf-period{text-align:center;font-size:14pt;line-height:1.1;margin:1mm 0 0}
+      .pe-pdf-types{display:grid;grid-template-columns:1fr 1fr;column-gap:3mm;row-gap:.8mm;font-size:12.5pt;line-height:1.05;margin:3mm 0 1.5mm}
       .pe-pdf-types div:nth-child(3){font-size:12pt}
-      .pe-pdf-stars{position:absolute;top:51mm;left:19mm;width:181mm;text-align:center;font-size:11pt;white-space:nowrap;overflow:hidden}
-      .pe-pdf-level{position:absolute;top:57mm;left:19mm;width:181mm;display:grid;grid-template-columns:25mm 65mm 1fr;grid-template-rows:7mm 7mm;align-items:center;font-size:12pt}
+      .pe-pdf-stars{text-align:center;font-size:10pt;white-space:nowrap;overflow:hidden;line-height:1}
+      .pe-pdf-level{display:grid;grid-template-columns:23mm 1fr 1fr;row-gap:1mm;align-items:center;font-size:12pt;line-height:1.12;margin:2.5mm 0}
       .pe-pdf-level strong{grid-row:1 / span 2}
-      .pe-pdf-level span:nth-of-type(1){grid-column:2;grid-row:1}
-      .pe-pdf-level span:nth-of-type(2){grid-column:3;grid-row:1}
-      .pe-pdf-level span:nth-of-type(3){grid-column:2;grid-row:2}
-      .pe-pdf-level span:nth-of-type(4){grid-column:3;grid-row:2}
-      .pe-pdf-declaration{position:absolute;top:72mm;left:19mm;width:181mm;height:26mm;font-size:12pt;line-height:1.12;text-align:justify}
-      .pe-pdf-table{position:absolute;top:99.8mm;left:19mm;width:181.2mm;border-collapse:collapse;table-layout:fixed;font-size:10.5pt}
-      .pe-pdf-table th,.pe-pdf-table td{border:.45pt solid #111;padding:1mm .7mm;vertical-align:middle}
-      .pe-pdf-table th{height:22.5mm;text-align:center;font-weight:700;line-height:1.05}
-      .pe-pdf-table td{height:7.7mm;text-align:center;line-height:1.0}
-      .pe-pdf-table .pe-pdf-name{text-align:left;white-space:nowrap;overflow:hidden}
-      .pe-pdf-table .pe-pdf-money{text-align:right}
-      .pe-pdf-table .pe-pdf-note{text-align:left;font-size:9pt}
-      .pe-pdf-total{position:absolute;top:184mm;left:19mm;width:181.2mm;height:15mm;display:grid;grid-template-columns:92.7mm 18.5mm 1fr;align-items:stretch;font-size:12pt}
-      .pe-pdf-total span{display:flex;align-items:center;justify-content:center;font-weight:700}
-      .pe-pdf-total strong{border:1px solid #111;display:flex;align-items:center;justify-content:center;font-weight:700}
-      .pe-pdf-signatures{position:absolute;top:211mm;left:19mm;width:181mm;display:grid;grid-template-columns:1fr 1fr;gap:20mm;font-size:12pt;text-align:center}
-      .pe-pdf-signature-block{position:relative;line-height:1.2;min-height:28mm}
-      .pe-pdf-signature{position:absolute;top:-8mm;width:25mm;height:9mm;object-fit:contain;object-position:center;pointer-events:none}
-      .pe-pdf-director{position:absolute;top:250mm;left:60mm;width:90mm;text-align:center;font-size:12pt;line-height:1.2}
-      .pe-pdf-director .pe-pdf-signature{left:34mm}
-      .pe-pdf-page{position:absolute;top:12mm;right:19mm;font-size:10pt;color:#555}
-      @media screen{body{background:#e5e7eb;padding:12px}.pe-pdf-page-sheet{box-shadow:0 2px 14px rgba(0,0,0,.16);margin:0 auto 12px}}
-      @media print{body{background:#fff;padding:0}.pe-pdf-page-sheet{box-shadow:none;margin:0}}
+      .pe-pdf-declaration{font-size:12.5pt;line-height:1.18;text-align:justify;margin:3mm 0 4mm}
+      .pe-pdf-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12pt;line-height:1.07;margin:0}
+      .pe-pdf-table thead{display:table-header-group}
+      .pe-pdf-table tbody{display:table-row-group}
+      .pe-pdf-table tr{break-inside:avoid;page-break-inside:avoid}
+      .pe-pdf-table th,.pe-pdf-table td{border:.45pt solid #111;padding:.65mm .6mm;vertical-align:middle;overflow-wrap:anywhere}
+      .pe-pdf-table th{height:12mm;text-align:center;font-weight:700;line-height:1.05}
+      .pe-pdf-table td{height:6.5mm;text-align:center}
+      .pe-pdf-table .pe-pdf-name{text-align:left}
+      .pe-pdf-table .pe-pdf-money{text-align:right;white-space:nowrap}
+      .pe-pdf-table .pe-pdf-note{text-align:left;font-size:10.5pt}
+      .pe-pdf-total,.pe-pdf-signatures,.pe-pdf-director{position:static}
+      .pe-pdf-total{display:flex;justify-content:flex-end;align-items:center;gap:3mm;margin-top:3.5mm;min-height:8mm;font-size:13pt;font-weight:700}
+      .pe-pdf-total strong{display:inline-block;min-width:32mm;text-align:center;border-bottom:.45pt solid #111;padding:0 2mm}
+      .pe-pdf-signatures{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin-top:5mm;font-size:12.5pt;text-align:center}
+      .pe-pdf-signature-block,.pe-pdf-director{position:relative;padding-top:9mm;line-height:1.2;min-height:21mm}
+      .pe-pdf-signature{position:absolute;left:50%!important;top:0;transform:translateX(-50%);width:27mm;height:10mm;object-fit:contain;pointer-events:none}
+      .pe-pdf-director{width:90mm;margin:3mm auto 0;text-align:center;font-size:12.5pt}
+      .pe-pdf-page{display:none}
+      /* Keep the final financial sum and all three signature slots together. */
+      .pe-pdf-total{break-after:avoid;page-break-after:avoid}
+      .pe-pdf-signatures{break-before:avoid;page-break-before:avoid;break-after:avoid}
+      .pe-pdf-director{break-before:avoid;page-break-before:avoid}
+      @media screen{html,body{background:#e5e7eb}.pe-pdf-page-sheet{width:210mm;padding:14mm 15mm 15mm;min-height:297mm;box-shadow:0 2px 14px #0002;margin:12px auto}}
+      @media print{html,body{background:#fff}.pe-pdf-page-sheet{width:100%;padding:0;margin:0;min-height:0;box-shadow:none}thead{display:table-header-group}}
     </style></head><body>${pages.join("")}</body></html>`);
     win.document.close();
     try {
