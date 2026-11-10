@@ -331,3 +331,38 @@ test("admin settings provides a persisted printed payer without giving finance w
   assert.match(source, /\.from\("payment_evidence_print_settings"\)/);
   assert.match(source, /root\.querySelector\("#pe-print-finance-save"\)/);
 });
+
+test("finance PDF type and grade checkboxes use the same left and right vertical grid guides", async () => {
+  const source = await readFile(new URL("../modules/payment-evidence-documents.js", import.meta.url), "utf8");
+  const css = source.slice(
+    source.indexOf("/* Keep both 2-column checkbox groups"),
+    source.indexOf("      .pe-pdf-declaration{"),
+  );
+  assert.ok(css.startsWith("/* Keep both 2-column checkbox groups"), "missing grid alignment styles");
+  assert.match(css, /\.pe-pdf-types,\.pe-pdf-level\{display:grid;grid-template-columns:23mm minmax\(0,1fr\) minmax\(0,1fr\);column-gap:0\}/);
+  for (const [selector, col, row] of [
+    ["div:nth-child(1)", 2, 1], ["div:nth-child(2)", 3, 1],
+    ["div:nth-child(3)", 2, 2], ["div:nth-child(4)", 3, 2],
+  ]) {
+    const pattern = new RegExp("\\.pe-pdf-types " + selector.replace(/[()]/g, "\\$&") + "\\{grid-column:" + col + ";grid-row:" + row);
+    assert.match(css, pattern);
+  }
+  for (const [number, col, row] of [[1, 2, 1], [2, 3, 1], [3, 2, 2], [4, 3, 2]]) {
+    assert.ok(css.includes(\`.pe-pdf-level span:nth-of-type(\${number}){grid-column:\${col};grid-row:\${row}}\`));
+  }
+  assert.match(css, /\.pe-pdf-types > div\{min-width:0;overflow-wrap:anywhere\}/);
+  assert.match(css, /\.pe-pdf-types div:nth-child\(3\)\{grid-column:2;grid-row:2;font-size:12pt;padding-right:3mm\}/);
+});
+
+test("finance PDF level heading remains at original left x but first kindergarten row y", async () => {
+  const source = await readFile(new URL("../modules/payment-evidence-documents.js", import.meta.url), "utf8");
+  const css = source.slice(source.indexOf("/* Keep both 2-column checkbox groups"), source.indexOf("      .pe-pdf-declaration{"));
+  assert.match(css, /\.pe-pdf-level strong\{grid-column:1;grid-row:1;align-self:start\}/);
+  assert.match(css, /\.pe-pdf-level\{row-gap:1mm;align-items:start;/);
+  assert.doesNotMatch(css, /grid-row:1\s*\/\s*span 2/);
+  const html = source.slice(source.indexOf('<div class="pe-pdf-level">'), source.indexOf('<div class="pe-pdf-declaration">'));
+  assert.match(html, /<strong>ระดับชั้น<\/strong>/);
+  assert.match(html, /อนุบาลปีที่/);
+  assert.match(source, /\.pe-pdf-title\{text-align:center;font-size:18pt;/);
+  assert.match(source, /class="pe-pdf-signatures"/);
+});
