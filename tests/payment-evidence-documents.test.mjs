@@ -9,6 +9,7 @@ import {
   paymentEvidenceCanEditDocument,
   paymentEvidenceIsDirectorRole,
   paymentEvidenceThaiDigits,
+  paymentEvidencePdfLevelRoom,
   paymentEvidencePrintTotalsMatch,
   paymentEvidenceApplyBulkDate,
 } from "../modules/payment-evidence-documents.js";
@@ -179,4 +180,45 @@ test("payment forms have rounded controls and a selected-student receipt date ac
   assert.match(source, /id="pe-bulk-date" type="date"/);
   assert.match(source, /#pe-apply-bulk-date/);
   assert.match(source, /paymentEvidenceApplyBulkDate\(local\.draft\.rows, date\)/);
+});
+
+test("official finance PDF prints classroom and room together in Thai digits", () => {
+  const classes = [{ id: "class-1", level_name: "ป.3", room_name: "2" }];
+  assert.equal(paymentEvidencePdfLevelRoom({
+    class_id: "class-1",
+    stage_code_snapshot: "stage1",
+    class_label_snapshot: "ป.3/2",
+    level_name_snapshot: "ป.3",
+  }, classes), "๓/๒");
+  assert.equal(paymentEvidencePdfLevelRoom({
+    class_label_snapshot: "อ.2/3",
+    level_name_snapshot: "อ.2",
+  }), "๒/๓");
+  assert.equal(paymentEvidencePdfLevelRoom({
+    class_label_snapshot: "ม.1/1",
+    level_name_snapshot: "ม.1",
+  }), "๑/๑");
+});
+
+test("official PDF preserves historical room snapshot and handles class fallback", () => {
+  const classes = [{ id: "old-class", level_name: "ป.3", room_name: "6" }];
+  assert.equal(paymentEvidencePdfLevelRoom({
+    class_id: "old-class", class_label_snapshot: "ป.3/2", level_name_snapshot: "ป.3",
+  }, classes), "๓/๒");
+  assert.equal(paymentEvidencePdfLevelRoom({
+    class_id: "old-class", level_name_snapshot: "ป.3",
+  }, classes), "๓/๖");
+  assert.equal(paymentEvidencePdfLevelRoom({
+    class_id: "missing", class_label_snapshot: "ป.4/1", level_name_snapshot: "ป.4",
+  }, []), "๔/๑");
+});
+
+test("official PDF shows class and room for kindergarten, primary, secondary while retaining signatures", async () => {
+  const source = await readFile(new URL("../modules/payment-evidence-documents.js", import.meta.url), "utf8");
+  const gradeRow = source.slice(source.indexOf('<div class="pe-pdf-level">'),source.indexOf('<div class="pe-pdf-declaration">'));
+  assert.match(gradeRow, /อนุบาลปีที่ \$\{kind === "kindergarten" \? esc\(levelRoom\)/);
+  assert.match(gradeRow, /ประถมศึกษาปีที่ \$\{kind === "primary" \? esc\(levelRoom\)/);
+  assert.match(gradeRow, /มัธยมศึกษาปีที่ \$\{kind === "secondary" \? esc\(levelRoom\)/);
+  assert.match(source, /bnkSignatureBeforeAction/);
+  assert.match(source, /class="pe-pdf-signatures"/);
 });
