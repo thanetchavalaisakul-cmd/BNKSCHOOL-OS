@@ -81,6 +81,17 @@ export function paymentEvidenceCanEditDocument({
     && assignments.some((item) => item.class_id === document.class_id);
 }
 
+// Mirrors the server-side document delete authorization.
+export function paymentEvidenceCanDeleteDocument({
+  document,
+  userId,
+  isSuperAdmin = false,
+  isFinance = false,
+} = {}) {
+  return Boolean(document && userId
+    && (isSuperAdmin || isFinance || String(document.created_by) === String(userId)));
+}
+
 const PAYMENT_TYPES = [
   { value: "learning_equipment", label: "ค่าอุปกรณ์การเรียน" },
   { value: "student_uniform", label: "ค่าเครื่องแบบนักเรียน" },
@@ -109,6 +120,7 @@ export function createPaymentEvidenceFeature(ctx) {
     toast,
     renderDashboard,
     bnkSignatureBeforeAction,
+    secureDeleteModal,
     officialPdfFontFaceCss,
     ensureOfficialPdfFont,
     isSuperAdminUser,
@@ -167,6 +179,15 @@ export function createPaymentEvidenceFeature(ctx) {
 
   function canCreate() {
     return Boolean(isAdmin() || local.assignments.length);
+  }
+
+  function canDeleteDocument(doc) {
+    return paymentEvidenceCanDeleteDocument({
+      document: doc,
+      userId: state.user?.id,
+      isSuperAdmin: isAdmin(),
+      isFinance: isFinance(),
+    });
   }
 
   function canEditDocument(doc) {
@@ -313,6 +334,8 @@ export function createPaymentEvidenceFeature(ctx) {
       .pe-btn.primary{background:#167a56;border-color:#167a56;color:#fff}
       .pe-btn.warning{background:#fff7df;border-color:#f3d58a;color:#946200}
       .pe-btn.danger{background:#fff0f0;border-color:#f2c4c4;color:#b42318}
+      .pe-btn.danger:hover{background:#ffe1e1;border-color:#e9a7a7}
+      .pe-btn.pe-delete-small{padding:6px 10px;border-radius:9px;font-size:12px;white-space:nowrap}
       .pe-btn:disabled{opacity:.55;cursor:not-allowed}
       .pe-detail-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
       .pe-detail-head h3{margin:0 0 5px;font-size:20px}
@@ -427,7 +450,10 @@ export function createPaymentEvidenceFeature(ctx) {
                 <td><strong>${formatMoney(doc.total_amount)}</strong> บาท</td>
                 <td>${esc(doc.created_by_name || "—")}</td>
                 <td>${statusBadge(doc.status)}</td>
-                <td><button class="pe-link" data-pe-open="${esc(doc.id)}">เปิดเอกสาร</button></td>
+                <td><div class="pe-actions">
+                  <button class="pe-link" data-pe-open="${esc(doc.id)}">เปิดเอกสาร</button>
+                  ${canDeleteDocument(doc) ? `<button class="pe-btn danger pe-delete-small" data-pe-delete="${esc(doc.id)}">ลบถาวร</button>` : ""}
+                </div></td>
               </tr>`).join("")}
           </tbody>
         </table>
@@ -487,6 +513,7 @@ export function createPaymentEvidenceFeature(ctx) {
     if (canPayDocument(doc)) actions.push('<button class="pe-btn primary" data-pe-action="pay">ลงนามยืนยันการจ่ายเงิน</button>');
     if (canDirectorSignDocument(doc)) actions.push('<button class="pe-btn primary" data-pe-action="director-sign">ผู้อำนวยการลงนามปิดเอกสาร</button>');
     actions.push('<button class="pe-btn" data-pe-action="print">พิมพ์ / บันทึก PDF</button>');
+    if (canDeleteDocument(doc)) actions.push('<button class="pe-btn danger" data-pe-action="delete">ลบเอกสารถาวร</button>');
 
     return `
       <section class="pe-card">
@@ -1235,6 +1262,42 @@ export function createPaymentEvidenceFeature(ctx) {
     win.print();
   }
 
+  function deleteDocumentPermanently(doc) {
+    if (!doc || !canDeleteDocument(doc)) {
+      toast("ไม่มีสิทธิ์ลบเอกสารนี้", "สามารถลบได้เฉพาะเอกสารของตนเอง หรือผู้ได้รับสิทธิ์เจ้าหน้าที่การเงินและแอดมินหลัก", "error");
+      return;
+    }
+    if (typeof secureDeleteModal !== "function") {
+      toast("ไม่สามารถเปิดการยืนยันการลบได้", "กรุณาโหลดหน้าเว็บไซต์ใหม่ก่อนดำเนินการ", "error");
+      return;
+    }
+    secureDeleteModal({
+      title: "ลบหลักฐานการจ่ายเงินถาวร",
+      description: `${classLabel(doc)} · ${typeLabel(doc.document_type)} · รวม ${formatMoney(doc.total_amount)} บาท`,
+      warning: "เอกสารนี้ รวมรายชื่อนักเรียน ยอดเงิน สถานะ และการลงนามของเอกสาร จะถูกลบจากระบบถาวร ไม่สามารถย้อนคืนได้ หากเคยบันทึก PDF ลงเครื่อง ต้องลบไฟล์บนเครื่องแยกต่างหาก และไฟล์ลายเซ็นกลางที่ใช้กับเอกสารอื่นจะไม่ถูกลบ",
+      confirmLabel: "ยืนยันลบเอกสารถาวร",
+      action: async (verifiedClient) => {
+        // For non-admin users this client is a NEW password-authenticated session.
+        // The RPC independently requires a fresh password AMR (90 seconds).
+        const { data, error } = await verifiedClient.rpc("payment_evidence_delete_document", {
+          p_document_id: doc.id,
+        });
+        if (error) throw error;
+        if (data !== true) throw new Error("เซิร์ฟเวอร์ไม่ยืนยันการลบ กรุณาตรวจสอบอีกครั้ง");
+        toast("ลบเอกสารแล้ว", "ลบหลักฐานการจ่ายเงินและรายการที่เกี่ยวข้องถาวรแล้ว", "success");
+      },
+      afterDelete: async () => {
+        local.detail = null;
+        local.items = [];
+        local.signers = [];
+        local.audit = [];
+        local.selectedDocId = null;
+        local.page = "list";
+        await renderDashboard();
+      },
+    });
+  }
+
   async function toggleFinancePermission(userId, active) {
     try {
       if (active) {
@@ -1281,12 +1344,20 @@ export function createPaymentEvidenceFeature(ctx) {
       await renderDashboard();
       toast("อัปเดตข้อมูลแล้ว", "", "success");
     });
-    root.querySelectorAll("[data-pe-open]").forEach((button) => {
-      button.addEventListener("click", async () => {
-        local.selectedDocId = button.dataset.peOpen;
+    // Stable event delegation also handles list rows replaced by filters/search.
+    root.addEventListener("click", async (event) => {
+      const deleteButton = event.target.closest?.("[data-pe-delete]");
+      if (deleteButton && root.contains(deleteButton)) {
+        const doc = local.docs.find((item) => String(item.id) === deleteButton.dataset.peDelete);
+        if (doc) deleteDocumentPermanently(doc);
+        return;
+      }
+      const openButton = event.target.closest?.("[data-pe-open]");
+      if (openButton && root.contains(openButton)) {
+        local.selectedDocId = openButton.dataset.peOpen;
         local.page = "detail";
         await renderDashboard();
-      });
+      }
     });
 
     root.querySelector("#pe-year")?.addEventListener("change", async (event) => {
@@ -1346,6 +1417,7 @@ export function createPaymentEvidenceFeature(ctx) {
     });
     root.querySelector('[data-pe-action="edit"]')?.addEventListener("click", () => openEditor(local.detail));
     root.querySelector('[data-pe-action="print"]')?.addEventListener("click", printDocument);
+    root.querySelector('[data-pe-action="delete"]')?.addEventListener("click", () => deleteDocumentPermanently(local.detail));
     root.querySelector('[data-pe-action="submit"]')?.addEventListener("click", () => signDocument("teacher"));
     root.querySelector('[data-pe-action="pay"]')?.addEventListener("click", () => signDocument("finance"));
     root.querySelector('[data-pe-action="director-sign"]')?.addEventListener("click", () => signDocument("director"));
