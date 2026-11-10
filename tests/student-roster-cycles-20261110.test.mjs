@@ -79,3 +79,14 @@ test("follow-up case read, insert, update and delete policies enforce student vi
   assert.equal((access.match(/private\.can_view_student\(student_id\)/g) || []).length, 5);
   assert.match(access, /mark_student_followup_case_followed[\s\S]*?private\.can_view_student\(v_case\.student_id\)/);
 });
+
+const aggregateCycles = await readFile(new URL("../supabase/migrations/20261110231045_aggregate_roster_cycle_import_sessions.sql", import.meta.url), "utf8");
+
+test("cycle totals aggregate unique missing students across every import session", () => {
+  assert.match(aggregateCycles, /count\(DISTINCT i\.student_id\).*missing_from_file/);
+  assert.match(aggregateCycles, /resolved_at IS NULL/);
+  assert.match(aggregateCycles, /count\(\*\) FILTER \(WHERE s\.status<>'reviewed'\)/);
+  assert.match(aggregateCycles, /GROUP BY s\.semester/);
+  assert.match(aggregateCycles, /coalesce\(t\.missing_count,0\)/);
+  assert.match(aggregateCycles, /coalesce\(t\.pending_count,0\)/);
+});
