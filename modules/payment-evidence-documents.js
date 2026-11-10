@@ -1234,9 +1234,10 @@ export function createPaymentEvidenceFeature(ctx) {
          The first 23mm is the unchanged left position of the "ระดับชั้น" label. */
       .pe-pdf-types,.pe-pdf-level{display:grid;grid-template-columns:23mm minmax(0,1fr) minmax(0,1fr);column-gap:0}
       .pe-pdf-types{row-gap:.8mm;font-size:12.5pt;line-height:1.05;margin:3mm 0 1.5mm}
+      .pe-pdf-types > div{min-width:0;overflow-wrap:anywhere}
       .pe-pdf-types div:nth-child(1){grid-column:2;grid-row:1}
       .pe-pdf-types div:nth-child(2){grid-column:3;grid-row:1}
-      .pe-pdf-types div:nth-child(3){grid-column:2;grid-row:2;font-size:12pt}
+      .pe-pdf-types div:nth-child(3){grid-column:2;grid-row:2;font-size:12pt;padding-right:3mm}
       .pe-pdf-types div:nth-child(4){grid-column:3;grid-row:2}
       .pe-pdf-stars{text-align:center;font-size:10pt;white-space:nowrap;overflow:hidden;line-height:1}
       .pe-pdf-level{row-gap:1mm;align-items:start;font-size:12pt;line-height:1.12;margin:2.5mm 0}
