@@ -1230,16 +1230,21 @@ export function createPaymentEvidenceFeature(ctx) {
       .pe-pdf-page-sheet{position:static;display:block;width:100%;height:auto;min-height:0;overflow:visible;margin:0 auto;padding:0;background:#fff;break-after:auto;page-break-after:auto}
       .pe-pdf-title{text-align:center;font-size:18pt;font-weight:700;line-height:1.12;margin:0}
       .pe-pdf-period{text-align:center;font-size:14pt;line-height:1.1;margin:1mm 0 0}
-      .pe-pdf-types{display:grid;grid-template-columns:1fr 1fr;column-gap:3mm;row-gap:.8mm;font-size:12.5pt;line-height:1.05;margin:3mm 0 1.5mm}
-      .pe-pdf-types div:nth-child(3){font-size:12pt}
+      /* Keep both 2-column checkbox groups on identical X positions.
+         The first 23mm is the unchanged left position of the "ระดับชั้น" label. */
+      .pe-pdf-types,.pe-pdf-level{display:grid;grid-template-columns:23mm minmax(0,1fr) minmax(0,1fr);column-gap:0}
+      .pe-pdf-types{row-gap:.8mm;font-size:12.5pt;line-height:1.05;margin:3mm 0 1.5mm}
+      .pe-pdf-types div:nth-child(1){grid-column:2;grid-row:1}
+      .pe-pdf-types div:nth-child(2){grid-column:3;grid-row:1}
+      .pe-pdf-types div:nth-child(3){grid-column:2;grid-row:2;font-size:12pt}
+      .pe-pdf-types div:nth-child(4){grid-column:3;grid-row:2}
       .pe-pdf-stars{text-align:center;font-size:10pt;white-space:nowrap;overflow:hidden;line-height:1}
-      .pe-pdf-level{display:grid;grid-template-columns:23mm 1fr 1fr;row-gap:1mm;align-items:center;font-size:12pt;line-height:1.12;margin:2.5mm 0}
-      .pe-pdf-level strong{grid-column:1;grid-row:1 / span 2}
+      .pe-pdf-level{row-gap:1mm;align-items:start;font-size:12pt;line-height:1.12;margin:2.5mm 0}
+      .pe-pdf-level strong{grid-column:1;grid-row:1;align-self:start}
       .pe-pdf-level span:nth-of-type(1){grid-column:2;grid-row:1}
       .pe-pdf-level span:nth-of-type(2){grid-column:3;grid-row:1}
       .pe-pdf-level span:nth-of-type(3){grid-column:2;grid-row:2}
       .pe-pdf-level span:nth-of-type(4){grid-column:3;grid-row:2}
-      .pe-pdf-level strong{grid-row:1 / span 2}
       .pe-pdf-declaration{font-size:12.5pt;line-height:1.18;text-align:justify;margin:3mm 0 4mm}
       .pe-pdf-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:11pt;line-height:1.05;margin:0}
       .pe-pdf-table thead{display:table-header-group}
