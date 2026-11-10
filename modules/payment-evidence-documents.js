@@ -147,6 +147,8 @@ export function createPaymentEvidenceFeature(ctx) {
     people: [],
     permissions: [],
     financeSearch: "",
+    printSettings: { finance_user_id: null },
+    printSignerNames: { finance: "", teacher: "", director: "" },
     selectedDocId: null,
     draft: null,
     error: "",
@@ -346,6 +348,10 @@ export function createPaymentEvidenceFeature(ctx) {
       .pe-callout{padding:11px 13px;border-radius:10px;background:#fff7df;color:#875c00;border:1px solid #f3d58a;margin:12px 0}
       .pe-section-title{font-weight:800;margin:16px 0 9px}
       .pe-signers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+      .pe-print-config{background:var(--surface-secondary,#f8fafc);border:1px solid var(--border,#d8dee8);border-radius:13px;padding:15px;margin:14px 0}
+      .pe-print-config strong{font-size:15px}
+      .pe-print-config p{font-size:12px;margin:5px 0 12px;color:var(--muted,#64748b)}
+      .pe-print-config .pe-toolbar{align-items:end}
       .pe-signer{border:1px solid var(--border,#d8dee8);border-radius:11px;padding:12px;min-width:0}
       .pe-signer strong{display:block;font-size:13px}
       .pe-signer span{display:block;font-size:12px;color:var(--muted,#64748b);margin-top:4px}
@@ -544,8 +550,8 @@ export function createPaymentEvidenceFeature(ctx) {
           ${["finance", "teacher", "director"].map((slot) => {
             const signer = signerBySlot[slot];
             return `<div class="pe-signer"><strong>${esc(signerLabel(slot))}</strong>
-              <span>${signer ? esc(signer.signer_name) : "ยังไม่ได้ลงนาม"}</span>
-              <span>${signer ? `วิธีลงนาม: ${esc(signer.method === "paper" ? "ลงนามบนกระดาษ" : signer.method === "drawn" ? "วาดลายเซ็น" : signer.method === "upload" ? "อัปโหลดลายเซ็น" : "ลายเซ็นที่บันทึกไว้")} · ${esc(formatDateTime(signer.signed_at))}` : "—"}</span>
+              <span>ชื่อที่พิมพ์ใน PDF: ${esc(local.printSignerNames[slot] || "ยังไม่กำหนด")}</span>
+              <span>${signer ? `ยืนยันขั้นตอนในระบบเมื่อ ${esc(formatDateTime(signer.signed_at))}` : "รอยืนยันขั้นตอนในระบบ"} · PDF เว้นช่องไว้ให้เซ็นสด</span>
             </div>`;
           }).join("")}
         </div>
@@ -577,8 +583,25 @@ export function createPaymentEvidenceFeature(ctx) {
       if (!query) return true;
       return [person.full_name, person.position_title, person.role].some((value) => String(value || "").toLowerCase().includes(query));
     });
+    const financeOptions = local.people.map((person) => `
+      <option value="${esc(person.user_id)}" ${local.printSettings.finance_user_id === person.user_id ? "selected" : ""}>${esc(person.full_name || "ไม่ระบุชื่อ")} ${person.position_title ? `· ${esc(person.position_title)}` : ""}</option>`).join("");
     return `
       <section class="pe-card">
+        <div class="pe-print-config">
+          <strong>ตั้งค่าชื่อผู้จ่ายเงินใน PDF (เซ็นสด)</strong>
+          <p>กำหนดชื่อเจ้าหน้าที่การเงินที่จะพิมพ์ใต้ช่องลงชื่อ โดยไม่แนบรูปภาพลายเซ็น · ไม่เปลี่ยนสิทธิ์เข้าถึงเอกสาร</p>
+          <div class="pe-toolbar">
+            <div class="pe-field" style="min-width:260px;max-width:460px">
+              <label for="pe-print-finance-user">ชื่อเจ้าหน้าที่การเงิน / ผู้จ่ายเงิน</label>
+              <select id="pe-print-finance-user">
+                <option value="">— ยังไม่กำหนดชื่อ —</option>
+                ${financeOptions}
+              </select>
+            </div>
+            <button class="pe-btn primary" id="pe-print-finance-save">บันทึกชื่อผู้จ่ายเงิน</button>
+          </div>
+          <p style="margin-top:10px">ครูประจำชั้น: ดึงชื่อจากห้องเรียนในเอกสาร · ผู้อำนวยการ: ดึงชื่อจากการตั้งค่าเอกสารราชการ · ทั้ง 3 ตำแหน่งเว้นที่ลงลายมือชื่อจริง</p>
+        </div>
         <div class="pe-detail-head"><div><strong>กำหนดสิทธิ์เจ้าหน้าที่การเงิน</strong><div class="pe-muted pe-small">เพิ่มได้ไม่จำกัดจำนวน · ผู้ที่ได้รับสิทธิ์จะเห็นและจัดการเอกสารทุกห้องเรียน</div></div><span class="pe-status pe-status-completed">ผู้ดูแลระบบ</span></div>
         <div class="pe-toolbar" style="margin:14px 0"><div class="pe-field" style="max-width:420px"><label>ค้นหาบุคลากร</label><input id="pe-finance-search" type="search" value="${esc(local.financeSearch)}" placeholder="ค้นหาชื่อ ตำแหน่ง หรือบทบาท"></div></div>
         <div class="pe-table-wrap"><table class="pe-table">
@@ -635,19 +658,21 @@ export function createPaymentEvidenceFeature(ctx) {
   }
 
   async function loadDetail(documentId) {
-    const [docRes, itemRes, signerRes, auditRes] = await Promise.all([
+    const [docRes, itemRes, signerRes, auditRes, printNamesRes] = await Promise.all([
       supabase.from("payment_evidence_documents").select("*").eq("id", documentId).maybeSingle(),
       supabase.from("payment_evidence_items").select("*").eq("document_id", documentId).order("row_order", { ascending: true }),
       supabase.from("payment_evidence_signers").select("*").eq("document_id", documentId),
       supabase.from("payment_evidence_audit").select("*").eq("document_id", documentId).order("created_at", { ascending: false }),
+      supabase.rpc("payment_evidence_print_signer_names", { p_document_id: documentId }),
     ]);
-    const firstError = docRes.error || itemRes.error || signerRes.error || auditRes.error;
+    const firstError = docRes.error || itemRes.error || signerRes.error || auditRes.error || printNamesRes.error;
     if (firstError) throw firstError;
     if (!docRes.data) throw new Error("ไม่พบเอกสารหรือไม่มีสิทธิ์เข้าถึง");
     local.detail = docRes.data;
     local.items = itemRes.data || [];
     local.signers = signerRes.data || [];
     local.audit = auditRes.data || [];
+    local.printSignerNames = printNamesRes.data || { finance: "", teacher: "", director: "" };
   }
 
   async function load() {
@@ -687,16 +712,19 @@ export function createPaymentEvidenceFeature(ctx) {
       local.docs = docRes.data || [];
 
       if (isAdmin()) {
-        const [peopleRes, permissionRes] = await Promise.all([
+        const [peopleRes, permissionRes, printSettingsRes] = await Promise.all([
           supabase.from("personnel_public_directory")
             .select("user_id,full_name,role,position_title")
             .order("full_name", { ascending: true }),
           supabase.from("payment_evidence_permissions")
             .select("user_id,is_active,created_at,updated_at"),
+          supabase.from("payment_evidence_print_settings")
+            .select("finance_user_id").eq("id", 1).maybeSingle(),
         ]);
-        if (peopleRes.error || permissionRes.error) throw (peopleRes.error || permissionRes.error);
+        if (peopleRes.error || permissionRes.error || printSettingsRes.error) throw (peopleRes.error || permissionRes.error || printSettingsRes.error);
         local.people = peopleRes.data || [];
         local.permissions = permissionRes.data || [];
+        local.printSettings = printSettingsRes.data || { finance_user_id: null };
       }
 
       if (local.page === "detail" && local.selectedDocId) {
@@ -706,6 +734,7 @@ export function createPaymentEvidenceFeature(ctx) {
         local.items = [];
         local.signers = [];
         local.audit = [];
+        local.printSignerNames = { finance: "", teacher: "", director: "" };
       }
     } catch (error) {
       local.error = error?.message || String(error);
@@ -1109,12 +1138,11 @@ export function createPaymentEvidenceFeature(ctx) {
         <td class="pe-pdf-note">${esc(note || "")}</td>
       </tr>`;
     });
-    const imageHtml = (slot, left) => signerImages[slot]
-      ? `<img class="pe-pdf-signature" style="left:${left}" src="${signerImages[slot]}" alt="">`
-      : "";
-    const finance = local.signers.find((s) => s.slot_code === "finance");
-    const teacher = local.signers.find((s) => s.slot_code === "teacher");
-    const director = local.signers.find((s) => s.slot_code === "director");
+    // The finance/teacher/director names come from the verified official roster.
+    // The PDF intentionally never embeds any central signature assets.
+    const financeName = local.printSignerNames.finance || "";
+    const teacherName = local.printSignerNames.teacher || "";
+    const directorName = local.printSignerNames.director || "";
     const totalAmount = paymentEvidenceThaiDigits(formatMoney(doc.total_amount));
     const pageLabel = ""; // Let the browser paginate the table at actual A4 boundaries.
     return `
@@ -1152,22 +1180,19 @@ export function createPaymentEvidenceFeature(ctx) {
         ${isLastPage ? `
           <div class="pe-pdf-signatures">
             <div class="pe-pdf-signature-block pe-pdf-finance">
-              ${imageHtml("finance", "27mm")}
               <div>ลงชื่อ........................................ผู้จ่ายเงิน</div>
-              <div>(${esc(finance?.signer_name || "........................................")})</div>
+              <div>(${esc(financeName || "........................................")})</div>
               <div>เจ้าหน้าที่การเงิน</div>
             </div>
             <div class="pe-pdf-signature-block pe-pdf-teacher">
-              ${imageHtml("teacher", "27mm")}
               <div>ครูประจำชั้น........................................</div>
-              <div>(${esc(teacher?.signer_name || "........................................")})</div>
+              <div>(${esc(teacherName || "........................................")})</div>
               <div>ตรวจสอบแล้วถูกต้อง</div>
             </div>
           </div>
           <div class="pe-pdf-director">
-            ${imageHtml("director", "34mm")}
             <div>ลงชื่อ........................................</div>
-            <div>(${esc(director?.signer_name || "........................................")})</div>
+            <div>(${esc(directorName || "........................................")})</div>
             <div>ผู้อำนวยการโรงเรียนบ้านหนองเขียว</div>
           </div>` : ""}
         </div>
@@ -1191,11 +1216,8 @@ export function createPaymentEvidenceFeature(ctx) {
       toast("เปิดหน้าพิมพ์ไม่ได้", "กรุณาอนุญาตป๊อปอัปสำหรับเว็บไซต์ BNK SCHOOL OS", "warning");
       return;
     }
+    // Preserve the original A4 layout while leaving all signature areas blank.
     const signerImages = {};
-    await Promise.all(local.signers.map(async (signer) => {
-      signerImages[signer.slot_code] = await loadSignerImage(signer);
-    }));
-    // A single flowing table: repeated THEAD, no per-page duplicate totals or signers.
     const pages = [pdfPageHtml(doc, items, 0, 1, signerImages, true)];
     const fontCss = typeof officialPdfFontFaceCss === "function" ? officialPdfFontFaceCss() : "";
     win.document.open();
@@ -1238,7 +1260,6 @@ export function createPaymentEvidenceFeature(ctx) {
       .pe-pdf-total strong{display:inline-block;min-width:32mm;text-align:center;border-bottom:.45pt solid #111;padding:0 2mm}
       .pe-pdf-signatures{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin-top:3mm;font-size:12.5pt;text-align:center}
       .pe-pdf-signature-block,.pe-pdf-director{position:relative;padding-top:8mm;line-height:1.2;min-height:19mm}
-      .pe-pdf-signature{position:absolute;left:50%!important;top:0;transform:translateX(-50%);width:27mm;height:8mm;object-fit:contain;pointer-events:none}
       .pe-pdf-director{width:90mm;margin:2mm auto 0;text-align:center;font-size:12.5pt}
       .pe-pdf-page{display:none}
       /* Keep the final financial sum and all three signature slots together. */
@@ -1298,6 +1319,26 @@ export function createPaymentEvidenceFeature(ctx) {
     });
   }
 
+  async function savePrintFinanceSigner() {
+    if (!isAdmin()) {
+      toast("ไม่มีสิทธิ์ตั้งค่า", "เฉพาะแอดมินหลักเท่านั้นที่แก้ไขชื่อเจ้าหน้าที่การเงินใน PDF ได้", "error");
+      return;
+    }
+    const userId = document.getElementById("pe-print-finance-user")?.value || "";
+    try {
+      const { data, error } = await supabase.rpc("payment_evidence_set_print_finance", {
+        p_user_id: userId || null,
+      });
+      if (error) throw error;
+      if (data !== true) throw new Error("เซิร์ฟเวอร์ยังไม่ยืนยันการบันทึก");
+      local.printSettings.finance_user_id = userId || null;
+      toast("บันทึกชื่อเจ้าหน้าที่การเงินแล้ว", "ชื่อจะปรากฏใน PDF ทุกฉบับโดยไม่มีรูปภาพลายเซ็น", "success");
+      await renderDashboard();
+    } catch (error) {
+      toast("บันทึกชื่อผู้จ่ายเงินไม่สำเร็จ", error?.message || String(error), "error");
+    }
+  }
+
   async function toggleFinancePermission(userId, active) {
     try {
       if (active) {
@@ -1339,6 +1380,7 @@ export function createPaymentEvidenceFeature(ctx) {
       });
     });
 
+    root.querySelector("#pe-print-finance-save")?.addEventListener("click", savePrintFinanceSigner);
     root.querySelector('[data-pe-action="create"]')?.addEventListener("click", () => openEditor());
     root.querySelector('[data-pe-action="refresh"]')?.addEventListener("click", async () => {
       await renderDashboard();
