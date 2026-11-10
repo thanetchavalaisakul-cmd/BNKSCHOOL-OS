@@ -50,6 +50,16 @@ async function loadGeneralStudentRosterFeature(){
   return bnkGeneralStudentRosterFeaturePromise;
 }
 
+let bnkPaymentEvidenceFeaturePromise=null;
+let paymentEvidenceFeature=null;
+async function loadPaymentEvidenceFeature(){
+  bnkPaymentEvidenceFeaturePromise??=import("./modules/payment-evidence-documents.js?v=20261110.6").then(mod=>{
+    paymentEvidenceFeature=mod.createPaymentEvidenceFeature({state,supabase,currentAcademicPeriod,escapeHtml,toast,renderDashboard,bnkSignatureBeforeAction,secureDeleteModal,officialPdfFontFaceCss,ensureOfficialPdfFont,isSuperAdminUser});
+    return paymentEvidenceFeature;
+  }).catch(error=>{bnkPaymentEvidenceFeaturePromise=null;throw error;});
+  return bnkPaymentEvidenceFeaturePromise;
+}
+
 let bnkAcademicReportPdfFeaturePromise=null;
 async function loadAcademicReportPdfFeature(){
  bnkAcademicReportPdfFeaturePromise??=import("./modules/academic-report-pdf.js?v=5.12.9.58").then(mod=>mod.createAcademicReportPdfFeature({academicSubmissionWorkflowSettings,classroomResearchOnePageData,classroomResearchPdfStyles,classroomResearchSignBlock,classroomResearchSignatureAssets,classroomResearchTypeLabel,classroomResearchWorkflow,clubActivityLines,clubActivityMembersFor,clubActivityNormalizeAttendance,clubActivityPdfSignBlock,clubActivityPdfStyles,clubActivityPhotoDataUrl,clubActivitySharedNames,clubActivitySignatureAssets,educationOffice,escapeHtml,learnerActivityActivities,learnerActivityCalcResult,learnerActivityChunk,learnerActivityGenderCounts,learnerActivityOverall,learnerActivityPdfHeader,learnerActivityPdfStyles,learnerActivityResultFor,learnerActivityResultSummary,learnerActivitySharedNames,learnerActivitySignBlock,learnerActivitySignatureAssets,learnerActivityStudentsFor,learningMediaCheck,learningMediaHeadFor,learningMediaItems,learningMediaOfficeShort,learningMediaPdfStyles,learningMediaPhotoAssets,learningMediaSchoolShort,learningMediaSignatureAssets,learningMediaThaiDate,learningMediaWorkflow,lessonUsageEffectiveMemo,lessonUsageGradePct,lessonUsageGradeTable,lessonUsageHeadFor,lessonUsageInterpretMean,lessonUsagePdfSection,lessonUsagePdfStyles,lessonUsageSatStats,lessonUsageSatTable,lessonUsageSignatureAssets,lessonUsageThaiDate,lessonUsageTopTable,lessonUsageUnitTable,lessonUsageWorkflow,money,postLessonBehaviorPageRows,postLessonPdfSection,postLessonPdfSignBlock,postLessonPdfStyles,postLessonScopeLabel,postLessonScopePdfText,postLessonSignatureAssets,schoolAddress,schoolLogoDataUrl,schoolName,sharedSignatureGridHtml,state,thaiDateTimeDocument})).catch(error=>{bnkAcademicReportPdfFeaturePromise=null;throw error;});
@@ -479,6 +489,8 @@ const state = {
   studentRegistryPromotionItems: [],
   studentRegistryView: "students",
   generalStudentRosterAccess: {can_view:false,can_manage_transfers:false,can_add_students:false,can_export:false,is_super_admin:false},
+  paymentEvidenceAccess: {can_access:false,is_finance:false,is_homeroom:false,is_director:false,is_super_admin:false},
+  paymentEvidenceLoadError: "",
   generalStudentRosterTab: "roster",
   generalStudentRosterYear: null,
   generalStudentRosterSemester: null,
@@ -1165,7 +1177,7 @@ function renderPending() {
 async function loadActiveUserData() {
   // The initial bootstrap already loaded shared catalog data.
   if (!state.systemSettings || !state.departments.length || !state.subjectGroups.length) await loadPublicData();
-  const [departmentsRes, modulesRes, notificationsRes, personnelOwnRes, academicTermsRes, academicCalendarSettingsRes, academicSupervisionSettingsRes, academicRegistrationSettingsRes, academicCertificateSettingsRes, academicDocumentServiceSettingsRes, procurementAccessRes, generalStudentRosterPermissionRes] = await Promise.all([
+  const [departmentsRes, modulesRes, notificationsRes, personnelOwnRes, academicTermsRes, academicCalendarSettingsRes, academicSupervisionSettingsRes, academicRegistrationSettingsRes, academicCertificateSettingsRes, academicDocumentServiceSettingsRes, procurementAccessRes, generalStudentRosterPermissionRes, paymentEvidencePermissionRes, paymentEvidenceHomeroomRes] = await Promise.all([
     supabase.from("departments").select("*").eq("is_active", true).order("sort_order"),
     supabase.from("modules").select("*, departments(code,name_th,name_en)").eq("is_active", true).order("sort_order"),
     supabase.from("notifications").select("*").is("dismissed_at", null).order("created_at", { ascending: false }).limit(60),
@@ -1178,6 +1190,8 @@ async function loadActiveUserData() {
     supabase.from("academic_document_service_settings").select("*").eq("id",1).maybeSingle(),
     supabase.from("procurement_module_permissions").select("user_id,can_access_control,can_access_documents,can_access_school_lunch").eq("user_id",state.user.id).maybeSingle(),
     supabase.from("general_student_roster_permissions").select("can_view,can_manage_transfers,can_add_students,can_export,is_active").eq("user_id",state.user.id).maybeSingle(),
+    supabase.from("payment_evidence_permissions").select("is_active").eq("user_id",state.user.id).maybeSingle(),
+    supabase.from("homeroom_teachers").select("class_id").eq("teacher_id",state.user.id),
   ]);
 
   state.departments = departmentsRes.data || [];
@@ -1190,7 +1204,22 @@ async function loadActiveUserData() {
         can_export:!!generalStudentRosterPermissionRes.data?.is_active&&!!generalStudentRosterPermissionRes.data?.can_view&&!!generalStudentRosterPermissionRes.data?.can_export,
         is_super_admin:false
       };
-  state.modules = (modulesRes.data || []).filter(m=>m.code!=="general_student_roster"||state.generalStudentRosterAccess.can_view);
+  const paymentEvidenceSuperAdmin = isSuperAdminUser();
+  const paymentEvidenceFinance = !!paymentEvidencePermissionRes.data?.is_active;
+  const paymentEvidenceHomeroom = (paymentEvidenceHomeroomRes.data || []).length > 0;
+  const paymentEvidenceDirector = ["director", "acting_director"].includes(state.profile?.role);
+  state.paymentEvidenceAccess = {
+    is_super_admin: paymentEvidenceSuperAdmin,
+    is_finance: paymentEvidenceFinance,
+    is_homeroom: paymentEvidenceHomeroom,
+    is_director: paymentEvidenceDirector,
+    can_access: paymentEvidenceSuperAdmin || paymentEvidenceFinance || paymentEvidenceHomeroom || paymentEvidenceDirector,
+  };
+  state.paymentEvidenceLoadError = "";
+  state.modules = (modulesRes.data || []).filter(m=>
+    (m.code!=="general_student_roster"||state.generalStudentRosterAccess.can_view)
+    && (m.code!=="payment_evidence_documents"||state.paymentEvidenceAccess.can_access)
+  );
   state.procurementPermissionError = procurementAccessRes.error ? (procurementAccessRes.error.message||String(procurementAccessRes.error)) : "";
   state.procurementAccess = isSuperAdminUser()
     ? {can_access_control:true,can_access_documents:true,can_access_school_lunch:true}
@@ -1256,6 +1285,25 @@ async function loadActiveUserData() {
     });
     state.modules.sort((a,b) => Number(a.sort_order||0) - Number(b.sort_order||0));
   }
+  if (procurementDepartment && state.paymentEvidenceAccess?.can_access && !state.modules.some(m => m.code === "payment_evidence_documents")) {
+    state.modules.push({
+      id: "local-payment-evidence-documents",
+      department_id: procurementDepartment.id,
+      code: "payment_evidence_documents",
+      name_th: "ระบบหลักฐานการจ่ายเงิน",
+      name_en: "Payment Evidence Documents",
+      route: "/plan-budget/payment-evidence",
+      sort_order: 22,
+      is_active: true,
+      departments: {
+        code: procurementDepartment.code,
+        name_th: procurementDepartment.name_th,
+        name_en: procurementDepartment.name_en,
+      },
+      _local_fallback: true,
+    });
+    state.modules.sort((a,b) => Number(a.sort_order||0) - Number(b.sort_order||0));
+  }
   const generalDepartment = state.departments.find(d=>d.code==="general");
   if(generalDepartment&&!state.modules.some(m=>m.code==="housing_electricity")){
     state.modules.push({id:"local-housing-electricity",department_id:generalDepartment.id,
@@ -1293,7 +1341,10 @@ async function loadActiveUserData() {
       _local_fallback: true,
     });
   }
-  state.modules = state.modules.filter(m=>!['procurement_document_control','procurement_documents','school_lunch_documents'].includes(m.code)||procurementHasModuleAccess(m.code));
+  state.modules = state.modules.filter(m=>
+    (!['procurement_document_control','procurement_documents','school_lunch_documents'].includes(m.code)||procurementHasModuleAccess(m.code))
+    && (m.code!=="payment_evidence_documents"||state.paymentEvidenceAccess?.can_access)
+  );
   state.modules.sort((a,b) => Number(a.sort_order||0) - Number(b.sort_order||0));
   if(state.profile?.role === "pa_evaluator") {
     state.modules = state.modules.filter(m=>m.code === "personnel_pa");
@@ -1623,6 +1674,16 @@ async function renderDashboard() {
       console.error("General student roster load failed",error);
     }
   }
+  if (state.currentView === "module:payment_evidence_documents" && state.paymentEvidenceAccess?.can_access) {
+    state.paymentEvidenceLoadError = "";
+    try {
+      await loadPaymentEvidenceFeature();
+      await paymentEvidenceFeature.load();
+    } catch(error) {
+      state.paymentEvidenceLoadError = error?.message || String(error);
+      console.error("Payment evidence workspace load failed",error);
+    }
+  }
   if (state.currentView === "module:student_cards") {
     await loadStudentCardWorkspace();
   }
@@ -1670,6 +1731,7 @@ async function renderDashboard() {
   enhanceResponsiveTables(document);
   await bindDashboardEvents();
   if(state.currentView==="module:general_student_roster"&&generalStudentRosterFeature)await generalStudentRosterFeature.bind();
+  if(state.currentView==="module:payment_evidence_documents"&&paymentEvidenceFeature)await paymentEvidenceFeature.bind();
   if(state.currentView==="module:academic_certificate_registry"&&academicCertificateRegistryFeature)await academicCertificateRegistryFeature.bind();
 }
 
@@ -14025,6 +14087,7 @@ function moduleView(code) {
   if(code==="procurement_document_control"&&!procurementHasModuleAccess(code))return procurementAccessDeniedHtml("ระบบเลขคุมเอกสารจัดซื้อจัดจ้างและพัสดุ");
   if(code==="procurement_documents"&&!procurementHasModuleAccess(code))return procurementAccessDeniedHtml("ระบบจัดทำเอกสารจัดซื้อจัดจ้างและพัสดุ");
   if(code==="school_lunch_documents"&&!procurementHasModuleAccess(code))return procurementAccessDeniedHtml("ระบบจัดทำเอกสารอาหารกลางวัน");
+  if(code==="payment_evidence_documents"&&!state.paymentEvidenceAccess?.can_access)return '<section class="panel"><div class="empty"><strong>ไม่มีสิทธิ์เข้าใช้งาน</strong><span>ระบบนี้เปิดให้ครูประจำชั้น เจ้าหน้าที่การเงิน และผู้อำนวยการเท่านั้น</span></div></section>';
   const module = state.modules.find(m => m.code === code);
   if (!module) return `<div class="empty"><strong>ไม่พบระบบย่อย</strong></div>`;
   if (code === "student_behavior") return behaviorFeature.html();
@@ -14051,6 +14114,10 @@ function moduleView(code) {
   if (code === "home_visit_management") return homeVisitWorkspaceHtml(module);
   if (code === "student_registry") return studentRegistryWorkspaceHtml(module);
   if (code === "general_student_roster") return generalStudentRosterFeature ? generalStudentRosterFeature.view(module) : `<section class="panel"><div class="empty"><strong>กำลังโหลดระบบบัญชีรายชื่อนักเรียน</strong></div></section>`;
+  if (code === "payment_evidence_documents") {
+    if (state.paymentEvidenceLoadError) return `<section class="panel"><div class="empty"><strong>โหลดระบบหลักฐานการจ่ายเงินไม่สำเร็จ</strong><span>${escapeHtml(state.paymentEvidenceLoadError)}</span></div></section>`;
+    return paymentEvidenceFeature ? paymentEvidenceFeature.view(module) : '<section class="panel"><div class="empty"><strong>กำลังโหลดระบบหลักฐานการจ่ายเงิน</strong></div></section>';
+  }
   if (code === "student_cards") return studentCardWorkspaceHtml(module);
   return `<section class="panel"><div class="empty"><strong>${escapeHtml(module.name_th)}</strong><span>Module นี้ยังไม่มีหน้าทำงานเฉพาะ</span></div></section>`;
 }

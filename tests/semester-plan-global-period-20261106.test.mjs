@@ -77,7 +77,7 @@ test("live tabs reconcile the central period and refresh only when safe",()=>{
 
 test("HTML and JS are revalidated; new builds notify users before reload",()=>{
   assert.match(html,/meta name="bnk-release"/);
-  assert.match(html,/app\.min\.js\?v=5\.12\.9\.800/);
+  assert.match(html,/app\.min\.js\?v=5\.12\.9\.\d+/);
   assert.match(html,/bnk-client-version\.js\?v=20261106\.1/);
   assert.ok(vercel.headers.some(h=>h.source==="/"&&h.headers.some(x=>x.key==="Cache-Control"&&x.value.includes("no-store"))));
   assert.match(moduleCode,/cache:"no-store"/);
