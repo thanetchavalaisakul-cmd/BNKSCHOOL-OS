@@ -20,6 +20,6 @@ new_cache = "./app.min.js?v=5.12.9.795"
 if old_cache in html:
     page.write_text(html.replace(old_cache, new_cache), encoding="utf-8")
 elif new_cache not in html:
-    current = re.search(r"\\./app\\.min\\.js\\?v=5\\.12\\.9\\.(\\d+)", html)
+    current = re.search(r"[.]/app[.]min[.]js[?]v=5[.]12[.]9[.]([0-9]+)", html)
     if not current or int(current.group(1)) < 795:
         raise SystemExit("Unexpected app.min.js asset version; review before changing")
