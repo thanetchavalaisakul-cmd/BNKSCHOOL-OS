@@ -867,8 +867,9 @@ export function createPaymentEvidenceFeature(ctx) {
       updateDraftSummary();
     });
     modal.querySelector("#pe-apply-bulk")?.addEventListener("click", () => {
-      const amount = Number(modal.querySelector("#pe-bulk-amount")?.value);
-      if (!Number.isFinite(amount) || amount < 0) {
+      const inputValue = modal.querySelector("#pe-bulk-amount")?.value?.trim() ?? "";
+      const amount = Number(inputValue);
+      if (!inputValue || !Number.isFinite(amount) || amount < 0) {
         toast("จำนวนเงินไม่ถูกต้อง", "กรุณากรอกจำนวนเงินตั้งแต่ 0 บาทขึ้นไป", "warning");
         return;
       }
@@ -878,6 +879,24 @@ export function createPaymentEvidenceFeature(ctx) {
         if (row) input.value = String(row.amount);
       });
       updateDraftSummary();
+    });
+    modal.querySelector("#pe-apply-bulk-date")?.addEventListener("click", () => {
+      const date = modal.querySelector("#pe-bulk-date")?.value || "";
+      const selectedCount = local.draft.rows.filter((row) => row.selected && row.student_id).length;
+      if (!selectedCount) {
+        toast("ยังไม่ได้เลือกรายชื่อ", "กรุณาเลือกรายชื่อนักเรียนก่อนกำหนดวันที่รับเงิน", "warning");
+        return;
+      }
+      try {
+        local.draft.rows = paymentEvidenceApplyBulkDate(local.draft.rows, date);
+        modal.querySelectorAll("[data-pe-row-date]").forEach((input) => {
+          const row = local.draft.rows.find((item) => String(item.student_id || "") === input.dataset.peRowDate);
+          if (row) input.value = row.received_date || "";
+        });
+        toast("กำหนดวันที่รับเงินแล้ว", `ใส่วันที่ให้ผู้ที่เลือก ${selectedCount} คนแล้ว สามารถแก้ไขแยกรายคนได้`, "success");
+      } catch (error) {
+        toast("วันที่รับเงินไม่ถูกต้อง", error?.message || String(error), "warning");
+      }
     });
     modal.querySelector("#pe-editor-rows")?.addEventListener("change", (event) => {
       const target = event.target;
@@ -1087,7 +1106,8 @@ export function createPaymentEvidenceFeature(ctx) {
           </tr></thead>
           <tbody>${rows.join("")}</tbody>
         </table>
-        <div class="pe-pdf-total"><span>รวมเงินทั้งสิ้น</span><strong>${totalAmount}</strong></div>
+        <div class="pe-pdf-final">
+        <div class="pe-pdf-total"><span>รวมเงินทั้งสิ้น</span><strong>${totalAmount}</strong><span>บาท</span></div>
         ${isLastPage ? `
           <div class="pe-pdf-signatures">
             <div class="pe-pdf-signature-block pe-pdf-finance">
@@ -1109,6 +1129,7 @@ export function createPaymentEvidenceFeature(ctx) {
             <div>(${esc(director?.signer_name || "........................................")})</div>
             <div>ผู้อำนวยการโรงเรียนบ้านหนองเขียว</div>
           </div>` : ""}
+        </div>
       </section>`;
   }
 
@@ -1162,6 +1183,7 @@ export function createPaymentEvidenceFeature(ctx) {
       .pe-pdf-table .pe-pdf-name{text-align:left}
       .pe-pdf-table .pe-pdf-money{text-align:right;white-space:nowrap}
       .pe-pdf-table .pe-pdf-note{text-align:left;font-size:10.5pt}
+      .pe-pdf-final{break-inside:avoid;page-break-inside:avoid;padding-top:3mm}
       .pe-pdf-total,.pe-pdf-signatures,.pe-pdf-director{position:static}
       .pe-pdf-total{display:flex;justify-content:flex-end;align-items:center;gap:3mm;margin-top:3.5mm;min-height:8mm;font-size:13pt;font-weight:700}
       .pe-pdf-total strong{display:inline-block;min-width:32mm;text-align:center;border-bottom:.45pt solid #111;padding:0 2mm}
