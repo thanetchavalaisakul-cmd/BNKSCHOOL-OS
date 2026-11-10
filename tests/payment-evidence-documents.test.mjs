@@ -348,7 +348,7 @@ test("finance PDF type and grade checkboxes use the same left and right vertical
     assert.match(css, pattern);
   }
   for (const [number, col, row] of [[1, 2, 1], [2, 3, 1], [3, 2, 2], [4, 3, 2]]) {
-    assert.ok(css.includes(\`.pe-pdf-level span:nth-of-type(\${number}){grid-column:\${col};grid-row:\${row}}\`));
+    assert.ok(css.includes(`.pe-pdf-level span:nth-of-type(${number}){grid-column:${col};grid-row:${row}}`));
   }
   assert.match(css, /\.pe-pdf-types > div\{min-width:0;overflow-wrap:anywhere\}/);
   assert.match(css, /\.pe-pdf-types div:nth-child\(3\)\{grid-column:2;grid-row:2;font-size:12pt;padding-right:3mm\}/);
