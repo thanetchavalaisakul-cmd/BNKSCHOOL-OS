@@ -452,9 +452,9 @@ export function createPaymentEvidenceFeature(ctx) {
       return `<tr>
         <td>${index + 1}</td>
         <td><strong>${esc(studentName(item))}</strong><div class="pe-muted pe-small">${esc(snapshot.student_code || "")}</div></td>
-        <td>${esc(studentCitizenId(item))}</td>
-        <td style="text-align:right">${formatMoney(item.amount)}</td>
-        <td>${esc(formatDate(item.received_date))}</td>
+        <td>${esc(paymentEvidenceThaiDigits(studentCitizenId(item)))}</td>
+        <td style="text-align:right">${paymentEvidenceThaiDigits(formatMoney(item.amount))}</td>
+        <td>${esc(paymentEvidenceThaiDigits(formatDate(item.received_date)))}</td>
         <td>${note ? esc(note) : "—"}</td>
       </tr>`;
     }).join("");
@@ -1028,10 +1028,10 @@ export function createPaymentEvidenceFeature(ctx) {
     const checked = (value) => value ? "☑" : "☐";
     const rows = pageItems.map((item, index) => {
       const snapshot = item.student_snapshot || {};
-      const globalNumber = pageIndex * 8 + index + 1;
+      const globalNumber = index + 1;
       const note = item.note || rosterStatusNote(snapshot.roster_status);
       return `<tr>
-        <td>${globalNumber}</td>
+        <td>${paymentEvidenceThaiDigits(globalNumber)}</td>
         <td class="pe-pdf-name">${esc(studentName(item))}</td>
         <td>${esc(studentCitizenId(item))}</td>
         <td class="pe-pdf-money">${formatMoney(item.amount)}</td>
@@ -1040,22 +1040,19 @@ export function createPaymentEvidenceFeature(ctx) {
         <td class="pe-pdf-note">${esc(note || "")}</td>
       </tr>`;
     });
-    while (rows.length < 8) {
-      rows.push("<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>");
-    }
     const imageHtml = (slot, left) => signerImages[slot]
       ? `<img class="pe-pdf-signature" style="left:${left}" src="${signerImages[slot]}" alt="">`
       : "";
     const finance = local.signers.find((s) => s.slot_code === "finance");
     const teacher = local.signers.find((s) => s.slot_code === "teacher");
     const director = local.signers.find((s) => s.slot_code === "director");
-    const totalAmount = formatMoney(doc.total_amount);
-    const pageLabel = pageCount > 1 ? `<div class="pe-pdf-page">หน้า ${pageIndex + 1}/${pageCount}</div>` : "";
+    const totalAmount = paymentEvidenceThaiDigits(formatMoney(doc.total_amount));
+    const pageLabel = ""; // Let the browser paginate the table at actual A4 boundaries.
     return `
       <section class="pe-pdf-page-sheet">
         ${pageLabel}
         <div class="pe-pdf-title">แบบหลักฐานการจ่ายเงิน</div>
-        <div class="pe-pdf-period">ภาคเรียนที่ ${esc(doc.semester)} ปีการศึกษา ${esc(doc.academic_year)}</div>
+        <div class="pe-pdf-period">ภาคเรียนที่ ${paymentEvidenceThaiDigits(esc(doc.semester))} ปีการศึกษา ${paymentEvidenceThaiDigits(esc(doc.academic_year))}</div>
         <div class="pe-pdf-types">
           <div>${checked(type === "learning_equipment")} ค่าอุปกรณ์การเรียน</div>
           <div>${checked(type === "student_uniform")} ค่าเครื่องแบบนักเรียน</div>
@@ -1071,13 +1068,13 @@ export function createPaymentEvidenceFeature(ctx) {
           <span>☐ ปวช. ที่จัดโดยสถานประกอบการ ปีที่......</span>
         </div>
         <div class="pe-pdf-declaration">
-          นักเรียนจำนวนทั้งสิ้น <strong>${Number(doc.student_count) || local.items.length}</strong> คน ได้รับเงินจากโรงเรียนบ้านหนองเขียว สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาเชียงใหม่ เขต 3
+          นักเรียนจำนวนทั้งสิ้น <strong>${paymentEvidenceThaiDigits(pageItems.length)}</strong> คน ได้รับเงินจากโรงเรียนบ้านหนองเขียว สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาเชียงใหม่ เขต 3
           ข้าพเจ้าขอรับรองว่าจะนำเงินที่ได้รับไปดำเนินการตามวัตถุประสงค์ของทางราชการ หากไม่ดำเนินการดังกล่าวข้าพเจ้ายินยอมชดใช้เงินคืนให้กับโรงเรียนต่อไป
         </div>
         <table class="pe-pdf-table">
           <colgroup><col style="width:9.2mm"><col style="width:48.6mm"><col style="width:35.1mm"><col style="width:18.5mm"><col style="width:21.8mm"><col style="width:29mm"><col style="width:19mm"></colgroup>
           <thead><tr>
-            <th>ที่</th><th>ชื่อ – สกุล</th><th>หมายเลขบัตร<br>ประชาชน หลัก 13</th><th>จำนวน<br>เงิน</th><th>วันที่รับเงิน</th><th>ลายมือชื่อ<br>ผู้ปกครอง/<br>นักเรียน</th><th>หมายเหตุ</th>
+            <th>ที่</th><th>ชื่อ – สกุล</th><th>หมายเลขบัตร<br>ประชาชน ๑๓ หลัก</th><th>จำนวน<br>เงิน</th><th>วันที่รับเงิน</th><th>ลายมือชื่อ<br>ผู้ปกครอง/<br>นักเรียน</th><th>หมายเหตุ</th>
           </tr></thead>
           <tbody>${rows.join("")}</tbody>
         </table>
@@ -1114,6 +1111,10 @@ export function createPaymentEvidenceFeature(ctx) {
       toast("ไม่มีรายชื่อนักเรียน", "เอกสารนี้ยังไม่มีรายการนักเรียนสำหรับพิมพ์", "warning");
       return;
     }
+    if (!paymentEvidencePrintTotalsMatch(doc, items)) {
+      toast("ยอดเงินหรือรายชื่อไม่ตรงกับเอกสาร", "กรุณาอัปเดตข้อมูลและตรวจสอบยอดรวมก่อนส่งออก PDF", "error");
+      return;
+    }
     const win = window.open("", "_blank");
     if (!win) {
       toast("เปิดหน้าพิมพ์ไม่ได้", "กรุณาอนุญาตป๊อปอัปสำหรับเว็บไซต์ BNK SCHOOL OS", "warning");
@@ -1123,19 +1124,15 @@ export function createPaymentEvidenceFeature(ctx) {
     await Promise.all(local.signers.map(async (signer) => {
       signerImages[signer.slot_code] = await loadSignerImage(signer);
     }));
-    const pageCount = Math.ceil(items.length / 8);
-    const pages = [];
-    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
-      const pageItems = items.slice(pageIndex * 8, (pageIndex + 1) * 8);
-      pages.push(pdfPageHtml(doc, pageItems, pageIndex, pageCount, signerImages, pageIndex === pageCount - 1));
-    }
+    // A single flowing table: repeated THEAD, no per-page duplicate totals or signers.
+    const pages = [pdfPageHtml(doc, items, 0, 1, signerImages, true)];
     const fontCss = typeof officialPdfFontFaceCss === "function" ? officialPdfFontFaceCss() : "";
     win.document.open();
     win.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>หลักฐานการจ่ายเงิน</title><style>
       ${fontCss}
       @page{size:A4;margin:0}
       *{box-sizing:border-box}
-      html,body{margin:0;padding:0;background:#fff;color:#111;font-family:"TH Sarabun New","Sarabun",sans-serif}
+      html,body{margin:0;padding:0;background:#fff;color:#111;font-family:"TH SarabunIT๙",serif}
       .pe-pdf-page-sheet{position:relative;width:210mm;height:297mm;overflow:hidden;background:#fff;margin:0 auto;page-break-after:always;padding:0;color:#111}
       .pe-pdf-page-sheet:last-child{page-break-after:auto}
       .pe-pdf-title{position:absolute;top:20mm;left:0;width:100%;text-align:center;font-size:16pt;font-weight:700}
@@ -1173,7 +1170,11 @@ export function createPaymentEvidenceFeature(ctx) {
     try {
       if (typeof ensureOfficialPdfFont === "function") await ensureOfficialPdfFont("14pt", win.document);
       if (win.document.fonts?.ready) await win.document.fonts.ready;
-    } catch {}
+    } catch(error) {
+      win.close();
+      toast("โหลดฟอนต์เอกสารไม่ได้", error?.message || "ไม่สามารถใช้ฟอนต์ TH Sarabun IT๙ ได้", "error");
+      return;
+    }
     win.focus();
     win.print();
   }
