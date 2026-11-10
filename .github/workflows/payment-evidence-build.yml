@@ -12,6 +12,7 @@ on:
       - 'tests/**'
       - supabase/migrations/20261110_payment_evidence_documents.sql
       - supabase/migrations/20261110_payment_evidence_secure_delete.sql
+      - supabase/migrations/20261110_payment_evidence_wet_signers.sql
       - package.json
       - package-lock.json
 
