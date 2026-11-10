@@ -169,26 +169,22 @@ language sql
 stable
 security definer
 set search_path = ''
-as $$
+as $
   select private.is_active_user()
      and exists (
        select 1
        from public.payment_evidence_documents d
        where d.id = p_document_id
+         and d.status in ('draft', 'returned')
          and (
            private.is_super_admin()
            or (
-             private.is_payment_evidence_finance()
-             and d.status in ('draft', 'submitted', 'returned')
-           )
-           or (
              d.created_by = auth.uid()
-             and d.status in ('draft', 'returned')
              and private.is_homeroom_teacher_for_class(auth.uid(), d.class_id)
            )
          )
      );
-$$;
+$;
 
 create or replace function private.can_sign_payment_evidence_document(p_document_id uuid)
 returns boolean
@@ -435,6 +431,12 @@ drop trigger if exists payment_evidence_status_guard on public.payment_evidence_
 create trigger payment_evidence_status_guard
 before update of status on public.payment_evidence_documents
 for each row execute function private.guard_payment_evidence_status_transition();
+
+-- Trigger functions are invoked by PostgreSQL triggers only; never expose their
+-- SECURITY DEFINER entry points to authenticated or anonymous API callers.
+revoke all on function private.set_payment_evidence_updated_at() from public, anon;
+revoke all on function private.audit_payment_evidence_document() from public, anon;
+revoke all on function private.guard_payment_evidence_status_transition() from public, anon;
 
 create or replace function public.payment_evidence_roster(
   p_academic_year text,

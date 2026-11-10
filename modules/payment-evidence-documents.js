@@ -24,6 +24,22 @@ export function paymentEvidenceDocumentStatusLabel(status) {
   })[status] || "ไม่ทราบสถานะ";
 }
 
+export function paymentEvidenceIsDirectorRole(role) {
+  return ["director", "acting_director"].includes(role);
+}
+
+export function paymentEvidenceCanEditDocument({
+  document,
+  userId,
+  isSuperAdmin = false,
+  assignments = [],
+} = {}) {
+  if (!document || !["draft", "returned"].includes(document.status)) return false;
+  if (isSuperAdmin) return true;
+  return document.created_by === userId
+    && assignments.some((item) => item.class_id === document.class_id);
+}
+
 const PAYMENT_TYPES = [
   { value: "learning_equipment", label: "ค่าอุปกรณ์การเรียน" },
   { value: "student_uniform", label: "ค่าเครื่องแบบนักเรียน" },
@@ -101,7 +117,7 @@ export function createPaymentEvidenceFeature(ctx) {
   }
 
   function isDirector() {
-    return Boolean(state.paymentEvidenceAccess?.is_director || state.profile?.role === "director");
+    return Boolean(state.paymentEvidenceAccess?.is_director || paymentEvidenceIsDirectorRole(state.profile?.role));
   }
 
   function canAccess() {
@@ -113,12 +129,12 @@ export function createPaymentEvidenceFeature(ctx) {
   }
 
   function canEditDocument(doc) {
-    if (!doc || ["completed", "cancelled"].includes(doc.status)) return false;
-    if (isAdmin()) return true;
-    if (isFinance() && ["draft", "submitted", "returned"].includes(doc.status)) return true;
-    return doc.created_by === state.user?.id
-      && ["draft", "returned"].includes(doc.status)
-      && local.assignments.some((item) => item.class_id === doc.class_id);
+    return paymentEvidenceCanEditDocument({
+      document: doc,
+      userId: state.user?.id,
+      isSuperAdmin: isAdmin(),
+      assignments: local.assignments,
+    });
   }
 
   function canSubmitDocument(doc) {

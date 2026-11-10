@@ -1207,7 +1207,7 @@ async function loadActiveUserData() {
   const paymentEvidenceSuperAdmin = isSuperAdminUser();
   const paymentEvidenceFinance = !!paymentEvidencePermissionRes.data?.is_active;
   const paymentEvidenceHomeroom = (paymentEvidenceHomeroomRes.data || []).length > 0;
-  const paymentEvidenceDirector = state.profile?.role === "director";
+  const paymentEvidenceDirector = ["director", "acting_director"].includes(state.profile?.role);
   state.paymentEvidenceAccess = {
     is_super_admin: paymentEvidenceSuperAdmin,
     is_finance: paymentEvidenceFinance,

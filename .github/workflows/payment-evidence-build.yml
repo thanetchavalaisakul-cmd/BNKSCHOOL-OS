@@ -5,6 +5,7 @@ on:
     branches:
       - feature/payment-evidence-documents-20261110
     paths:
+      - .github/workflows/payment-evidence-build.yml
       - app.js
       - modules/payment-evidence-documents.js
       - tests/payment-evidence-documents.test.mjs
@@ -20,13 +21,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout feature branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: feature/payment-evidence-documents-20261110
           persist-credentials: true
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
