@@ -6,6 +6,33 @@ export function calculatePaymentEvidenceTotals(items = []) {
   };
 }
 
+// Official BNK documents use TH Sarabun IT๙ and Thai numerals on print.
+export function paymentEvidenceThaiDigits(value) {
+  return String(value ?? "").replace(/[0-9]/g, (digit) => "๐๑๒๓๔๕๖๗๘๙"[Number(digit)]);
+}
+
+// Use integer satang to avoid float-rounding errors in official financial totals.
+export function paymentEvidencePrintTotalsMatch(document, items = []) {
+  if (!document || !Array.isArray(items) || !items.length) return false;
+  if (Number(document.student_count) !== items.length) return false;
+  const actual = items.reduce((sum, item) => sum + Math.round(Number(item.amount) * 100), 0);
+  const stated = Math.round(Number(document.total_amount) * 100);
+  return items.every((item) => Number.isFinite(Number(item.amount)) && Number(item.amount) >= 0)
+    && Number.isSafeInteger(actual) && Number.isSafeInteger(stated)
+    && actual === stated;
+}
+
+// Apply one reception date only to currently selected students; individual overrides remain.
+export function paymentEvidenceApplyBulkDate(rows = [], date) {
+  const iso = String(date || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || Number.isNaN(Date.parse(iso))) {
+    throw new Error("กรุณาเลือกวันที่รับเงินที่ถูกต้อง");
+  }
+  return rows.map((row) => row?.selected && row.student_id
+    ? { ...row, received_date: iso }
+    : row);
+}
+
 export function paymentEvidenceRosterStatusLabel(status) {
   if (status === "transferred_out") return "ย้ายแล้ว";
   if (status === "transfer_pending") return "มีใบย้าย · รอดำเนินการ";
