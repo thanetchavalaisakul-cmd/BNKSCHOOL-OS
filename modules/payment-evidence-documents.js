@@ -266,7 +266,12 @@ export function createPaymentEvidenceFeature(ctx) {
       .pe-toolbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
       .pe-field{display:flex;flex-direction:column;gap:5px;min-width:120px;flex:1}
       .pe-field label{font-size:12px;font-weight:700;color:var(--muted,#64748b)}
-      .pe-field input,.pe-field select,.pe-field textarea{width:100%;min-width:0}
+      .pe-field input,.pe-field select,.pe-field textarea{width:100%;min-width:0;min-height:43px;padding:9px 12px;border:1px solid var(--border,#cbd5e1);border-radius:12px;background:var(--card,#fff);color:var(--text,#172033);font:inherit;font-size:14px;box-shadow:0 1px 2px rgba(15,23,42,.035);transition:border-color .15s ease,box-shadow .15s ease}
+      .pe-field input:focus,.pe-field select:focus,.pe-field textarea:focus,.pe-roster-table input:focus{outline:0;border-color:#15936b;box-shadow:0 0 0 3px rgba(22,163,106,.14)}
+      .pe-field input:disabled,.pe-field select:disabled{background:var(--surface-secondary,#f1f5f9);color:var(--muted,#64748b);box-shadow:none;opacity:1}
+      .pe-field select{cursor:pointer;padding-right:25px}
+      .pe-field input[type=date]{color-scheme:light;cursor:pointer}
+      .pe-field label{line-height:1.35}
       .pe-tabs{display:flex;gap:8px;flex-wrap:wrap}
       .pe-tab{border:1px solid var(--border,#d8dee8);background:var(--card,#fff);color:var(--text,#172033);padding:9px 13px;border-radius:10px;font-weight:700;cursor:pointer}
       .pe-tab.active{background:rgba(22,163,106,.12);border-color:#16a36a;color:#137b51}
@@ -321,6 +326,9 @@ export function createPaymentEvidenceFeature(ctx) {
       .pe-roster-table{width:100%;border-collapse:collapse;min-width:850px}
       .pe-roster-table th,.pe-roster-table td{padding:7px 8px;border-bottom:1px solid var(--border,#e5e7eb);font-size:12px;text-align:left;vertical-align:middle}
       .pe-roster-table th{position:sticky;top:0;background:var(--surface-secondary,#f8fafc);z-index:1}
+      .pe-roster-table input:not([type=checkbox]){height:39px;min-height:39px;padding:7px 9px;border:1px solid var(--border,#cbd5e1);border-radius:10px;background:var(--card,#fff);color:var(--text,#172033);font:inherit;font-size:12px;transition:border-color .15s ease,box-shadow .15s ease}
+      .pe-roster-table input:not([type=checkbox]):disabled{background:var(--surface-secondary,#f1f5f9);opacity:.65}
+      .pe-roster-table input[type=checkbox]{accent-color:#168458;width:17px;height:17px;cursor:pointer}
       .pe-roster-table input[type=number]{width:105px}
       .pe-roster-table input[type=date]{width:145px}
       .pe-roster-table input[type=text]{min-width:120px;width:100%}
@@ -718,8 +726,9 @@ export function createPaymentEvidenceFeature(ctx) {
             <button class="pe-mode ${draft.selectionMode === "selected" ? "active" : ""}" data-pe-mode="selected">ชุดที่ 2 · เลือกเฉพาะราย</button>
           </div>
           <div class="pe-toolbar">
-            <div class="pe-field" style="max-width:170px"><label>จำนวนเงินเพื่อใส่ให้ผู้ที่เลือก</label><input id="pe-bulk-amount" type="number" min="0" step="0.01" placeholder="เช่น 100"></div>
-            <div class="pe-actions"><button class="pe-btn" id="pe-apply-bulk">ใส่จำนวนเงินให้ผู้ที่เลือก</button><button class="pe-btn" id="pe-select-all">เลือกทั้งหมด</button><button class="pe-btn" id="pe-clear-selection">ยกเลิกทั้งหมด</button></div>
+            <div class="pe-field" style="max-width:185px"><label>จำนวนเงินสำหรับผู้ที่เลือก</label><input id="pe-bulk-amount" type="number" min="0" step="0.01" placeholder="เช่น 100"></div>
+             <div class="pe-field" style="max-width:200px"><label>วันที่รับเงินสำหรับผู้ที่เลือก</label><input id="pe-bulk-date" type="date" aria-label="วันที่รับเงินสำหรับนักเรียนที่เลือก"></div>
+            <div class="pe-actions"><button class="pe-btn" id="pe-apply-bulk">ใส่จำนวนเงินที่เลือก</button><button class="pe-btn" id="pe-apply-bulk-date">ใช้วันที่กับผู้ที่เลือก</button><button class="pe-btn" id="pe-select-all">เลือกทั้งหมด</button><button class="pe-btn" id="pe-clear-selection">ยกเลิกทั้งหมด</button></div>
           </div>
           ${draftSummaryHtml()}
           <div class="pe-roster-scroll">
@@ -728,7 +737,7 @@ export function createPaymentEvidenceFeature(ctx) {
               <tbody id="pe-editor-rows">${editorRowsHtml()}</tbody>
             </table>
           </div>
-          <div class="pe-modal-foot"><span class="pe-muted pe-small">ชุดที่ 1 จะรวมรายชื่อเด็กผีด้วย · ชุดที่ 2 เลือกเฉพาะนักเรียนที่ต้องการ</span><div class="pe-actions"><button class="pe-btn" id="pe-editor-cancel">ยกเลิก</button><button class="pe-btn primary" id="pe-editor-save">บันทึกฉบับร่าง</button></div></div>
+          <div class="pe-modal-foot"><span class="pe-muted pe-small">เลือกวันที่ครั้งเดียวแล้วกดใช้กับผู้ที่เลือกได้ · ยังแก้ไขวันที่รายคนได้ · ชุดที่ 1 รวมรายชื่อเด็กผี</span><div class="pe-actions"><button class="pe-btn" id="pe-editor-cancel">ยกเลิก</button><button class="pe-btn primary" id="pe-editor-save">บันทึกฉบับร่าง</button></div></div>
         </div>
       </div>`;
   }
