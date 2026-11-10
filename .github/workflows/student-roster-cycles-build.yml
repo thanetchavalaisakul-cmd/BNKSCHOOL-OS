@@ -10,6 +10,8 @@ on:
       - index.html
       - modules/general-student-roster.js
       - tests/student-roster-cycles-20261110.test.mjs
+      - tests/general-student-roster.test.mjs
+      - tests/general-student-roster-transfer-all-periods-20261103.test.mjs
       - supabase/migrations/20261110153548_student_roster_cycles_and_lifecycle.sql
       - supabase/migrations/20261110154108_student_roster_status_guard_and_idempotency.sql
       - package.json
