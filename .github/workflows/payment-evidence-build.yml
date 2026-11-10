@@ -1,0 +1,53 @@
+name: BNK payment evidence feature validation
+
+on:
+  push:
+    branches:
+      - feature/payment-evidence-documents-20261110
+    paths:
+      - app.js
+      - modules/payment-evidence-documents.js
+      - tests/payment-evidence-documents.test.mjs
+      - supabase/migrations/20261110_payment_evidence_documents.sql
+      - package.json
+      - package-lock.json
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/payment-evidence-documents-20261110
+          persist-credentials: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate application bundle and tests
+        run: |
+          node --check modules/payment-evidence-documents.js
+          npm run verify
+          git diff --check
+
+      - name: Commit refreshed production bundle to feature branch
+        run: |
+          if git diff --quiet -- app.min.js; then
+            echo "app.min.js is already up to date"
+          else
+            git config user.name "BNK School OS Build"
+            git config user.email "bnk-school-os-build@users.noreply.github.com"
+            git add app.min.js
+            git commit -m "build: refresh payment evidence app bundle"
+            git push origin HEAD:feature/payment-evidence-documents-20261110
+          fi
