@@ -471,7 +471,7 @@ begin
   if not private.is_active_user() then
     raise exception 'กรุณาเข้าสู่ระบบก่อนใช้งาน';
   end if;
-  if p_semester not in (1, 2) then
+  if p_academic_year is null or p_semester not in (1, 2) then
     raise exception 'ภาคเรียนไม่ถูกต้อง';
   end if;
   if not private.can_access_payment_evidence_class(p_class_id) then
@@ -535,9 +535,12 @@ begin
     from public.academic_transfer_requests r
     join candidates c on c.student_id = r.student_id
     where r.academic_year = p_academic_year
-      and r.semester = p_semester
+      and (
+        r.semester = p_semester
+        or (p_semester = 2 and c.source_semester = 1)
+      )
       and r.status not in ('rejected', 'cancelled')
-    order by r.student_id, r.updated_at desc
+    order by r.student_id, r.semester desc, r.updated_at desc
   )
   select
     s.id,
@@ -606,12 +609,12 @@ begin
   if p_academic_year is null or p_semester not in (1, 2) then
     raise exception 'ปีการศึกษาหรือภาคเรียนไม่ถูกต้อง';
   end if;
-  if p_document_type not in (
+  if p_document_type is null or p_document_type not in (
     'learning_equipment', 'student_uniform', 'basic_learning_support', 'additional_uniform'
   ) then
     raise exception 'ประเภทเงินไม่ถูกต้อง';
   end if;
-  if p_selection_mode not in ('all', 'selected') then
+  if p_selection_mode is null or p_selection_mode not in ('all', 'selected') then
     raise exception 'รูปแบบการเลือกรายชื่อไม่ถูกต้อง';
   end if;
   if p_items is null or jsonb_typeof(p_items) <> 'array'
