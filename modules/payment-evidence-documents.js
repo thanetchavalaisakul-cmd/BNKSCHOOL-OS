@@ -23,6 +23,20 @@ export function paymentEvidencePrintTotalsMatch(document, items = []) {
 }
 
 // Apply one reception date only to currently selected students; individual overrides remain.
+// The document snapshots the complete class label (e.g., "ป.3/2") at creation.
+ // Keep that historical room number on official PDFs, even if a class is renamed.
+export function paymentEvidencePdfLevelRoom(doc = {}, classes = []) {
+  const label = String(doc?.class_label_snapshot || "").trim();
+  const storedLevel = String(doc?.level_name_snapshot || "").trim();
+  const matchingClass = classes.find((item) => String(item.id) === String(doc?.class_id));
+  const levelName = storedLevel || String(matchingClass?.level_name || "").trim() || label.split("/")[0];
+  const levelNumber = levelName.match(/[0-9๐-๙]+/)?.[0] || "........";
+  // Snapshot before live lookup: financial records must show their original class.
+  const snapshotRoom = label.includes("/") ? label.slice(label.indexOf("/") + 1).trim() : "";
+  const roomName = snapshotRoom || String(matchingClass?.room_name || "").trim() || "........";
+  return paymentEvidenceThaiDigits(`${levelNumber}/${roomName}`);
+}
+
 export function paymentEvidenceApplyBulkDate(rows = [], date) {
   const iso = String(date || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || Number.isNaN(Date.parse(iso))) {
@@ -1051,7 +1065,7 @@ export function createPaymentEvidenceFeature(ctx) {
   function pdfPageHtml(doc, pageItems, pageIndex, pageCount, signerImages, isLastPage) {
     const type = doc.document_type;
     const stage = doc.stage_code_snapshot;
-    const level = String(doc.level_name_snapshot || "").match(/\d+/)?.[0] || "........";
+    const levelRoom = paymentEvidencePdfLevelRoom(doc, local.classes);
     const kind = stage === "early_childhood" ? "kindergarten" : stage === "stage3" ? "secondary" : "primary";
     const checked = (value) => value ? "☑" : "☐";
     const rows = pageItems.map((item, index) => {
@@ -1090,9 +1104,9 @@ export function createPaymentEvidenceFeature(ctx) {
         <div class="pe-pdf-stars">***********************************************************************************************</div>
         <div class="pe-pdf-level">
           <strong>ระดับชั้น</strong>
-          <span>${checked(kind === "kindergarten")} อนุบาลปีที่ ${kind === "kindergarten" ? esc(level) : "........"}</span>
-          <span>${checked(kind === "primary")} ประถมศึกษาปีที่ ${kind === "primary" ? esc(level) : "........"}</span>
-          <span>${checked(kind === "secondary")} มัธยมศึกษาปีที่ ${kind === "secondary" ? esc(level) : "........"}</span>
+          <span>${checked(kind === "kindergarten")} อนุบาลปีที่ ${kind === "kindergarten" ? esc(levelRoom) : "......../........"}</span>
+          <span>${checked(kind === "primary")} ประถมศึกษาปีที่ ${kind === "primary" ? esc(levelRoom) : "......../........"}</span>
+          <span>${checked(kind === "secondary")} มัธยมศึกษาปีที่ ${kind === "secondary" ? esc(levelRoom) : "......../........"}</span>
           <span>☐ ปวช. ที่จัดโดยสถานประกอบการ ปีที่......</span>
         </div>
         <div class="pe-pdf-declaration">
