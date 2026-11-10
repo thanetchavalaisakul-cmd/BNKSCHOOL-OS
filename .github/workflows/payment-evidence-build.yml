@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/payment-evidence-build.yml
       - app.js
+      - index.html
       - modules/payment-evidence-documents.js
       - tests/payment-evidence-documents.test.mjs
       - supabase/migrations/20261110_payment_evidence_documents.sql
