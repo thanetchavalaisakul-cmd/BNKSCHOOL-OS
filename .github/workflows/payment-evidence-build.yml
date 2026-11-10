@@ -11,6 +11,7 @@ on:
       - modules/payment-evidence-documents.js
       - 'tests/**'
       - supabase/migrations/20261110_payment_evidence_documents.sql
+      - supabase/migrations/20261110_payment_evidence_secure_delete.sql
       - package.json
       - package-lock.json
 
