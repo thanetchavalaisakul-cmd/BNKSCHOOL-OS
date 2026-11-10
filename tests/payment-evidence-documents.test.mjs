@@ -271,3 +271,63 @@ test("deleting a payment document clears its own cascade records but preserves s
     assert.match(section.slice(0, 500), /document_id uuid not null references public\.payment_evidence_documents\(id\) on delete cascade/i);
   }
 });
+
+test("finance print signers are separate from finance access and admin-only", async () => {
+  const sql = await readFile(
+    new URL("../supabase/migrations/20261110_payment_evidence_wet_signers.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(sql, /create table if not exists public\.payment_evidence_print_settings/i);
+  assert.match(sql, /alter table public\.payment_evidence_print_settings enable row level security/i);
+  assert.match(sql, /create or replace function public\.payment_evidence_set_print_finance\(p_user_id uuid\)/i);
+  assert.match(sql, /not private\.is_super_admin\(\)/i);
+  assert.match(sql, /private\.is_active_user\(\)/i);
+  assert.match(sql, /create or replace function public\.payment_evidence_print_signer_names\(p_document_id uuid\)/i);
+  assert.match(sql, /private\.can_view_payment_evidence_document\(p_document_id\)/i);
+  assert.match(sql, /revoke all on public\.payment_evidence_print_settings from public, anon, authenticated/i);
+  assert.match(sql, /grant execute on function public\.payment_evidence_set_print_finance\(uuid\) to authenticated/i);
+  assert.doesNotMatch(sql, /insert into public\.payment_evidence_permissions/i);
+  assert.doesNotMatch(sql, /update public\.payment_evidence_permissions/i);
+});
+
+test("print names follow actual class teachers, shared director and selected payer", async () => {
+  const sql = await readFile(
+    new URL("../supabase/migrations/20261110_payment_evidence_wet_signers.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(sql, /from public\.homeroom_teachers h/i);
+  assert.match(sql, /where h\.class_id = v_document\.class_id/i);
+  assert.match(sql, /h\.teacher_id = v_document\.created_by/i);
+  assert.match(sql, /from public\.academic_certificate_settings c where c\.id = 1/i);
+  assert.match(sql, /from public\.academic_registration_settings r where r\.id = 1/i);
+  assert.match(sql, /from public\.payment_evidence_print_settings s/i);
+  assert.match(sql, /'finance', coalesce\(v_finance, ''\)/);
+  assert.match(sql, /'teacher', coalesce\(v_teacher, ''\)/);
+  assert.match(sql, /'director', coalesce\(v_director, ''\)/);
+});
+
+test("wet-signed financial PDF never embeds online central signature images", async () => {
+  const source = await readFile(new URL("../modules/payment-evidence-documents.js", import.meta.url), "utf8");
+  const pdf = source.slice(source.indexOf("function pdfPageHtml("),source.indexOf("async function toggleFinancePermission("));
+  assert.match(pdf, /local\.printSignerNames\.finance/);
+  assert.match(pdf, /local\.printSignerNames\.teacher/);
+  assert.match(pdf, /local\.printSignerNames\.director/);
+  assert.match(pdf, /const signerImages = \{\}/);
+  assert.doesNotMatch(pdf, /imageHtml\("finance"/);
+  assert.doesNotMatch(pdf, /imageHtml\("teacher"/);
+  assert.doesNotMatch(pdf, /imageHtml\("director"/);
+  assert.doesNotMatch(pdf, /loadSignerImage\(signer\)/);
+  assert.match(pdf, /class="pe-pdf-signatures"/);
+  assert.match(pdf, /ลงชื่อ\.*ผู้จ่ายเงิน/);
+  assert.match(pdf, /ครูประจำชั้น\.*\./);
+});
+
+test("admin settings provides a persisted printed payer without giving finance workflow permissions", async () => {
+  const source = await readFile(new URL("../modules/payment-evidence-documents.js", import.meta.url), "utf8");
+  assert.match(source, /id="pe-print-finance-user"/);
+  assert.match(source, /id="pe-print-finance-save"/);
+  assert.match(source, /supabase\.rpc\("payment_evidence_set_print_finance"/);
+  assert.match(source, /supabase\.rpc\("payment_evidence_print_signer_names"/);
+  assert.match(source, /\.from\("payment_evidence_print_settings"\)/);
+  assert.match(source, /root\.querySelector\("#pe-print-finance-save"\)/);
+});
