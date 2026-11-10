@@ -9,7 +9,7 @@ on:
       - app.js
       - index.html
       - modules/payment-evidence-documents.js
-      - tests/payment-evidence-documents.test.mjs
+      - 'tests/**'
       - supabase/migrations/20261110_payment_evidence_documents.sql
       - package.json
       - package-lock.json
