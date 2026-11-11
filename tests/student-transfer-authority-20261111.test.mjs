@@ -6,6 +6,7 @@ const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const authority = await readFile(new URL("../supabase/migrations/20261111000245_student_transfer_authority_and_dmc_import_guard.sql", import.meta.url), "utf8");
 const dmcGuard = await readFile(new URL("../supabase/migrations/20261111000421_dmc_transfer_out_requires_transfer_workflow.sql", import.meta.url), "utf8");
 const dmcImportPolicy = await readFile(new URL("../supabase/migrations/20261111001627_limit_dmc_skip_to_confirmed_transfer_out.sql", import.meta.url), "utf8");
+const renumber = await readFile(new URL("../supabase/migrations/20261111002020_fix_student_class_renumber_temp_range.sql", import.meta.url), "utf8");
 
 test("DMC import skips only confirmed transfer-outs and follows DMC for other statuses", () => {
   const start = dmcImportPolicy.indexOf("CREATE OR REPLACE FUNCTION public.import_student_registry");
@@ -15,6 +16,8 @@ test("DMC import skips only confirmed transfer-outs and follows DMC for other st
   assert.doesNotMatch(importer, /v_existing_status IS DISTINCT FROM 'active'/);
   assert.match(importer, /status='active',updated_by=auth\.uid\(\),updated_at=now\(\)/);
   assert.match(importer, /'skipped_transferred_out',v_skipped_transferred_out/);
+  assert.match(renumber, /set student_number=2000000000\\+ranked\\.rn/);
+  assert.match(renumber, /set student_number=ranked\\.rn/);
   assert.match(app, /master\.status==="transferred_out"/);
   assert.match(app, /blockedTransferredOut/);
   assert.doesNotMatch(app, /master\.status!=="active"/);
