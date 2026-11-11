@@ -27,6 +27,7 @@ test("office admin can submit and track only their own leave requests", () => {
 
 test("office admin is never treated as electricity manager", () => {
   assert.ok(app.includes('function electricityManagerUi(){return isSuperAdminUser()||(!isOfficeAdminUser()&&state.electricitySettings?.manager_user_id===state.user?.id);}'));
+  assert.ok(app.includes("filter(p=>p.role!=='office_admin')"));
   assert.ok(personalMigration.includes('coalesce(private."current_role"(), \'\') <> \'office_admin\''));
   assert.ok(!personalMigration.includes('private."current_role"() = \'office_admin\''));
   assert.ok(app.includes('const defaultAffects = r.id ? Boolean(r.affects_teaching_schedule) : !["director","super_admin","office_admin"].includes(state.profile.role);'));
