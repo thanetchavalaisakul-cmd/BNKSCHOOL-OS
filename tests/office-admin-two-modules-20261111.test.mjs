@@ -42,8 +42,8 @@ test("Super Admin can approve the dedicated office admin role", () => {
 });
 
 test("database access is limited to leave and housing electricity for office admin", () => {
-  assert.ok(migration.includes("private.current_role() = 'office_admin'"));
-  assert.ok(migration.includes("private.current_role() IN ('director','super_admin','office_admin')"));
+  assert.ok(migration.includes('private."current_role"() = \'office_admin\''));
+  assert.ok(migration.includes('private."current_role"() IN (\'director\',\'super_admin\',\'office_admin\')'));
   assert.ok(migration.includes("code IN ('leave_management','housing_electricity')"));
   assert.ok(migration.includes("CREATE POLICY office_admin_module_scope ON public.%I AS RESTRICTIVE"));
   assert.ok(migration.includes("CREATE POLICY profiles_read_scope"));
