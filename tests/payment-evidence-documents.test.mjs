@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 import {
   calculatePaymentEvidenceTotals,
+  paymentEvidenceFilterCurrentRoster,
   paymentEvidenceRosterStatusLabel,
   paymentEvidenceDocumentStatusLabel,
   paymentEvidenceCanEditDocument,
@@ -34,7 +35,21 @@ test("payment evidence totals handle empty and invalid amounts safely", () => {
   ]), { studentCount: 1, totalAmount: 0 });
 });
 
-test("roster status labels distinguish moved, pending, ghost and active students", () => {
+test("current payment-evidence roster excludes confirmed transfers but keeps pending and ghost rows", () => {
+  const rows = [
+    { student_id: "active", roster_status: "active", enrollment_status: "active" },
+    { student_id: "pending", roster_status: "transfer_pending", enrollment_status: "active" },
+    { student_id: "ghost", roster_status: "ghost", enrollment_status: "inactive" },
+    { student_id: "moved-by-roster", roster_status: "transferred_out", enrollment_status: "active" },
+    { student_id: "moved-by-enrollment", roster_status: "active", enrollment_status: "transferred_out" },
+  ];
+  const filtered = paymentEvidenceFilterCurrentRoster(rows);
+  assert.deepEqual(filtered.map((row) => row.student_id), ["active", "pending", "ghost"]);
+  assert.equal(rows.length, 5, "the source roster is not mutated");
+  assert.deepEqual(paymentEvidenceFilterCurrentRoster(null), []);
+});
+
+testAnchor+
   assert.equal(paymentEvidenceRosterStatusLabel("transferred_out"), "ย้ายแล้ว");
   assert.equal(paymentEvidenceRosterStatusLabel("transfer_pending"), "มีใบย้าย · รอดำเนินการ");
   assert.equal(paymentEvidenceRosterStatusLabel("ghost"), "เด็กผี");
@@ -118,6 +133,17 @@ test("database migration enforces RLS and server-side edit boundaries", async ()
   }
 });
 
+
+test("payment evidence current-roster RPC excludes only confirmed transfer-outs", async () => {
+  const migration = await readFile(
+    new URL("../supabase/migrations/20261111014500_payment_evidence_exclude_confirmed_transfers.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(migration, /s\.status is distinct from 'transferred_out'/i);
+  assert.match(migration, /c\.enrollment_status is distinct from 'transferred_out'/i);
+  assert.match(migration, /tr\.roster_processed_at is null/i);
+  assert.match(migration, /create or replace function public\.payment_evidence_roster/i);
+});
 
 test("payment evidence migration keeps SQL function dollar quotes balanced", async () => {
   const migration = await readFile(
