@@ -11,7 +11,7 @@ test("office admin has a distinct display role and only two visible modules", ()
   assert.ok(app.includes('state.modules = state.modules.filter(m=>allowedOfficeModules.includes(m.code))'));
   assert.ok(app.includes('office-admin-sidebar'));
   assert.ok(app.includes('!["module:leave_management","module:housing_electricity"].includes(state.currentView)'));
-  assert.ok(app.includes('state.leaveView = "all"'));
+  assert.ok(app.includes('state.leaveView = "overview"'));
 });
 
 test("office admin is included in both staff rosters and can see the leave overview", () => {
