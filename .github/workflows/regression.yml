@@ -19,6 +19,8 @@ jobs:
         run: node --check app.js
       - name: Local regression tests
         run: node --test tests/performance-regression.test.mjs
+      - name: Leave weekday and school-open weekend checks
+        run: node --test tests/leave-half-day-weekday-quota-20261111.test.mjs tests/leave-weekend-school-days-20261111.test.mjs
       - name: Academic certificate registry checks
         run: |
           node --check modules/academic-certificate-registry.js
