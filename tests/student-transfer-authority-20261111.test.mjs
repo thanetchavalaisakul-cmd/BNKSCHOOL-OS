@@ -5,18 +5,20 @@ import { readFile } from "node:fs/promises";
 const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const authority = await readFile(new URL("../supabase/migrations/20261111000245_student_transfer_authority_and_dmc_import_guard.sql", import.meta.url), "utf8");
 const dmcGuard = await readFile(new URL("../supabase/migrations/20261111000421_dmc_transfer_out_requires_transfer_workflow.sql", import.meta.url), "utf8");
+const dmcImportPolicy = await readFile(new URL("../supabase/migrations/20261111001627_limit_dmc_skip_to_confirmed_transfer_out.sql", import.meta.url), "utf8");
 
-test("DMC import skips all non-active master records and reports the skipped count", () => {
-  const start = authority.indexOf("CREATE OR REPLACE FUNCTION public.import_student_registry");
-  const end = authority.indexOf("$function$;", start);
-  const importer = authority.slice(start, end);
-  assert.match(importer, /v_existing_status IS DISTINCT FROM 'active'/);
-  assert.match(importer, /v_skipped_non_active:=v_skipped_non_active\+1/);
-  assert.match(importer, /'skipped_non_active',v_skipped_non_active/);
-  assert.doesNotMatch(importer, /pending_disposal_status=nullif\(v_row->>'pending_disposal_status',''\),status='active'/);
-  assert.match(app, /master\.status!=="active"/);
-  assert.match(app, /blockedNonActive/);
-  assert.match(app, /skippedNonActive\+=Number\(data\?\.skipped_non_active\|\|0\)/);
+test("DMC import skips only confirmed transfer-outs and follows DMC for other statuses", () => {
+  const start = dmcImportPolicy.indexOf("CREATE OR REPLACE FUNCTION public.import_student_registry");
+  const end = dmcImportPolicy.indexOf("$function$;", start);
+  const importer = dmcImportPolicy.slice(start, end);
+  assert.match(importer, /IF v_existing_status='transferred_out' THEN/);
+  assert.doesNotMatch(importer, /v_existing_status IS DISTINCT FROM 'active'/);
+  assert.match(importer, /status='active',updated_by=auth\.uid\(\),updated_at=now\(\)/);
+  assert.match(importer, /'skipped_transferred_out',v_skipped_transferred_out/);
+  assert.match(app, /master\.status==="transferred_out"/);
+  assert.match(app, /blockedTransferredOut/);
+  assert.doesNotMatch(app, /master\.status!=="active"/);
+  assert.match(app, /skippedTransferredOut\+=Number\(data\?\.skipped_transferred_out\|\|0\)/);
 });
 
 test("DMC absence cannot mark a student transferred out", () => {
