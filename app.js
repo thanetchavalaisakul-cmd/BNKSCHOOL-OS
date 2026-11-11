@@ -5303,7 +5303,7 @@ function leaveReviewModal(stage) {
   const modal = document.createElement("div");
   modal.className = "modal-backdrop";
   modal.innerHTML = `<div class="modal">
-    <div class="modal-head"><div><h3>${isPersonnel ? "ตรวจคำขอลา" : "อนุมัติคำขอลาขั้นสุดท้าย"}</h3><p>${escapeHtml(r.requester_name)} · ${escapeHtml(leaveTypeName(r.leave_type_code,r.other_leave_text))} · ${escapeHtml(leaveSessionLabel(r.leave_session))} · ${formatLeaveDays(r.leave_days)} วัน</p></div><button class="modal-close">×</button></div>
+    <div class="modal-head"><div><h3>${isPersonnel ? "ตรวจคำขอลา" : "อนุมัติคำขอลาขั้นสุดท้าย"}</h3><p>${escapeHtml(r.requester_name)} · ${escapeHtml(leaveTypeName(r.leave_type_code,r.other_leave_text))} · ${escapeHtml(leaveSessionLabel(r.leave_session))} · ${Array.isArray(r.weekend_working_dates)&&r.weekend_working_dates.length ? `ลาในวันหยุดที่โรงเรียนเปิดเรียน: ${escapeHtml(leaveWeekendDatesLabel(r.weekend_working_dates))} · ` : ""}${formatLeaveDays(r.leave_days)} วัน</p></div><button class="modal-close">×</button></div>
     <div class="review-choice-grid">
       <button class="review-choice approve active" data-leave-decision="approve"><strong>✓ อนุมัติ</strong><span>${isPersonnel ? "ส่งต่อให้ผู้บริหาร" : "อนุมัติขั้นสุดท้าย"}</span></button>
       <button class="review-choice reject" data-leave-decision="reject"><strong>× ไม่อนุมัติ</strong><span>ยุติ Workflow และแจ้งผู้ลา</span></button>
