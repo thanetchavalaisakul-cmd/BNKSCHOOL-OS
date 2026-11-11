@@ -4433,7 +4433,16 @@ function leaveTypeName(code, otherText = "") {
   return type?.name_th || code || "—";
 }
 
-function leaveWorkingDayCount(start,end) {
+function leaveDateIsWeekend(value) {
+  const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||""));
+  if(!match)return false;
+  const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]);
+  const date=new Date(Date.UTC(year,month-1,day));
+  if(date.getUTCFullYear()!==year||date.getUTCMonth()!==month-1||date.getUTCDate()!==day)return false;
+  const weekday=date.getUTCDay();
+  return weekday===0||weekday===6;
+}
+function leaveWorkingDayCount(start,end,weekendWorkingDates=[]) {
   const parse=value=>{
     const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||""));
     if(!match)return null;
@@ -4444,15 +4453,18 @@ function leaveWorkingDayCount(start,end) {
   };
   const first=parse(start),last=parse(end);
   if(!first||!last||last<first)return 0;
+  const selectedWeekendDates=new Set((Array.isArray(weekendWorkingDates)?weekendWorkingDates:[])
+    .map(value=>String(value||"").slice(0,10)).filter(leaveDateIsWeekend));
   let total=0;
   for(let stamp=first.getTime(),endStamp=last.getTime();stamp<=endStamp;stamp+=86400000){
     const weekday=new Date(stamp).getUTCDay();
-    if(weekday!==0&&weekday!==6)total++;
+    const dateValue=new Date(stamp).toISOString().slice(0,10);
+    if((weekday!==0&&weekday!==6)||selectedWeekendDates.has(dateValue))total++;
   }
   return total;
 }
-function leaveWorkingDays(start,end,session="full_day") {
-  const workingDays=leaveWorkingDayCount(start,end);
+function leaveWorkingDays(start,end,session="full_day",weekendWorkingDates=[]) {
+  const workingDays=leaveWorkingDayCount(start,end,weekendWorkingDates);
   const factor=session==="morning"||session==="afternoon"?0.5:1;
   return Math.round(workingDays*factor*10)/10;
 }
@@ -4460,6 +4472,10 @@ function leaveSessionLabel(session) {
   if(session==="morning")return "ครึ่งวันเช้า";
   if(session==="afternoon")return "ครึ่งวันบ่าย";
   return "เต็มวัน";
+}
+function leaveWeekendDatesLabel(value) {
+  const dates=Array.isArray(value)?value:[];
+  return dates.map(date=>thaiDateOnly(String(date).slice(0,10))).join(", ")||"—";
 }
 function formatLeaveDays(value) {
   const number=Number(value||0);
@@ -4773,7 +4789,7 @@ function leaveHistoryTable(requests, showRequester = false) {
         <td><strong>${ordinal ? `ครั้งที่ ${ordinal}` : "ฉบับร่าง"}</strong><br><span class="table-muted">#${r.request_no}</span></td>
         ${showRequester ? `<td><strong>${escapeHtml(r.requester_name)}</strong><br><span class="table-muted">${escapeHtml(r.requester_position || ROLE_LABEL[r.requester_role] || r.requester_role)}</span></td>` : ""}
         <td>${escapeHtml(leaveTypeName(r.leave_type_code,r.other_leave_text))}</td>
-        <td>${thaiDateOnly(r.start_date)}<br><span class="table-muted">ถึง ${thaiDateOnly(r.end_date)}</span><br><span class="table-muted">${escapeHtml(leaveSessionLabel(r.leave_session))}</span></td>
+        <td>${thaiDateOnly(r.start_date)}<br><span class="table-muted">ถึง ${thaiDateOnly(r.end_date)}</span><br><span class="table-muted">${escapeHtml(leaveSessionLabel(r.leave_session))}</span>${Array.isArray(r.weekend_working_dates)&&r.weekend_working_dates.length ? `<br><span class="table-muted">วันเปิดเรียน: ${escapeHtml(leaveWeekendDatesLabel(r.weekend_working_dates))}</span>` : ""}</td>
         <td><strong>${Number(r.leave_days)} วัน</strong></td>
         <td>${escapeHtml(r.contact_during_leave || "—")}${r.contact_phone ? `<br><span class="table-muted">${escapeHtml(r.contact_phone)}</span>` : ""}</td>
         <td><span class="pill ${leaveStatusClass(r.status)}">${escapeHtml(LEAVE_STATUS_LABEL[r.status] || r.status)}</span></td>
@@ -5009,6 +5025,7 @@ function leaveDetailHtml(request) {
       ${planField("วันที่เริ่มลา",thaiDateOnly(request.start_date))}
       ${planField("วันที่สิ้นสุด",thaiDateOnly(request.end_date))}
       ${planField("ช่วงเวลาการลา",leaveSessionLabel(request.leave_session))}
+      ${Array.isArray(request.weekend_working_dates)&&request.weekend_working_dates.length ? planField("ลาในวันหยุดที่โรงเรียนเปิดเรียน",leaveWeekendDatesLabel(request.weekend_working_dates)) : ""}
       ${planField("ปีการศึกษา",String(request.academic_year || "—"))}
       ${planField("ภาคเรียนที่",String(request.semester || "—"))}
       ${planField("มีผลต่อตารางสอน",request.affects_teaching_schedule ? "ต้องจัดการตารางสอน/ผู้สอนแทน" : "ไม่ต้องจัดผู้สอนแทน")}
@@ -5047,8 +5064,11 @@ function leaveRequestModal(request = null) {
     ? { academicYear: Number(r.academic_year), semester: Number(r.semester) }
     : currentAcademicPeriod(r.start_date || new Date());
   const defaultLeaveSession = r.leave_session || "full_day";
+  const defaultWeekendDates = Array.isArray(r.weekend_working_dates)
+    ? [...new Set(r.weekend_working_dates.map(value=>String(value||"").slice(0,10)).filter(leaveDateIsWeekend))].sort()
+    : [];
   modal.innerHTML = `<div class="modal modal-wide">
-    <div class="modal-head"><div><h3>${request ? "แก้ไขคำขอลา" : "ยื่นคำขอลา"}</h3><p>นับเฉพาะวันจันทร์–ศุกร์ และเลือกลาเต็มวันหรือครึ่งวันได้</p></div><button class="modal-close">×</button></div>
+    <div class="modal-head"><div><h3>${request ? "แก้ไขคำขอลา" : "ยื่นคำขอลา"}</h3><p>นับวันจันทร์–ศุกร์ตามปกติ และเลือกวันหยุดที่โรงเรียนเปิดเรียนได้</p></div><button class="modal-close">×</button></div>
     <form id="leave-form" class="form-grid">
       <div class="form-row">
         <div class="field"><label>ประเภทการลา</label><select class="select" name="leave_type_code" id="leave-type-code" required>
@@ -5073,6 +5093,12 @@ function leaveRequestModal(request = null) {
           <option value="afternoon" ${defaultLeaveSession==="afternoon"?"selected":""}>ครึ่งวันบ่าย (0.5 วันต่อวันทำการ)</option>
         </select><small class="helper">หากเลือกช่วงหลายวัน ระบบจะคำนวณตามช่วงเวลานี้ในทุกวันทำการ</small></div>
       </div>
+      <label class="leave-teaching-check leave-weekend-check"><input type="checkbox" id="leave-weekend-enabled" name="weekend_working_enabled" ${defaultWeekendDates.length ? "checked" : ""}><span><strong>ลาในวันหยุดที่โรงเรียนเปิดเรียน</strong><small>เลือกวันที่เป็นวันเสาร์หรือวันอาทิตย์ที่โรงเรียนเปิดเรียน ระบบจะนับเฉพาะวันที่เลือกเป็นวันทำการ</small></span></label>
+      <input type="hidden" name="weekend_working_dates" id="leave-weekend-dates-value" value="${escapeHtml(JSON.stringify(defaultWeekendDates))}">
+      <div id="leave-weekend-panel" class="leave-weekend-panel" style="display:${defaultWeekendDates.length ? "block" : "none"}">
+        <div class="form-row"><div class="field"><label for="leave-weekend-date">เลือกวันที่โรงเรียนเปิดเรียน</label><input class="input" type="date" id="leave-weekend-date"></div><div class="field"><label> </label><button type="button" class="btn btn-secondary" id="leave-weekend-add">เพิ่มวันที่</button></div></div>
+        <div id="leave-weekend-selected"></div><small class="helper" id="leave-weekend-range-warning" style="display:none;color:#b45309">วันที่ที่เลือกต้องอยู่ภายในช่วงวันที่ลา</small>
+      </div>
       <div class="leave-days-preview" id="leave-days-preview"><span>จำนวนวันลา · ไม่นับเสาร์–อาทิตย์</span><strong>${r.leave_days ? formatLeaveDays(r.leave_days) : "—"} วัน</strong></div>
       <div class="form-row">
         <div class="field"><label>สถานที่/ที่อยู่ระหว่างลา <span class="helper">(ถ้ามี)</span></label><input class="input" name="contact_during_leave" maxlength="240" value="${escapeHtml(r.contact_during_leave || "")}"></div>
@@ -5089,16 +5115,62 @@ function leaveRequestModal(request = null) {
   modal.querySelector(".modal-cancel").addEventListener("click",close);
   modal.addEventListener("click",e=>{if(e.target===modal)close();});
 
+  const selectedWeekendDates = [...defaultWeekendDates];
+  const weekendEnabledInput = modal.querySelector("#leave-weekend-enabled");
+  const weekendPanel = modal.querySelector("#leave-weekend-panel");
+  const weekendDateInput = modal.querySelector("#leave-weekend-date");
+  const weekendDatesHidden = modal.querySelector("#leave-weekend-dates-value");
+  const renderWeekendDates = () => {
+    const target = modal.querySelector("#leave-weekend-selected");
+    target.innerHTML = selectedWeekendDates.length
+      ? selectedWeekendDates.map(date=>`<div class="form-row" style="align-items:center;margin-top:8px"><span class="table-muted">${escapeHtml(thaiDateOnly(date))}</span><button type="button" class="btn btn-ghost" data-remove-weekend-date="${escapeHtml(date)}">นำออก</button></div>`).join("")
+      : '<small class="helper">ยังไม่ได้เลือกวันที่โรงเรียนเปิดเรียน</small>';
+    target.querySelectorAll("[data-remove-weekend-date]").forEach(button=>{
+      button.addEventListener("click",()=>{
+        const date=button.getAttribute("data-remove-weekend-date");
+        const index=selectedWeekendDates.indexOf(date);
+        if(index>=0)selectedWeekendDates.splice(index,1);
+        renderWeekendDates();
+        refresh();
+      });
+    });
+  };
   const refresh = () => {
     const start = modal.querySelector("#leave-start-date").value;
     const end = modal.querySelector("#leave-end-date").value;
     const session = modal.querySelector("#leave-session").value || "full_day";
-    const days = leaveWorkingDays(start,end,session);
-    modal.querySelector("#leave-days-preview").innerHTML = `<span>จำนวนวันลา · ไม่นับเสาร์–อาทิตย์</span><strong>${days ? formatLeaveDays(days)+" วัน" : "—"}</strong>`;
+    const weekendEnabled = weekendEnabledInput.checked;
+    const weekendDates = weekendEnabled ? selectedWeekendDates : [];
+    weekendPanel.style.display = weekendEnabled ? "block" : "none";
+    weekendDateInput.min = start || "";
+    weekendDateInput.max = end || "";
+    weekendDatesHidden.value = JSON.stringify(weekendDates);
+    const outOfRange = weekendDates.filter(date=>!start||!end||date<start||date>end);
+    modal.querySelector("#leave-weekend-range-warning").style.display = outOfRange.length ? "block" : "none";
+    const days = leaveWorkingDays(start,end,session,weekendDates);
+    const previewLabel = weekendDates.length ? "จำนวนวันลา · รวมวันที่โรงเรียนเปิดเรียน" : "จำนวนวันลา · ไม่นับเสาร์–อาทิตย์";
+    modal.querySelector("#leave-days-preview").innerHTML = `<span>${previewLabel}</span><strong>${days ? formatLeaveDays(days)+" วัน" : "—"}</strong>`;
     const other = modal.querySelector("#leave-type-code").value === "other";
     modal.querySelector("[name='other_leave_text']").required = other;
     modal.querySelector("#leave-other-field").classList.toggle("leave-field-muted",!other);
   };
+  renderWeekendDates();
+  modal.querySelector("#leave-weekend-enabled").addEventListener("change",refresh);
+  modal.querySelector("#leave-weekend-add").addEventListener("click",()=>{
+    const value=weekendDateInput.value;
+    const start=modal.querySelector("#leave-start-date").value;
+    const end=modal.querySelector("#leave-end-date").value;
+    if(!weekendEnabledInput.checked)return toast("กรุณาเลือกตัวเลือกวันเปิดเรียนก่อน","เปิดใช้ “ลาในวันหยุดที่โรงเรียนเปิดเรียน” ก่อนเพิ่มวันที่","warning");
+    if(!value)return toast("กรุณาเลือกวันที่","เลือกวันเสาร์หรือวันอาทิตย์ที่โรงเรียนเปิดเรียน","warning");
+    if(!leaveDateIsWeekend(value))return toast("เลือกได้เฉพาะวันเสาร์–อาทิตย์","วันดังกล่าวเป็นวันทำการปกติอยู่แล้ว","warning");
+    if(!start||!end||value<start||value>end)return toast("วันที่อยู่นอกช่วงลา","เลือกวันที่ให้อยู่ระหว่างวันเริ่มลาและวันสิ้นสุดลา","warning");
+    if(selectedWeekendDates.includes(value))return toast("เพิ่มวันที่นี้แล้ว","ไม่ต้องเพิ่มวันที่ซ้ำ","info");
+    selectedWeekendDates.push(value);
+    selectedWeekendDates.sort();
+    weekendDateInput.value="";
+    renderWeekendDates();
+    refresh();
+  });
   modal.querySelector("#leave-start-date").addEventListener("change",refresh);
   modal.querySelector("#leave-end-date").addEventListener("change",refresh);
   modal.querySelector("#leave-session").addEventListener("change",refresh);
@@ -5124,8 +5196,18 @@ async function saveLeaveRequest(modal,existing,submitAfter,button) {
   const start = String(fd.get("start_date") || "");
   const end = String(fd.get("end_date") || "");
   const session = String(fd.get("leave_session") || "full_day");
-  const days = leaveWorkingDays(start,end,session);
-  if (!days) return toast("ช่วงวันที่ลาไม่ถูกต้อง","กรุณาเลือกช่วงที่มีวันทำการอย่างน้อย 1 วัน (ไม่นับวันเสาร์–อาทิตย์)","error");
+  const weekendEnabled = String(fd.get("weekend_working_enabled") || "") === "on";
+  let weekendWorkingDates = [];
+  try {
+    const parsed = JSON.parse(String(fd.get("weekend_working_dates") || "[]"));
+    if (Array.isArray(parsed)) weekendWorkingDates = [...new Set(parsed.map(value=>String(value||"").slice(0,10)))].sort();
+  } catch {}
+  if (!weekendEnabled) weekendWorkingDates = [];
+  if (weekendEnabled && !weekendWorkingDates.length) return toast("กรุณาเลือกวันที่โรงเรียนเปิดเรียน","เลือกวันเสาร์หรือวันอาทิตย์ที่ต้องการลาอย่างน้อย 1 วัน","error");
+  const invalidWeekendDate = weekendWorkingDates.find(date=>!leaveDateIsWeekend(date)||date<start||date>end);
+  if (invalidWeekendDate) return toast("วันที่เปิดเรียนไม่ถูกต้อง","วันที่เลือกต้องเป็นวันเสาร์หรือวันอาทิตย์ และอยู่ภายในช่วงวันที่ลา","error");
+  const days = leaveWorkingDays(start,end,session,weekendWorkingDates);
+  if (!days) return toast("ช่วงวันที่ลาไม่ถูกต้อง","กรุณาเลือกช่วงที่มีวันทำการ หรือเลือกวันที่โรงเรียนเปิดเรียนในวันเสาร์–อาทิตย์","error");
 
   const payload = {
     leave_type_code: String(fd.get("leave_type_code")),
@@ -5134,6 +5216,7 @@ async function saveLeaveRequest(modal,existing,submitAfter,button) {
     start_date: start,
     end_date: end,
     leave_session: session,
+    weekend_working_dates: weekendWorkingDates,
     leave_days: days,
     leave_year: dateOnly(start)?.getFullYear() || currentLeaveYear(),
     academic_year: Number(fd.get("academic_year")),
@@ -5220,7 +5303,7 @@ function leaveReviewModal(stage) {
   const modal = document.createElement("div");
   modal.className = "modal-backdrop";
   modal.innerHTML = `<div class="modal">
-    <div class="modal-head"><div><h3>${isPersonnel ? "ตรวจคำขอลา" : "อนุมัติคำขอลาขั้นสุดท้าย"}</h3><p>${escapeHtml(r.requester_name)} · ${escapeHtml(leaveTypeName(r.leave_type_code,r.other_leave_text))} · ${escapeHtml(leaveSessionLabel(r.leave_session))} · ${formatLeaveDays(r.leave_days)} วัน</p></div><button class="modal-close">×</button></div>
+    <div class="modal-head"><div><h3>${isPersonnel ? "ตรวจคำขอลา" : "อนุมัติคำขอลาขั้นสุดท้าย"}</h3><p>${escapeHtml(r.requester_name)} · ${escapeHtml(leaveTypeName(r.leave_type_code,r.other_leave_text))} · ${escapeHtml(leaveSessionLabel(r.leave_session))} · ${Array.isArray(r.weekend_working_dates)&&r.weekend_working_dates.length ? `ลาในวันหยุดที่โรงเรียนเปิดเรียน: ${escapeHtml(leaveWeekendDatesLabel(r.weekend_working_dates))} · ` : ""}${formatLeaveDays(r.leave_days)} วัน</p></div><button class="modal-close">×</button></div>
     <div class="review-choice-grid">
       <button class="review-choice approve active" data-leave-decision="approve"><strong>✓ อนุมัติ</strong><span>${isPersonnel ? "ส่งต่อให้ผู้บริหาร" : "อนุมัติขั้นสุดท้าย"}</span></button>
       <button class="review-choice reject" data-leave-decision="reject"><strong>× ไม่อนุมัติ</strong><span>ยุติ Workflow และแจ้งผู้ลา</span></button>
@@ -5342,6 +5425,7 @@ function buildLeaveA4Html(request,assets={}) {
       <div><span>ตั้งแต่วันที่</span><strong>${thaiDateOnly(request.start_date)}</strong></div>
       <div><span>ถึงวันที่</span><strong>${thaiDateOnly(request.end_date)}</strong></div>
       <div><span>ช่วงเวลาการลา</span><strong>${escapeHtml(leaveSessionLabel(request.leave_session))}</strong></div>
+      ${Array.isArray(request.weekend_working_dates)&&request.weekend_working_dates.length ? `<div><span>ลาในวันหยุดที่โรงเรียนเปิดเรียน</span><strong>${escapeHtml(leaveWeekendDatesLabel(request.weekend_working_dates))}</strong></div>` : ""}
       <div><span>จำนวนวันลา</span><strong>${formatLeaveDays(request.leave_days)} วัน</strong></div>
       <div><span>ปีการศึกษา / ภาคเรียน</span><strong>${escapeHtml(String(request.academic_year||"—"))} / ภาคเรียนที่ ${escapeHtml(String(request.semester||"—"))}</strong></div>
     </div>

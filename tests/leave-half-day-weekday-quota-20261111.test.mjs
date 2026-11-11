@@ -14,7 +14,7 @@ function extractFunction(name) {
 }
 
 const helpers = runInNewContext(
-  ["leaveWorkingDayCount", "leaveWorkingDays", "leaveSessionLabel", "formatLeaveDays"].map(extractFunction).join("\n") +
+  ["leaveDateIsWeekend", "leaveWorkingDayCount", "leaveWorkingDays", "leaveSessionLabel", "formatLeaveDays"].map(extractFunction).join("\n") +
   "\n({leaveWorkingDayCount,leaveWorkingDays,leaveSessionLabel,formatLeaveDays})"
 );
 
