@@ -26,17 +26,17 @@ test("student master and transfer history remain synchronized without deleting h
   assert.doesNotMatch(migration, /DELETE\s+FROM\s+(public\.)?(students|student_enrollments)/i);
 });
 
-test("operational roster and PDF/Excel export default to active learners, with archived status still selectable", () => {
-  assert.match(roster, /if\(!state\.generalStudentRosterDefaultStatusSet\)/);
-  assert.match(roster, /state\.generalStudentRosterStatus="active"/);
-  assert.match(roster, /if\(state\.generalStudentRosterStatus!=="all"&&r\.enrollment_status!==state\.generalStudentRosterStatus\)return false/);
-  assert.match(roster, /<option value="all">ทุกสถานะ<\/option>/);
-  assert.match(roster, /<option value="transferred_out"/);
+test("operational roster and exports always show only current DMC students; transfer history is separate", () => {
+  assert.match(roster, /current DMC-verified student list/);
+  assert.doesNotMatch(roster, /id="gsr-status"/);
+  assert.doesNotMatch(roster, /<option value="all">ทุกสถานะ<\/option>/);
+  assert.doesNotMatch(roster, /<option value="transferred_out"/);
+  assert.doesNotMatch(roster, /state\.generalStudentRosterStatus!==/);
   assert.match(roster, /function exportRows\(\)\{\s*return filteredRows\(\)/);
   assert.match(roster, /async function exportPdf\(\)[\s\S]*const rows=filteredRows\(\)/);
-  assert.match(roster, /นักเรียนกำลังศึกษา/);
-  assert.match(roster, /ทะเบียนภาคเรียนนี้/);
-});
+  assert.match(roster, /รายชื่อนักเรียนปัจจุบัน/);
+  assert.match(roster, /function historyView\(\)/);
+});;
 
 test("academic registry current student list excludes transferred learners in source and compiled bundle", () => {
   const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");

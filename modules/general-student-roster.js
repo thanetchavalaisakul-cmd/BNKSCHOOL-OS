@@ -2,11 +2,8 @@
 // Uses the shared student/enrollment master. No duplicate roster storage is created.
 export function createGeneralStudentRosterFeature(ctx){
   const {state,supabase,currentAcademicPeriod,escapeHtml,toast,isSuperAdminUser,studentPdfBase,xlsxDownloadFromRows,renderDashboard}=ctx;
-  // Operational lists/exports show current students by default; history remains available via "ทุกสถานะ".
-  if(!state.generalStudentRosterDefaultStatusSet){
-    state.generalStudentRosterStatus="active";
-    state.generalStudentRosterDefaultStatusSet=true;
-  }
+  // Operational roster and exports always use the current DMC-verified student list.
+  // Transfer requests and audit history remain in their dedicated tabs.
   const buttonLoading=(el,busy,label)=>{if(!el)return;el.disabled=!!busy;if(label&&busy)el.dataset.gsrOriginalLabel=el.textContent,el.textContent=label;else if(!busy&&el.dataset.gsrOriginalLabel){el.textContent=el.dataset.gsrOriginalLabel;delete el.dataset.gsrOriginalLabel;}};
   const access=()=>state.generalStudentRosterAccess||{};
   const canView=()=>!!(isSuperAdminUser()||access().can_view);
@@ -28,7 +25,6 @@ export function createGeneralStudentRosterFeature(ctx){
     const q=String(state.generalStudentRosterSearch||"").trim().toLowerCase();
     return (state.generalStudentRosterRows||[]).filter(r=>{
       if(state.generalStudentRosterClassId&&r.class_id!==state.generalStudentRosterClassId)return false;
-      if(state.generalStudentRosterStatus!=="all"&&r.enrollment_status!==state.generalStudentRosterStatus)return false;
       if(!q)return true;
       return [r.student_code,name(r),r.class_label,r.exit_note].some(v=>String(v||"").toLowerCase().includes(q));
     });
@@ -63,9 +59,9 @@ export function createGeneralStudentRosterFeature(ctx){
     }
   }
   function hero(){
-    const rows=state.generalStudentRosterRows||[],active=rows.filter(r=>r.enrollment_status==="active").length,
-      moved=rows.filter(r=>r.enrollment_status==="transferred_out").length,pending=(state.generalStudentRosterTransfers||[]).length;
-    return '<section class="gsr-hero"><div class="gsr-hero-copy"><span class="gsr-kicker">ฝ่ายบริหารงานทั่วไป · GENERAL ADMINISTRATION</span><h2>ระบบจัดการรายชื่อนักเรียน</h2><p>บัญชีรายชื่อกลาง เชื่อมโยงทะเบียนวิชาการ พร้อมติดตามการย้ายเข้าและย้ายออก</p><div class="gsr-period">ปีการศึกษา <strong>'+esc(period().year)+'</strong> · ภาคเรียนที่ <strong>'+period().semester+'</strong></div></div><div class="gsr-stats"><article><span>นักเรียนกำลังศึกษา</span><strong>'+active+'</strong><small>คน</small></article><article><span>ทะเบียนภาคเรียนนี้</span><strong>'+rows.length+'</strong><small>รวมประวัติทุกสถานะ</small></article><article><span>ใบย้ายรอดำเนินการ</span><strong>'+pending+'</strong><small>รายการ</small></article><article><span>ย้ายออกแล้ว</span><strong>'+moved+'</strong><small>คน</small></article></div></section>';
+    const rows=state.generalStudentRosterRows||[],
+      pending=(state.generalStudentRosterTransfers||[]).length;
+    return '<section class="gsr-hero"><div class="gsr-hero-copy"><span class="gsr-kicker">ฝ่ายบริหารงานทั่วไป · GENERAL ADMINISTRATION</span><h2>ระบบจัดการรายชื่อนักเรียน</h2><p>แสดงเฉพาะรายชื่อนักเรียนปัจจุบันจากทะเบียนกลาง DMC</p><div class="gsr-period">ปีการศึกษา <strong>'+esc(period().year)+'</strong> · ภาคเรียนที่ <strong>'+period().semester+'</strong></div></div><div class="gsr-stats"><article><span>รายชื่อนักเรียนปัจจุบัน</span><strong>'+rows.length+'</strong><small>คน</small></article><article><span>ใบย้ายรอดำเนินการ</span><strong>'+pending+'</strong><small>รายการ</small></article></div></section>';
   }
   function tabs(){
     const items=[["roster","บัญชีรายชื่อ",null],["transfers","ใบย้ายที่อนุมัติแล้ว",(state.generalStudentRosterTransfers||[]).length],["history","ประวัติการย้ายเข้า–ออก",null]];
@@ -74,12 +70,12 @@ export function createGeneralStudentRosterFeature(ctx){
   }
   function filters(){
     const p=period(),years=[...new Set((state.generalStudentRosterClasses||[]).map(c=>String(c.academic_year)))].sort((a,b)=>Number(b)-Number(a)),classes=classOptions();
-    return '<section class="gsr-filter"><div class="gsr-filter-grid"><label>ปีการศึกษา<select class="select" id="gsr-year">'+years.map(y=>'<option value="'+esc(y)+'" '+(y===p.year?"selected":"")+'>'+esc(y)+'</option>').join("")+'</select></label><label>ภาคเรียน<select class="select" id="gsr-semester"><option value="1" '+(p.semester===1?"selected":"")+'>ภาคเรียนที่ 1</option><option value="2" '+(p.semester===2?"selected":"")+'>ภาคเรียนที่ 2</option></select></label><label>ห้องเรียน<select class="select" id="gsr-class"><option value="">ทุกห้อง</option>'+classes.map(c=>'<option value="'+c.id+'" '+(state.generalStudentRosterClassId===c.id?"selected":"")+'>'+esc(c.level_name+"/"+c.room_name)+'</option>').join("")+'</select></label><label>สถานะ<select class="select" id="gsr-status"><option value="all">ทุกสถานะ</option><option value="active" '+(state.generalStudentRosterStatus==="active"?"selected":"")+'>กำลังเรียน</option><option value="transferred_out" '+(state.generalStudentRosterStatus==="transferred_out"?"selected":"")+'>ย้ายออก</option><option value="inactive" '+(state.generalStudentRosterStatus==="inactive"?"selected":"")+'>พ้นสภาพ</option><option value="graduated" '+(state.generalStudentRosterStatus==="graduated"?"selected":"")+'>จบการศึกษา</option></select></label></div><div class="gsr-filter-actions"><input class="input" id="gsr-search" value="'+esc(state.generalStudentRosterSearch||"")+'" placeholder="ค้นหาชื่อ / เลขประจำตัว / ห้องเรียน"><button class="btn btn-secondary" id="gsr-refresh">↻ รีเฟรช</button></div></section>';
+    return '<section class="gsr-filter"><div class="gsr-filter-grid"><label>ปีการศึกษา<select class="select" id="gsr-year">'+years.map(y=>'<option value="'+esc(y)+'" '+(y===p.year?"selected":"")+'>'+esc(y)+'</option>').join("")+'</select></label><label>ภาคเรียน<select class="select" id="gsr-semester"><option value="1" '+(p.semester===1?"selected":"")+'>ภาคเรียนที่ 1</option><option value="2" '+(p.semester===2?"selected":"")+'>ภาคเรียนที่ 2</option></select></label><label>ห้องเรียน<select class="select" id="gsr-class"><option value="">ทุกห้อง</option>'+classes.map(c=>'<option value="'+c.id+'" '+(state.generalStudentRosterClassId===c.id?"selected":"")+'>'+esc(c.level_name+"/"+c.room_name)+'</option>').join("")+'</select></label></div><div class="gsr-filter-actions"><input class="input" id="gsr-search" value="'+esc(state.generalStudentRosterSearch||"")+'" placeholder="ค้นหาชื่อ / เลขประจำตัว / ห้องเรียน"><button class="btn btn-secondary" id="gsr-refresh">↻ รีเฟรช</button></div></section>';
   }
   function rosterView(){
     const rows=filteredRows(),p=period();
     const actions='<div class="gsr-toolbar">'+(canAddStudents()?'<button class="btn btn-primary" id="gsr-add-student">＋ เพิ่มนักเรียน / รับย้ายเข้า</button>':"")+(canExport()?'<button class="btn btn-secondary" id="gsr-export-pdf">PDF</button><button class="btn btn-secondary" id="gsr-export-xlsx">Excel</button>':"")+'</div>';
-    return '<section class="gsr-card"><div class="gsr-card-head"><div><h3>บัญชีรายชื่อนักเรียน</h3><p>แสดงเฉพาะข้อมูลที่จำเป็นต่อการจัดการรายชื่อ ไม่แสดงเลขประชาชนและข้อมูลผู้ปกครอง</p></div>'+actions+'</div><div class="gsr-table-wrap"><table class="gsr-table"><thead><tr><th>เลขที่</th><th>เลขประจำตัว</th><th>ชื่อ–นามสกุล</th><th>ชั้น/ห้อง</th><th>สถานะ</th><th>รายละเอียดการออก</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+(r.student_number||"—")+'</td><td><strong>'+esc(r.student_code)+'</strong></td><td>'+esc(name(r))+'</td><td>'+esc(r.class_label)+'</td><td><span class="gsr-status '+esc(r.enrollment_status)+'">'+esc(statusLabel(r.enrollment_status))+'</span></td><td>'+esc(r.exit_note||"—")+'</td></tr>').join("")+'</tbody></table>'+(rows.length?"":'<div class="gsr-empty">ไม่พบรายชื่อนักเรียนตามเงื่อนไขที่เลือก</div>')+'</div><div class="gsr-table-foot">พบ '+rows.length+' รายชื่อ · ปีการศึกษา '+esc(p.year)+' ภาคเรียนที่ '+p.semester+'</div></section>';
+    return '<section class="gsr-card"><div class="gsr-card-head"><div><h3>บัญชีรายชื่อนักเรียน</h3><p>แสดงเฉพาะข้อมูลที่จำเป็นต่อการจัดการรายชื่อ ไม่แสดงเลขประชาชนและข้อมูลผู้ปกครอง</p></div>'+actions+'</div><div class="gsr-table-wrap"><table class="gsr-table"><thead><tr><th>เลขที่</th><th>เลขประจำตัว</th><th>ชื่อ–นามสกุล</th><th>ชั้น/ห้อง</th><th>สถานะ</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+(r.student_number||"—")+'</td><td><strong>'+esc(r.student_code)+'</strong></td><td>'+esc(name(r))+'</td><td>'+esc(r.class_label)+'</td><td><span class="gsr-status '+esc(r.enrollment_status)+'">'+esc(statusLabel(r.enrollment_status))+'</span></td></tr>').join("")+'</tbody></table>'+(rows.length?"":'<div class="gsr-empty">ไม่พบรายชื่อนักเรียนตามเงื่อนไขที่เลือก</div>')+'</div><div class="gsr-table-foot">พบ '+rows.length+' รายชื่อ · ปีการศึกษา '+esc(p.year)+' ภาคเรียนที่ '+p.semester+'</div></section>';
   }
   function transfersView(){
     const rows=state.generalStudentRosterTransfers||[];

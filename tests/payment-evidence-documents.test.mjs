@@ -35,19 +35,21 @@ test("payment evidence totals handle empty and invalid amounts safely", () => {
   ]), { studentCount: 1, totalAmount: 0 });
 });
 
-test("current payment-evidence roster excludes confirmed transfers but keeps pending and ghost rows", () => {
+test("current payment-evidence roster keeps only active DMC entries and excludes ghost, inactive, transferred and historical rows", () => {
   const rows = [
     { student_id: "active", roster_status: "active", enrollment_status: "active" },
     { student_id: "pending", roster_status: "transfer_pending", enrollment_status: "active" },
     { student_id: "ghost", roster_status: "ghost", enrollment_status: "inactive" },
+    { student_id: "inactive-master", roster_status: "active", enrollment_status: "active", student_status: "inactive" },
     { student_id: "moved-by-roster", roster_status: "transferred_out", enrollment_status: "active" },
     { student_id: "moved-by-enrollment", roster_status: "active", enrollment_status: "transferred_out" },
+    { student_id: "historical", roster_status: "active", enrollment_status: "active", isHistorical: true },
   ];
   const filtered = paymentEvidenceFilterCurrentRoster(rows);
-  assert.deepEqual(filtered.map((row) => row.student_id), ["active", "pending", "ghost"]);
-  assert.equal(rows.length, 5, "the source roster is not mutated");
+  assert.deepEqual(filtered.map((row) => row.student_id), ["active", "pending"]);
+  assert.equal(rows.length, 7, "the source roster is not mutated");
   assert.deepEqual(paymentEvidenceFilterCurrentRoster(null), []);
-});
+});;
 
 test("roster status labels distinguish moved, pending, ghost and active students", () => {
   assert.equal(paymentEvidenceRosterStatusLabel("transferred_out"), "ย้ายแล้ว");

@@ -7,14 +7,17 @@ export function calculatePaymentEvidenceTotals(items = []) {
 }
 
 /**
- * Confirmed transfer-outs are historical records, not current payment-evidence
- * candidates. Keep pending transfers and ghost rows available for the existing
- * workflow; only remove records confirmed by the transfer process.
+ * Operational forms use only the current DMC roster for the selected period.
+ * Pending transfer requests remain visible until the transfer is confirmed.
  */
 export function paymentEvidenceFilterCurrentRoster(rows = []) {
   if (!Array.isArray(rows)) return [];
-  return rows.filter((row) => row?.roster_status !== "transferred_out"
-    && row?.enrollment_status !== "transferred_out");
+  return rows.filter((row) => row?.enrollment_status === "active"
+    && row?.roster_status !== "transferred_out"
+    && row?.roster_status !== "ghost"
+    && row?.student_status !== "inactive"
+    && row?.student_status !== "transferred_out"
+    && row?.isHistorical !== true);
 }
 
 // Official BNK documents use TH Sarabun IT๙ and Thai numerals on print.
@@ -806,7 +809,7 @@ export function createPaymentEvidenceFeature(ctx) {
             <div class="pe-field" style="min-width:260px"><label>ประเภทเงิน</label><select id="pe-editor-type">${typeOptions}</select></div>
           </div>
           <div class="pe-mode-row">
-            <button class="pe-mode ${draft.selectionMode === "all" ? "active" : ""}" data-pe-mode="all">ชุดที่ 1 · เลือกทั้งหมดรวมเด็กผี</button>
+            <button class="pe-mode ${draft.selectionMode === "all" ? "active" : ""}" data-pe-mode="all">ชุดที่ 1 · เลือกทั้งหมดตามรายชื่อล่าสุด</button>
             <button class="pe-mode ${draft.selectionMode === "selected" ? "active" : ""}" data-pe-mode="selected">ชุดที่ 2 · เลือกเฉพาะราย</button>
           </div>
           <div class="pe-toolbar">
@@ -821,7 +824,7 @@ export function createPaymentEvidenceFeature(ctx) {
               <tbody id="pe-editor-rows">${editorRowsHtml()}</tbody>
             </table>
           </div>
-          <div class="pe-modal-foot"><span class="pe-muted pe-small">เลือกวันที่ครั้งเดียวแล้วกดใช้กับผู้ที่เลือกได้ · ยังแก้ไขวันที่รายคนได้ · ชุดที่ 1 รวมรายชื่อเด็กผี</span><div class="pe-actions"><button class="pe-btn" id="pe-editor-cancel">ยกเลิก</button><button class="pe-btn primary" id="pe-editor-save">บันทึกฉบับร่าง</button></div></div>
+          <div class="pe-modal-foot"><span class="pe-muted pe-small">เลือกวันที่ครั้งเดียวแล้วกดใช้กับผู้ที่เลือกได้ · ยังแก้ไขวันที่รายคนได้ · ชุดที่ 1 ใช้รายชื่อนักเรียนปัจจุบันจากทะเบียนกลาง</span><div class="pe-actions"><button class="pe-btn" id="pe-editor-cancel">ยกเลิก</button><button class="pe-btn primary" id="pe-editor-save">บันทึกฉบับร่าง</button></div></div>
         </div>
       </div>`;
   }
@@ -857,25 +860,6 @@ export function createPaymentEvidenceFeature(ctx) {
           student_snapshot: snapshot,
         };
       });
-      const currentIds = new Set(rows.map((row) => row.student_id));
-      for (const old of oldItems) {
-        if (old.student_id && currentIds.has(old.student_id)) continue;
-        const snapshot = old.student_snapshot || {};
-        rows.push({
-          student_id: old.student_id || null,
-          full_name: studentName(old),
-          student_code: snapshot.student_code || "",
-          citizen_id: snapshot.citizen_id || "",
-          roster_status: snapshot.roster_status || "ghost",
-          selected: true,
-          amount: old.amount,
-          received_date: old.received_date || "",
-          note: old.note || rosterStatusNote(snapshot.roster_status),
-          row_order: old.row_order || rows.length + 1,
-          student_snapshot: snapshot,
-          isHistorical: true,
-        });
-      }
       local.draft = {
         documentId: doc?.id || null,
         year,
@@ -1010,7 +994,7 @@ export function createPaymentEvidenceFeature(ctx) {
       return;
     }
     if (draft.selectionMode === "all" && draft.rows.some((row) => row.student_id && !row.selected)) {
-      toast("รายชื่อยังไม่ครบ", "ชุดที่ 1 ต้องเลือกนักเรียนทั้งหมดรวมรายชื่อเด็กผี", "warning");
+      toast("รายชื่อยังไม่ครบ", "ชุดที่ 1 ต้องเลือกนักเรียนทุกคนตามรายชื่อปัจจุบัน", "warning");
       return;
     }
     const items = selected.map((row, index) => ({
