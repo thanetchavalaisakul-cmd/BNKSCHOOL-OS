@@ -1,0 +1,41 @@
+name: Verify BNK daily leave schedule
+on:
+  push:
+    branches:
+      - feature/leave-daily-sessions-20261111
+    paths:
+      - 'app.js'
+      - 'tests/**'
+      - 'supabase/migrations/**'
+      - 'index.html'
+      - 'leave-day-schedule.css'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app.js'
+      - 'tests/**'
+      - 'supabase/migrations/**'
+      - 'index.html'
+      - 'leave-day-schedule.css'
+      - 'package.json'
+      - 'package-lock.json'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install pinned build tool
+        run: npm ci --no-audit --no-fund
+      - name: Build and run all regression tests
+        run: npm run verify
+      - name: Check patch whitespace
+        run: git diff --check
