@@ -273,3 +273,58 @@ ON public.electricity_readings
 FOR SELECT
 TO authenticated
 USING ((SELECT private.electricity_can_view_reading(id)));
+
+
+-- Preserve the normal leave-signature workflow without granting access to the
+-- general signature administration module or to another person's signatures.
+DROP POLICY IF EXISTS office_admin_module_scope ON public.signatures;
+CREATE POLICY office_admin_module_scope
+ON public.signatures
+AS RESTRICTIVE
+FOR ALL
+TO authenticated
+USING (
+  coalesce(private."current_role"(), '') <> 'office_admin'
+  OR user_id = (SELECT auth.uid())
+)
+WITH CHECK (
+  coalesce(private."current_role"(), '') <> 'office_admin'
+  OR user_id = (SELECT auth.uid())
+);
+
+-- Office Admin may read/write only their own requester signature on their own
+-- leave request; every other school-document signature remains blocked.
+DROP POLICY IF EXISTS office_admin_module_scope ON public.school_document_signatures;
+CREATE POLICY office_admin_module_scope
+ON public.school_document_signatures
+AS RESTRICTIVE
+FOR ALL
+TO authenticated
+USING (
+  coalesce(private."current_role"(), '') <> 'office_admin'
+  OR (
+    document_kind = 'leave'
+    AND slot_code = 'requester'
+    AND signer_user_id = (SELECT auth.uid())
+    AND EXISTS (
+      SELECT 1
+      FROM public.leave_requests r
+      WHERE r.id = document_id
+        AND r.requester_id = (SELECT auth.uid())
+    )
+  )
+)
+WITH CHECK (
+  coalesce(private."current_role"(), '') <> 'office_admin'
+  OR (
+    document_kind = 'leave'
+    AND slot_code = 'requester'
+    AND signer_user_id = (SELECT auth.uid())
+    AND EXISTS (
+      SELECT 1
+      FROM public.leave_requests r
+      WHERE r.id = document_id
+        AND r.requester_id = (SELECT auth.uid())
+    )
+  )
+);
