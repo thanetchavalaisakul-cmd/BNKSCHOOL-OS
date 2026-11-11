@@ -23,7 +23,7 @@ import { createTimetableConstraintFeature } from "./timetable-constraints.js?v=4
 import { staffDutyTeachingDisplay } from "./staff-duty-label.js?v=1";
 import { paginateRows } from "./student-pagination.js?v=1";
 import { openJointActivityModal } from "./timetable-joint.js?v=1";
-import { wholeDayDocumentRows, wholeDayDocumentImages } from "./substitute-day-document.mjs";
+import { wholeDayDocumentRows, wholeDayDocumentImages } from "./substitute-day-document.mjs?v=20261111.1";
 import { compareProjectRecords, compareActivityRecords } from "./project-natural-sort.mjs";
 // Load document generation tools only when the user requests a PDF or image.
 let canvasModulePromise=null,jsPdfModulePromise=null,pdfDocumentModulePromise=null;
@@ -4433,11 +4433,37 @@ function leaveTypeName(code, otherText = "") {
   return type?.name_th || code || "—";
 }
 
-function inclusiveLeaveDays(start, end) {
-  const s = dateOnly(start);
-  const e = dateOnly(end);
-  if (!s || !e || e < s) return 0;
-  return Math.floor((e - s) / 86400000) + 1;
+function leaveWorkingDayCount(start,end) {
+  const parse=value=>{
+    const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||""));
+    if(!match)return null;
+    const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]);
+    const date=new Date(Date.UTC(year,month-1,day));
+    if(date.getUTCFullYear()!==year||date.getUTCMonth()!==month-1||date.getUTCDate()!==day)return null;
+    return date;
+  };
+  const first=parse(start),last=parse(end);
+  if(!first||!last||last<first)return 0;
+  let total=0;
+  for(let stamp=first.getTime(),endStamp=last.getTime();stamp<=endStamp;stamp+=86400000){
+    const weekday=new Date(stamp).getUTCDay();
+    if(weekday!==0&&weekday!==6)total++;
+  }
+  return total;
+}
+function leaveWorkingDays(start,end,session="full_day") {
+  const workingDays=leaveWorkingDayCount(start,end);
+  const factor=session==="morning"||session==="afternoon"?0.5:1;
+  return Math.round(workingDays*factor*10)/10;
+}
+function leaveSessionLabel(session) {
+  if(session==="morning")return "ครึ่งวันเช้า";
+  if(session==="afternoon")return "ครึ่งวันบ่าย";
+  return "เต็มวัน";
+}
+function formatLeaveDays(value) {
+  const number=Number(value||0);
+  return Number.isFinite(number)?number.toFixed(1).replace(/\.0$/,""):"0";
 }
 
 function currentAcademicPeriod(dateValue = new Date()) {
@@ -4747,7 +4773,7 @@ function leaveHistoryTable(requests, showRequester = false) {
         <td><strong>${ordinal ? `ครั้งที่ ${ordinal}` : "ฉบับร่าง"}</strong><br><span class="table-muted">#${r.request_no}</span></td>
         ${showRequester ? `<td><strong>${escapeHtml(r.requester_name)}</strong><br><span class="table-muted">${escapeHtml(r.requester_position || ROLE_LABEL[r.requester_role] || r.requester_role)}</span></td>` : ""}
         <td>${escapeHtml(leaveTypeName(r.leave_type_code,r.other_leave_text))}</td>
-        <td>${thaiDateOnly(r.start_date)}<br><span class="table-muted">ถึง ${thaiDateOnly(r.end_date)}</span></td>
+        <td>${thaiDateOnly(r.start_date)}<br><span class="table-muted">ถึง ${thaiDateOnly(r.end_date)}</span><br><span class="table-muted">${escapeHtml(leaveSessionLabel(r.leave_session))}</span></td>
         <td><strong>${Number(r.leave_days)} วัน</strong></td>
         <td>${escapeHtml(r.contact_during_leave || "—")}${r.contact_phone ? `<br><span class="table-muted">${escapeHtml(r.contact_phone)}</span>` : ""}</td>
         <td><span class="pill ${leaveStatusClass(r.status)}">${escapeHtml(LEAVE_STATUS_LABEL[r.status] || r.status)}</span></td>
@@ -4982,6 +5008,7 @@ function leaveDetailHtml(request) {
     <div class="detail-grid leave-detail-grid">
       ${planField("วันที่เริ่มลา",thaiDateOnly(request.start_date))}
       ${planField("วันที่สิ้นสุด",thaiDateOnly(request.end_date))}
+      ${planField("ช่วงเวลาการลา",leaveSessionLabel(request.leave_session))}
       ${planField("ปีการศึกษา",String(request.academic_year || "—"))}
       ${planField("ภาคเรียนที่",String(request.semester || "—"))}
       ${planField("มีผลต่อตารางสอน",request.affects_teaching_schedule ? "ต้องจัดการตารางสอน/ผู้สอนแทน" : "ไม่ต้องจัดผู้สอนแทน")}
@@ -5019,8 +5046,9 @@ function leaveRequestModal(request = null) {
   const defaultPeriod = r.academic_year && r.semester
     ? { academicYear: Number(r.academic_year), semester: Number(r.semester) }
     : currentAcademicPeriod(r.start_date || new Date());
+  const defaultLeaveSession = r.leave_session || "full_day";
   modal.innerHTML = `<div class="modal modal-wide">
-    <div class="modal-head"><div><h3>${request ? "แก้ไขคำขอลา" : "ยื่นคำขอลา"}</h3><p>ระบบจะคำนวณจำนวนวันแบบรวมวันเริ่มและวันสิ้นสุด</p></div><button class="modal-close">×</button></div>
+    <div class="modal-head"><div><h3>${request ? "แก้ไขคำขอลา" : "ยื่นคำขอลา"}</h3><p>นับเฉพาะวันจันทร์–ศุกร์ และเลือกลาเต็มวันหรือครึ่งวันได้</p></div><button class="modal-close">×</button></div>
     <form id="leave-form" class="form-grid">
       <div class="form-row">
         <div class="field"><label>ประเภทการลา</label><select class="select" name="leave_type_code" id="leave-type-code" required>
@@ -5038,7 +5066,14 @@ function leaveRequestModal(request = null) {
         <div class="field"><label>ตั้งแต่วันที่</label><input class="input" name="start_date" id="leave-start-date" type="date" required value="${escapeHtml(r.start_date || "")}"></div>
         <div class="field"><label>ถึงวันที่</label><input class="input" name="end_date" id="leave-end-date" type="date" required value="${escapeHtml(r.end_date || "")}"></div>
       </div>
-      <div class="leave-days-preview" id="leave-days-preview"><span>จำนวนวันลา</span><strong>${r.leave_days ? Number(r.leave_days) : "—"} วัน</strong></div>
+      <div class="form-row">
+        <div class="field"><label>ช่วงเวลาการลา</label><select class="select" name="leave_session" id="leave-session" required>
+          <option value="full_day" ${defaultLeaveSession==="full_day"?"selected":""}>เต็มวัน (1 วันต่อวันทำการ)</option>
+          <option value="morning" ${defaultLeaveSession==="morning"?"selected":""}>ครึ่งวันเช้า (0.5 วันต่อวันทำการ)</option>
+          <option value="afternoon" ${defaultLeaveSession==="afternoon"?"selected":""}>ครึ่งวันบ่าย (0.5 วันต่อวันทำการ)</option>
+        </select><small class="helper">หากเลือกช่วงหลายวัน ระบบจะคำนวณตามช่วงเวลานี้ในทุกวันทำการ</small></div>
+      </div>
+      <div class="leave-days-preview" id="leave-days-preview"><span>จำนวนวันลา · ไม่นับเสาร์–อาทิตย์</span><strong>${r.leave_days ? formatLeaveDays(r.leave_days) : "—"} วัน</strong></div>
       <div class="form-row">
         <div class="field"><label>สถานที่/ที่อยู่ระหว่างลา <span class="helper">(ถ้ามี)</span></label><input class="input" name="contact_during_leave" maxlength="240" value="${escapeHtml(r.contact_during_leave || "")}"></div>
         <div class="field"><label>เบอร์ติดต่อระหว่างลา <span class="helper">(ถ้ามี)</span></label><input class="input" name="contact_phone" maxlength="40" value="${escapeHtml(r.contact_phone || state.profile.phone || "")}"></div>
@@ -5057,14 +5092,16 @@ function leaveRequestModal(request = null) {
   const refresh = () => {
     const start = modal.querySelector("#leave-start-date").value;
     const end = modal.querySelector("#leave-end-date").value;
-    const days = inclusiveLeaveDays(start,end);
-    modal.querySelector("#leave-days-preview").innerHTML = `<span>จำนวนวันลา</span><strong>${days || "—"} วัน</strong>`;
+    const session = modal.querySelector("#leave-session").value || "full_day";
+    const days = leaveWorkingDays(start,end,session);
+    modal.querySelector("#leave-days-preview").innerHTML = `<span>จำนวนวันลา · ไม่นับเสาร์–อาทิตย์</span><strong>${days ? formatLeaveDays(days)+" วัน" : "—"}</strong>`;
     const other = modal.querySelector("#leave-type-code").value === "other";
     modal.querySelector("[name='other_leave_text']").required = other;
     modal.querySelector("#leave-other-field").classList.toggle("leave-field-muted",!other);
   };
   modal.querySelector("#leave-start-date").addEventListener("change",refresh);
   modal.querySelector("#leave-end-date").addEventListener("change",refresh);
+  modal.querySelector("#leave-session").addEventListener("change",refresh);
   modal.querySelector("#leave-type-code").addEventListener("change",refresh);
   refresh();
 
@@ -5086,8 +5123,9 @@ async function saveLeaveRequest(modal,existing,submitAfter,button) {
   const fd = new FormData(form);
   const start = String(fd.get("start_date") || "");
   const end = String(fd.get("end_date") || "");
-  const days = inclusiveLeaveDays(start,end);
-  if (!days) return toast("วันที่ลาไม่ถูกต้อง","วันสิ้นสุดต้องไม่น้อยกว่าวันเริ่มลา","error");
+  const session = String(fd.get("leave_session") || "full_day");
+  const days = leaveWorkingDays(start,end,session);
+  if (!days) return toast("ช่วงวันที่ลาไม่ถูกต้อง","กรุณาเลือกช่วงที่มีวันทำการอย่างน้อย 1 วัน (ไม่นับวันเสาร์–อาทิตย์)","error");
 
   const payload = {
     leave_type_code: String(fd.get("leave_type_code")),
@@ -5095,6 +5133,8 @@ async function saveLeaveRequest(modal,existing,submitAfter,button) {
     reason: String(fd.get("reason") || "").trim(),
     start_date: start,
     end_date: end,
+    leave_session: session,
+    leave_days: days,
     leave_year: dateOnly(start)?.getFullYear() || currentLeaveYear(),
     academic_year: Number(fd.get("academic_year")),
     semester: Number(fd.get("semester")),
@@ -5180,7 +5220,7 @@ function leaveReviewModal(stage) {
   const modal = document.createElement("div");
   modal.className = "modal-backdrop";
   modal.innerHTML = `<div class="modal">
-    <div class="modal-head"><div><h3>${isPersonnel ? "ตรวจคำขอลา" : "อนุมัติคำขอลาขั้นสุดท้าย"}</h3><p>${escapeHtml(r.requester_name)} · ${escapeHtml(leaveTypeName(r.leave_type_code,r.other_leave_text))} · ${Number(r.leave_days)} วัน</p></div><button class="modal-close">×</button></div>
+    <div class="modal-head"><div><h3>${isPersonnel ? "ตรวจคำขอลา" : "อนุมัติคำขอลาขั้นสุดท้าย"}</h3><p>${escapeHtml(r.requester_name)} · ${escapeHtml(leaveTypeName(r.leave_type_code,r.other_leave_text))} · ${escapeHtml(leaveSessionLabel(r.leave_session))} · ${formatLeaveDays(r.leave_days)} วัน</p></div><button class="modal-close">×</button></div>
     <div class="review-choice-grid">
       <button class="review-choice approve active" data-leave-decision="approve"><strong>✓ อนุมัติ</strong><span>${isPersonnel ? "ส่งต่อให้ผู้บริหาร" : "อนุมัติขั้นสุดท้าย"}</span></button>
       <button class="review-choice reject" data-leave-decision="reject"><strong>× ไม่อนุมัติ</strong><span>ยุติ Workflow และแจ้งผู้ลา</span></button>
@@ -5301,7 +5341,8 @@ function buildLeaveA4Html(request,assets={}) {
       <div><span>ตำแหน่ง</span><strong>${escapeHtml(request.requester_position||ROLE_LABEL[request.requester_role]||request.requester_role)}</strong></div>
       <div><span>ตั้งแต่วันที่</span><strong>${thaiDateOnly(request.start_date)}</strong></div>
       <div><span>ถึงวันที่</span><strong>${thaiDateOnly(request.end_date)}</strong></div>
-      <div><span>จำนวนวันลา</span><strong>${Number(request.leave_days)} วัน</strong></div>
+      <div><span>ช่วงเวลาการลา</span><strong>${escapeHtml(leaveSessionLabel(request.leave_session))}</strong></div>
+      <div><span>จำนวนวันลา</span><strong>${formatLeaveDays(request.leave_days)} วัน</strong></div>
       <div><span>ปีการศึกษา / ภาคเรียน</span><strong>${escapeHtml(String(request.academic_year||"—"))} / ภาคเรียนที่ ${escapeHtml(String(request.semester||"—"))}</strong></div>
     </div>
     <section class="leave-print-section"><h2>เหตุผลการลา</h2><div>${escapeHtml(request.reason)}</div></section>
@@ -5435,7 +5476,7 @@ function buildPersonLeaveReportHtml(userId,assets={}) {
       ${stats.map(s=>`<tr><td>${escapeHtml(s.name)}</td><td>${s.times}</td><td>${Number(s.days.toFixed(1))}</td></tr>`).join("")}
     </tbody></table></section>
     <section class="leave-print-section"><h2>ประวัติรายการลา</h2><table class="leave-report-person-table"><thead><tr><th>#</th><th>ประเภท</th><th>ช่วงวันที่</th><th>วัน</th><th>สถานะ</th></tr></thead><tbody>
-      ${requests.length?requests.map((r,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(leaveTypeName(r.leave_type_code,r.other_leave_text))}</td><td>${thaiDateOnly(r.start_date)} – ${thaiDateOnly(r.end_date)}</td><td>${Number(r.leave_days)}</td><td>${escapeHtml(LEAVE_STATUS_LABEL[r.status]||r.status)}</td></tr>`).join(""):`<tr><td colspan="5">ไม่มีรายการลาในช่วงที่เลือก</td></tr>`}
+      ${requests.length?requests.map((r,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(leaveTypeName(r.leave_type_code,r.other_leave_text))}</td><td>${thaiDateOnly(r.start_date)} – ${thaiDateOnly(r.end_date)}<br><small>${escapeHtml(leaveSessionLabel(r.leave_session))}</small></td><td>${Number(r.leave_days)}</td><td>${escapeHtml(LEAVE_STATUS_LABEL[r.status]||r.status)}</td></tr>`).join(""):`<tr><td colspan="5">ไม่มีรายการลาในช่วงที่เลือก</td></tr>`}
     </tbody></table></section>
     <div class="leave-report-signatures">${leaveReportSignature("หัวหน้ากลุ่มงานบริหารงานบุคคล",signers.personnelHeadName)}${leaveReportSignature("ผู้อำนวยการโรงเรียน",signers.directorName)}</div>
     <footer class="a4-foot"><span>รายงานวันลารายบุคคล · ${escapeHtml(appName())}</span><span>พิมพ์เมื่อ ${thaiDateTimeDocument(new Date().toISOString())}</span></footer>
@@ -7466,9 +7507,9 @@ function preschoolCoverWorkspaceHtml(){
   if(state.preschoolCoverLoadError)return `${top}<section class="panel"><div class="drive-permission-warning"><strong>ยังไม่ได้เปิดใช้ระบบฝากสอนปฐมวัย</strong><span>ต้องรันไฟล์ SQL v5.12.9 ใน Supabase โปรเจกต์ BNK School OS ก่อน · ${escapeHtml(state.preschoolCoverLoadError)}</span></div></section>`;
   if(selected){
     const prog=preschoolCoverProgress(selected),me=prog.members.find(m=>m.teacher_id===state.user.id);
-    return `${top}<section class="panel preschool-cover-panel"><div class="panel-head"><div class="panel-title-wrap"><button class="type-back-link" id="preschool-cover-back">← กลับรายการ</button><h3>ใบฝากดูแลชั้นอนุบาล · ${escapeHtml(selected.class_label)}</h3><p>${thaiDateOnly(selected.leave_date)} · ผู้ลา ${escapeHtml(selected.absent_teacher_name)}</p></div><button class="btn btn-primary" id="preschool-cover-export">▤ Preview / PDF</button></div><div class="preschool-tip"><strong>หน่วยการเรียนรู้: ${escapeHtml(preschoolCoverUnitLabel(selected))}</strong><span>ครูอนุบาลที่ไม่ได้ลา รับทราบแล้ว ${prog.done}/${prog.eligible.length} คน · แสดงรายชื่อทุกคนที่อยู่ในทีม พร้อมสถานะผู้ลาคนอื่น</span></div>${preschoolCoverEndorsementButtons(selected)}${prog.members.length?`<div class="table-wrap"><table class="table"><thead><tr><th>ที่</th><th>รายชื่อครูอนุบาล</th><th>สถานะ</th><th>วันเวลารับทราบ</th><th></th></tr></thead><tbody>${prog.members.map((m,i)=>`<tr><td>${i+1}</td><td><strong>${escapeHtml(m.teacher_name)}</strong></td><td><span class="pill ${!m.is_available?"suspended":m.acknowledged_at?"active":"pending"}">${!m.is_available?"ลา / ไม่สามารถรับฝาก":m.acknowledged_at?"รับทราบแล้ว":"รอรับทราบ"}</span></td><td>${m.acknowledged_at?formatDate(m.acknowledged_at):"—"}</td><td>${m.teacher_id===state.user.id&&m.is_available?`<button class="btn ${m.acknowledged_at?"btn-ghost":"btn-primary"}" data-preschool-ack="${selected.id}" data-ack-value="${m.acknowledged_at?"false":"true"}">${m.acknowledged_at?"ยกเลิกการรับทราบ":"รับทราบ / รับฝาก"}</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:`<div class="empty"><strong>ยังไม่มีรายชื่อครูอนุบาลที่เชื่อมกับชั้นเรียน</strong><span>กรุณากำหนดครูประจำชั้นและผู้สอนระดับปฐมวัยในเมนูจัดการหน้าที่ครู แล้วกดซิงก์</span></div>`}${me?.acknowledged_at?`<p class="table-muted">คุณรับทราบการฝากดูแลแล้วเมื่อ ${formatDate(me.acknowledged_at)} (ระบบบันทึกเวลาอัตโนมัติ)</p>`:""}</section>`;
+    return `${top}<section class="panel preschool-cover-panel"><div class="panel-head"><div class="panel-title-wrap"><button class="type-back-link" id="preschool-cover-back">← กลับรายการ</button><h3>ใบฝากดูแลชั้นอนุบาล · ${escapeHtml(selected.class_label)}</h3><p>${thaiDateOnly(selected.leave_date)} · ${escapeHtml(leaveSessionLabel(selected.leave_session))} · ผู้ลา ${escapeHtml(selected.absent_teacher_name)}</p></div><button class="btn btn-primary" id="preschool-cover-export">▤ Preview / PDF</button></div><div class="preschool-tip"><strong>หน่วยการเรียนรู้: ${escapeHtml(preschoolCoverUnitLabel(selected))}</strong><span>ครูอนุบาลที่ไม่ได้ลา รับทราบแล้ว ${prog.done}/${prog.eligible.length} คน · แสดงรายชื่อทุกคนที่อยู่ในทีม พร้อมสถานะผู้ลาคนอื่น</span></div>${preschoolCoverEndorsementButtons(selected)}${prog.members.length?`<div class="table-wrap"><table class="table"><thead><tr><th>ที่</th><th>รายชื่อครูอนุบาล</th><th>สถานะ</th><th>วันเวลารับทราบ</th><th></th></tr></thead><tbody>${prog.members.map((m,i)=>`<tr><td>${i+1}</td><td><strong>${escapeHtml(m.teacher_name)}</strong></td><td><span class="pill ${!m.is_available?"suspended":m.acknowledged_at?"active":"pending"}">${!m.is_available?"ลา / ไม่สามารถรับฝาก":m.acknowledged_at?"รับทราบแล้ว":"รอรับทราบ"}</span></td><td>${m.acknowledged_at?formatDate(m.acknowledged_at):"—"}</td><td>${m.teacher_id===state.user.id&&m.is_available?`<button class="btn ${m.acknowledged_at?"btn-ghost":"btn-primary"}" data-preschool-ack="${selected.id}" data-ack-value="${m.acknowledged_at?"false":"true"}">${m.acknowledged_at?"ยกเลิกการรับทราบ":"รับทราบ / รับฝาก"}</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:`<div class="empty"><strong>ยังไม่มีรายชื่อครูอนุบาลที่เชื่อมกับชั้นเรียน</strong><span>กรุณากำหนดครูประจำชั้นและผู้สอนระดับปฐมวัยในเมนูจัดการหน้าที่ครู แล้วกดซิงก์</span></div>`}${me?.acknowledged_at?`<p class="table-muted">คุณรับทราบการฝากดูแลแล้วเมื่อ ${formatDate(me.acknowledged_at)} (ระบบบันทึกเวลาอัตโนมัติ)</p>`:""}</section>`;
   }
-  return `${top}<section class="panel preschool-cover-panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ฝากดูแลและจัดประสบการณ์ปฐมวัย (แบบกลุ่ม)</h3><p>ไม่ต้องเลือกคาบ · ครูอนุบาลทุกคนที่กำหนดหน้าที่ไว้จะแสดงในใบฝากดูแลรายวัน</p></div>${canSyncPreschoolCovers()?`<button class="btn btn-secondary" id="sync-preschool-covers">↻ ซิงก์ใบลาปฐมวัย</button>`:""}</div><div class="preschool-tip"><strong>หลักการทำงาน</strong><span>เมื่อครูประจำชั้นอนุบาลส่งใบลา ระบบสร้างใบฝากดูแลรายวันอัตโนมัติ · ผู้รับฝากทุกคนกดรับทราบและลงชื่อบนใบ PDF ได้</span></div>${rows.length?`<div class="preschool-cover-cards">${rows.map(g=>{const x=preschoolCoverProgress(g);return `<article class="preschool-cover-card"><div><span class="eyebrow dark">${thaiDateOnly(g.leave_date)} · ${escapeHtml(g.class_label)}</span><h3>${escapeHtml(g.absent_teacher_name)}</h3><p>${escapeHtml(preschoolCoverUnitLabel(g))}</p></div><div class="preschool-cover-side"><span class="pill ${x.pending?"pending":"active"}">รับทราบ ${x.done}/${x.eligible.length} คน</span><button class="btn btn-primary" data-preschool-cover-open="${g.id}">เปิดใบฝากสอน</button></div></article>`}).join("")}</div>`:`<div class="empty"><strong>ยังไม่มีใบฝากสอนปฐมวัยในภาคเรียนนี้</strong><span>เมื่อครูอนุบาลที่มีหน้าที่ครูประจำชั้นยื่นใบลา ระบบจะสร้างรายการให้อัตโนมัติ</span></div>`}</section>`;
+  return `${top}<section class="panel preschool-cover-panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ฝากดูแลและจัดประสบการณ์ปฐมวัย (แบบกลุ่ม)</h3><p>ไม่ต้องเลือกคาบ · ครูอนุบาลทุกคนที่กำหนดหน้าที่ไว้จะแสดงในใบฝากดูแลรายวัน</p></div>${canSyncPreschoolCovers()?`<button class="btn btn-secondary" id="sync-preschool-covers">↻ ซิงก์ใบลาปฐมวัย</button>`:""}</div><div class="preschool-tip"><strong>หลักการทำงาน</strong><span>เมื่อครูประจำชั้นอนุบาลส่งใบลา ระบบสร้างใบฝากดูแลรายวันอัตโนมัติ · ผู้รับฝากทุกคนกดรับทราบและลงชื่อบนใบ PDF ได้</span></div>${rows.length?`<div class="preschool-cover-cards">${rows.map(g=>{const x=preschoolCoverProgress(g);return `<article class="preschool-cover-card"><div><span class="eyebrow dark">${thaiDateOnly(g.leave_date)} · ${escapeHtml(leaveSessionLabel(g.leave_session))} · ${escapeHtml(g.class_label)}</span><h3>${escapeHtml(g.absent_teacher_name)}</h3><p>${escapeHtml(preschoolCoverUnitLabel(g))}</p></div><div class="preschool-cover-side"><span class="pill ${x.pending?"pending":"active"}">รับทราบ ${x.done}/${x.eligible.length} คน</span><button class="btn btn-primary" data-preschool-cover-open="${g.id}">เปิดใบฝากสอน</button></div></article>`}).join("")}</div>`:`<div class="empty"><strong>ยังไม่มีใบฝากสอนปฐมวัยในภาคเรียนนี้</strong><span>เมื่อครูอนุบาลที่มีหน้าที่ครูประจำชั้นยื่นใบลา ระบบจะสร้างรายการให้อัตโนมัติ</span></div>`}</section>`;
 }
 async function syncPreschoolCovers(){
   if(!canSyncPreschoolCovers())return;
@@ -7605,7 +7646,7 @@ function buildPreschoolCoverDocument(g,assets={}){
   };
   const members=preschoolCoverMembers(g.id);
   const unit=preschoolUnitForDate(g.class_id,g.leave_date);
-  return `<article class="a4-document"><div class="a4-document-inner"><header class="ps-doc-title">${assets.schoolLogo?`<img class="a4-school-logo" src="${assets.schoolLogo}" style="height:19mm" alt="ตราโรงเรียน">`:""}<div>${escapeHtml(schoolName())}</div><h1>บันทึกการฝากดูแลและจัดประสบการณ์ระดับปฐมวัย</h1><div>ระบบจัดการสอนแทน · ภาคเรียนที่ ${g.semester} ปีการศึกษา ${g.academic_year}</div></header><div class="ps-doc-summary"><div>ผู้ฝาก: <strong>${escapeHtml(g.absent_teacher_name)}</strong> &nbsp; ชั้นเรียน: <strong>${escapeHtml(g.class_label)}</strong></div><div>วันที่ฝากดูแล: <strong>${thaiDateOnly(g.leave_date)}</strong></div><div>หน่วยการจัดประสบการณ์: <strong>${escapeHtml(unit?.unit_title||"ยังไม่กำหนดหน่วย")}</strong>${unit?` (สัปดาห์ที่ ${unit.week_no})`:""}</div><div>ขอความร่วมมือคณะครูระดับปฐมวัยร่วมดูแลเด็กและดำเนินกิจกรรมตามหน่วยการจัดประสบการณ์ในวันที่ระบุ</div></div><table class="ps-doc-table"><thead><tr><th style="width:10mm">ที่</th><th>รายชื่อครูอนุบาลผู้รับฝาก</th><th style="width:30mm">สถานะ</th><th style="width:48mm">ลายมือชื่อ</th></tr></thead><tbody>${members.length?members.map((m,i)=>`<tr><td style="text-align:center">${i+1}</td><td>${escapeHtml(m.teacher_name)}</td><td style="text-align:center">${!m.is_available?"ลา":m.acknowledged_at?"รับทราบแล้ว":"รอลงชื่อ"}</td><td style="height:12mm">${m.acknowledged_at?`${assets.signatureByTeacher?.[m.teacher_id]?.image
+  return `<article class="a4-document"><div class="a4-document-inner"><header class="ps-doc-title">${assets.schoolLogo?`<img class="a4-school-logo" src="${assets.schoolLogo}" style="height:19mm" alt="ตราโรงเรียน">`:""}<div>${escapeHtml(schoolName())}</div><h1>บันทึกการฝากดูแลและจัดประสบการณ์ระดับปฐมวัย</h1><div>ระบบจัดการสอนแทน · ภาคเรียนที่ ${g.semester} ปีการศึกษา ${g.academic_year}</div></header><div class="ps-doc-summary"><div>ผู้ฝาก: <strong>${escapeHtml(g.absent_teacher_name)}</strong> &nbsp; ชั้นเรียน: <strong>${escapeHtml(g.class_label)}</strong></div><div>วันที่ฝากดูแล: <strong>${thaiDateOnly(g.leave_date)} · ${escapeHtml(leaveSessionLabel(g.leave_session))}</strong></div><div>หน่วยการจัดประสบการณ์: <strong>${escapeHtml(unit?.unit_title||"ยังไม่กำหนดหน่วย")}</strong>${unit?` (สัปดาห์ที่ ${unit.week_no})`:""}</div><div>ขอความร่วมมือคณะครูระดับปฐมวัยร่วมดูแลเด็กและดำเนินกิจกรรมตามหน่วยการจัดประสบการณ์ในช่วงเวลาที่ระบุ</div></div><table class="ps-doc-table"><thead><tr><th style="width:10mm">ที่</th><th>รายชื่อครูอนุบาลผู้รับฝาก</th><th style="width:30mm">สถานะ</th><th style="width:48mm">ลายมือชื่อ</th></tr></thead><tbody>${members.length?members.map((m,i)=>`<tr><td style="text-align:center">${i+1}</td><td>${escapeHtml(m.teacher_name)}</td><td style="text-align:center">${!m.is_available?"ลา":m.acknowledged_at?"รับทราบแล้ว":"รอลงชื่อ"}</td><td style="height:12mm">${m.acknowledged_at?`${assets.signatureByTeacher?.[m.teacher_id]?.image
  ?`<img class="ps-sign-image" src="${escapeHtml(assets.signatureByTeacher[m.teacher_id].image)}" alt="ลายเซ็นผู้รับฝาก">
     <span class="ps-sign-note">${assets.signatureByTeacher[m.teacher_id].source_kind==="profile_current"?"ภาพลายเซ็นจากโปรไฟล์ ณ วันที่พิมพ์":"ลงนามอิเล็กทรอนิกส์"}</span>`:""}
  <span class="ps-sign-date">รับทราบในระบบ ${thaiDateOnly(m.acknowledged_at.slice(0,10))}</span>`:""}</td></tr>`).join(""):`<tr><td colspan="4">ยังไม่พบรายชื่อครูปฐมวัย กรุณากำหนดหน้าที่ครูในระบบ</td></tr>`}</tbody></table><div class="ps-doc-sign-block">${preschoolCoverWetSignature("ผู้ฝากดูแลชั้นเรียน",g.absent_teacher_name,linkedImage("requester"),linkedNote("requester","อ้างอิงการยื่นคำขอลา"))}${preschoolCoverWetSignature("หัวหน้าช่วงชั้นปฐมวัย",assets.signers?.stage_head_name,linkedImage("stage_head"),linkedNote("stage_head","รับทราบและลงนาม"))}${preschoolCoverWetSignature("หัวหน้ากลุ่มงานบริหารงานวิชาการ",assets.signers?.academic_head_name,linkedImage("academic_head"),linkedNote("academic_head","รับทราบและลงนาม"))}${preschoolCoverWetSignature("ผู้อำนวยการโรงเรียน",assets.signers?.director_name,linkedImage("director"),linkedNote("director","อ้างอิงการอนุมัติการลา ไม่ต้องอนุมัติสอนแทนซ้ำ"))}</div><div class="ps-doc-foot">หมายเหตุ: ลายเซ็นผู้ลาและผู้อำนวยการอ้างอิงจากคำขอลาที่อนุมัติแล้ว ไม่ใช่การอนุมัติใบฝากดูแลซ้ำ · หัวหน้าช่วงชั้นและหัวหน้าวิชาการลงนามรับทราบแยกต่างหาก · ภาพจากโปรไฟล์ของผู้รับฝากที่เพิ่มภายหลังไม่ถือเป็นการลงนามย้อนหลัง</div></div></article>`;
