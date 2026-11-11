@@ -119,8 +119,7 @@ begin
     and tr.roster_processed_at is null
   order by c.student_number, s.first_name, s.last_name;
 end;
-$function$
-
+$function$;
 
 COMMENT ON FUNCTION public.payment_evidence_roster(text, integer, uuid)
 IS 'Returns current payment-evidence candidates, excluding confirmed transfer-outs while preserving pending and ghost records.';
