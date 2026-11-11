@@ -49,7 +49,7 @@ test("current payment-evidence roster excludes confirmed transfers but keeps pen
   assert.deepEqual(paymentEvidenceFilterCurrentRoster(null), []);
 });
 
-testAnchor+
+test("roster status labels distinguish moved, pending, ghost and active students", () => {
   assert.equal(paymentEvidenceRosterStatusLabel("transferred_out"), "ย้ายแล้ว");
   assert.equal(paymentEvidenceRosterStatusLabel("transfer_pending"), "มีใบย้าย · รอดำเนินการ");
   assert.equal(paymentEvidenceRosterStatusLabel("ghost"), "เด็กผี");
