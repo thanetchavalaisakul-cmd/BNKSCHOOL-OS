@@ -1,0 +1,52 @@
+name: BNK payment evidence transfer-out roster filter
+
+on:
+  push:
+    branches:
+      - fix/payment-evidence-exclude-transferred-out-20261111
+    paths:
+      - .github/workflows/payment-evidence-transfer-filter-build.yml
+      - app.js
+      - index.html
+      - modules/payment-evidence-documents.js
+      - tests/payment-evidence-documents.test.mjs
+      - supabase/migrations/20261111014500_payment_evidence_exclude_confirmed_transfers.sql
+      - package.json
+      - package-lock.json
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: fix/payment-evidence-exclude-transferred-out-20261111
+          persist-credentials: true
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Validate source, bundle, and regressions
+        run: |
+          node --check modules/payment-evidence-documents.js
+          npm run verify
+          git diff --check
+      - name: Commit refreshed production bundle
+        run: |
+          if git diff --quiet -- app.min.js; then
+            echo "app.min.js is already up to date"
+          else
+            git config user.name "BNK School OS Build"
+            git config user.email "bnk-school-os-build@users.noreply.github.com"
+            git add app.min.js
+            git commit -m "build: refresh payment evidence roster bundle"
+            git push origin HEAD:fix/payment-evidence-exclude-transferred-out-20261111
+          fi
