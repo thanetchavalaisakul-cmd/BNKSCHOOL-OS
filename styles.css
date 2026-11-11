@@ -6333,3 +6333,22 @@ body.procurement-master-open{overflow:hidden!important}
   display:inline-block!important;
   white-space:nowrap!important;
 }
+
+
+/* Leave: independent session selection for each working date. */
+.leave-daily-session-field{padding:13px 14px;border:1px solid #dbe4ef;border-radius:13px;background:#fbfdff;}
+.leave-daily-session-field>label{display:block;font-weight:700;color:#0f172a;margin-bottom:4px;}
+.leave-daily-session-field>.helper{display:block;margin-bottom:10px;line-height:1.5;}
+.leave-daily-session-list{display:grid;gap:7px;margin-top:9px;}
+.leave-daily-session-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,230px);gap:12px;align-items:center;padding:9px 11px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;}
+.leave-daily-session-date{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.leave-daily-session-date strong{font-size:13px;color:#1e293b;}
+.leave-daily-session-date small{font-size:11px;color:#64748b;}
+.leave-daily-session-row .select{width:100%;min-width:0;}
+.leave-daily-session-empty{padding:12px;border:1px dashed #cbd5e1;border-radius:10px;color:#64748b;background:#fff;font-size:12px;line-height:1.5;}
+.leave-detail-sessions strong{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;}
+.leave-daily-session-chip{display:inline-flex;gap:5px;align-items:center;padding:4px 8px;border:1px solid #dbe4ef;border-radius:8px;background:#f8fafc;font-size:12px;font-weight:500;}
+@media(max-width:640px){
+  .leave-daily-session-row{grid-template-columns:minmax(0,1fr);gap:7px;}
+  .leave-daily-session-row .select{min-height:42px;}
+}
