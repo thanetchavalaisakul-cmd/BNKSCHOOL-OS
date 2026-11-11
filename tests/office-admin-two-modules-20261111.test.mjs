@@ -37,7 +37,7 @@ test("electricity history and evidence are visible to the assigned meter occupan
   assert.ok(personalMigration.includes('m.occupant_user_id = (SELECT auth.uid())'));
   assert.ok(personalMigration.includes('CREATE POLICY electricity_readings_read'));
   assert.ok(personalMigration.includes('private.electricity_can_view_reading(id)'));
-  assert.ok(personalMigration.includes('private.electricity_can_view_file(p_path)'));
+  assert.ok(personalMigration.includes('CREATE OR REPLACE FUNCTION private.electricity_can_view_file(p_path text)'));
   assert.ok(personalMigration.includes('r.payer_user_id = (SELECT auth.uid())'));
 });
 
