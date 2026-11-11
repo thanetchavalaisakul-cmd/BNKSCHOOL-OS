@@ -683,6 +683,7 @@ const ROLE_LABEL = {
   department_head: "หัวหน้ากลุ่มงาน",
   teacher: "ครูผู้สอน",
   pa_evaluator: "กรรมการประเมิน PA",
+  office_admin: "ธุรการ",
 };
 
 const STATUS_LABEL = {
@@ -752,6 +753,10 @@ function toast(title, message = "", type = "default") {
 
 function isSuperAdminUser(){
   return state.profile?.role === "super_admin";
+}
+
+function isOfficeAdminUser(){
+  return state.profile?.role === "office_admin";
 }
 
 function procurementHasModuleAccess(code){
@@ -964,6 +969,7 @@ function signupForm() {
         <label for="signup-department">กลุ่มงานที่สังกัด</label>
         <select class="select" id="signup-department" required>
           <option value="">เลือกกลุ่มงาน</option>
+          <option value="none">ไม่สังกัดฝ่าย (ธุรการ)</option>
           ${state.departments.map(d => `<option value="${escapeHtml(d.code)}">${escapeHtml(d.name_th)}</option>`).join("")}
         </select>
         <span class="helper">ใช้เป็นข้อมูลประกอบให้ Super Admin ตรวจสอบ ไม่ได้กำหนดสิทธิ์ Head อัตโนมัติ</span>
@@ -972,6 +978,7 @@ function signupForm() {
         <label for="signup-subject-group">กลุ่มสาระ / ระดับการศึกษา</label>
         <select class="select" id="signup-subject-group" required>
           <option value="">เลือกกลุ่มสาระ</option>
+          <option value="none">ไม่ระบุกลุ่มสาระ (ธุรการ)</option>
           ${state.subjectGroups.map(s => `<option value="${escapeHtml(s.code)}">${escapeHtml(s.name_th)}</option>`).join("")}
         </select>
       </div>
@@ -1035,8 +1042,8 @@ function bindAuthEvents() {
           full_name: fullName,
           employee_code: employeeCode || null,
           phone: phone || null,
-          requested_department_code: requestedDepartmentCode || null,
-          subject_group_code: subjectGroupCode || null,
+          requested_department_code: requestedDepartmentCode && requestedDepartmentCode !== "none" ? requestedDepartmentCode : null,
+          subject_group_code: subjectGroupCode && subjectGroupCode !== "none" ? subjectGroupCode : null,
         },
       },
     });
@@ -1354,9 +1361,19 @@ async function loadActiveUserData() {
     state.personnelPaView = "mine";
   }
 
+  if(isOfficeAdminUser()) {
+    const allowedOfficeModules = ["leave_management","housing_electricity"];
+    state.modules = state.modules.filter(m=>allowedOfficeModules.includes(m.code));
+    const currentModule = String(state.currentView||"").startsWith("module:")
+      ? String(state.currentView).slice(7)
+      : "";
+    if(!allowedOfficeModules.includes(currentModule)) state.currentView = "module:leave_management";
+    state.leaveView = "all";
+  }
+
   state.notifications = notificationsRes.data || [];
   // Review tasks are synchronized once per active sign-in, not per page render.
-  if (state.user?.id && state.profile?.role !== "pa_evaluator"
+  if (state.user?.id && !["pa_evaluator","office_admin"].includes(state.profile?.role)
       && state.centralApprovalSyncUser !== state.user.id) {
     state.centralApprovalSyncUser=state.user.id;
     try {
@@ -1377,6 +1394,20 @@ async function loadActiveUserData() {
   state.academicCertificateSettings = academicCertificateSettingsRes.error ? null : (academicCertificateSettingsRes.data || null);
   state.academicDocumentServiceSettings = academicDocumentServiceSettingsRes.error ? null : (academicDocumentServiceSettingsRes.data || null);
   state.personnelOwnRecord = personnelOwnRes.error ? null : (personnelOwnRes.data || null);
+
+  if(isOfficeAdminUser()) {
+    state.personnelOwnRecord = null;
+    state.signaturePreferences = null;
+    state.signatureAutomationLast = null;
+    state.approvalControlCenter = null;
+    state.approvalSystemRegistry = [];
+    state.pendingUsers = [];
+    state.procurementPermissionRows = [];
+    state.teacherDutyAudit = [];
+    state.adminStageHeads = [];
+    state.adminSubjectGroupHeads = [];
+    return;
+  }
 
   if(state.profile?.role !== "pa_evaluator") await refreshMySignatureProfile();
   else { state.signatureProfile=null; state.signaturePreferences=null; state.signatureAutomationLast=null; }
@@ -1526,6 +1557,26 @@ function sidebarHtml() {
         </div>
       </aside>`;
   }
+  if(isOfficeAdminUser()) {
+    const allowedModules = state.modules.filter(m=>["leave_management","housing_electricity"].includes(m.code));
+    return `
+      <aside class="sidebar office-admin-sidebar">
+        <div class="brand">
+          <div class="brand-mark sidebar-school-logo-wrap"><img class="sidebar-school-logo" src="./school-logo.png" alt="โลโก้โรงเรียน"></div>
+          <div class="brand-copy"><strong>${escapeHtml(appName())}</strong><span>Office Access</span></div>
+        </div>
+        <div class="nav-section-title">ระบบที่ได้รับสิทธิ์</div>
+        ${allowedModules.map(m=>`<button type="button" class="nav-item ${state.currentView === "module:" + m.code ? "active" : ""}" data-view="module:${escapeHtml(m.code)}" title="${escapeHtml(m.name_th)}"><span class="nav-icon">•</span><span class="nav-label">${escapeHtml(m.name_th)}</span></button>`).join("")}
+        <div class="sidebar-user">
+          <div class="user-line">
+            <div class="avatar">${escapeHtml(initials(state.profile.full_name || state.profile.email))}</div>
+            <div class="user-text"><strong>${escapeHtml(state.profile.full_name || state.profile.email)}</strong><span>${escapeHtml(ROLE_LABEL[state.profile.role] || "ธุรการ")}</span></div>
+          </div>
+          <button class="btn btn-ghost" id="signout-btn">ออกจากระบบ</button>
+        </div>
+      </aside>`;
+  }
+
   const grouped = state.departments.map(dep => {
     const modules = state.modules.filter(m => m.department_id === dep.id);
     if (!modules.length) return "";
@@ -1581,6 +1632,9 @@ function showModuleLoadingScreen(){
  surface.innerHTML='<section class="bnk-module-loading" role="status" aria-live="polite"><div class="bnk-loading-spinner" aria-hidden="true"></div><div><strong>'+escapeHtml(pageTitle())+'</strong><p>กำลังโหลดข้อมูลที่จำเป็น…</p></div></section>';
 }
 async function renderDashboard() {
+ if(isOfficeAdminUser() && !["module:leave_management","module:housing_electricity"].includes(state.currentView)) {
+   state.currentView = "module:leave_management";
+ }
  const renderSequence=++dashboardRenderSequence;
  const requestedView=state.currentView;
   if (state.currentView === "data_center" && state.profile?.role === "super_admin" && !state.dataCenterOverview && !state.dataCenterError) await loadDataCenterWorkspace();
@@ -4412,7 +4466,7 @@ function canFinalReviewLeave() {
 }
 
 function canSeeLeaveOverview() {
-  return isPersonnelHeadUser() || canFinalReviewLeave() || state.profile?.role === "super_admin";
+  return isPersonnelHeadUser() || canFinalReviewLeave() || state.profile?.role === "super_admin" || isOfficeAdminUser();
 }
 
 function leaveStatusClass(status) {
@@ -4670,12 +4724,12 @@ async function loadLeaveWorkspace() {
     reviewer
       ? supabase.from("profiles")
           .select("id,email,full_name,role,department_id,account_status")
-          .in("role", ["teacher","department_head","director"])
+          .in("role", ["teacher","department_head","director","office_admin"])
           .eq("account_status","active")
           .is("deleted_at",null)
           .order("full_name",{ascending:true})
       : Promise.resolve({ data: [state.profile], error: null }),
-    reviewer
+    reviewer && !isOfficeAdminUser()
       ? supabase.from("personnel_records").select("user_id,position_title,first_appointment_date")
       : Promise.resolve({ data: state.personnelOwnRecord ? [state.personnelOwnRecord] : [], error: null }),
     supabase.from("substitute_lessons").select("*").order("leave_date").order("period_no"),
@@ -14115,7 +14169,7 @@ function bindSchoolLunchEvents(){
 
 // ===== BNK School OS v5.12.9.7 · General Administration: Housing Electricity =====
 const ELECTRICITY_STATUS={reading_submitted:'รอตรวจเลขมิเตอร์',reading_rejected:'แก้ไขเลขมิเตอร์',awaiting_payment:'รอชำระเงิน',payment_submitted:'รอตรวจสลิป',payment_rejected:'แก้ไขการชำระ',paid:'ชำระแล้ว',voided:'ยกเลิกรายการ'};
-function electricityManagerUi(){return isSuperAdminUser()||state.electricitySettings?.manager_user_id===state.user?.id;}
+function electricityManagerUi(){return isSuperAdminUser()||isOfficeAdminUser()||state.electricitySettings?.manager_user_id===state.user?.id;}
 function electricityMonthLabel(x){if(!x)return '—';return new Intl.DateTimeFormat('th-TH',{year:'numeric',month:'long'}).format(new Date(`${x.slice(0,10)}T12:00:00`));}
 function electricityMyName(m){return m.occupant_user_id?(state.electricityStaff||[]).find(x=>x.id===m.occupant_user_id)?.full_name||m.occupant_name||'บุคลากร':m.occupant_name||'บันทึกโดยผู้รับผิดชอบ';}
 function electricityPeriod(){return (state.electricityPeriods||[]).find(x=>x.id===state.electricityPeriodId)||null;}
@@ -15534,6 +15588,7 @@ function showApprovalModal(user, action) {
           <label>กำหนดสิทธิ์</label>
           <select class="select" id="role-select">
             <option value="teacher" ${user.role === "teacher" ? "selected" : ""}>Teacher — ครูผู้สอน</option>
+            <option value="office_admin" ${user.role === "office_admin" ? "selected" : ""}>Office Admin — ธุรการ (ระบบวันลา + ค่าไฟฟ้าเท่านั้น)</option>
             <option value="department_head" ${user.role === "department_head" ? "selected" : ""}>Head of Department — หัวหน้ากลุ่มงาน + ครูผู้สอน</option>
             <option value="director" ${user.role === "director" ? "selected" : ""}>Director — ผู้บริหาร</option>
           </select>
