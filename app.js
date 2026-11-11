@@ -1368,7 +1368,7 @@ async function loadActiveUserData() {
       ? String(state.currentView).slice(7)
       : "";
     if(!allowedOfficeModules.includes(currentModule)) state.currentView = "module:leave_management";
-    state.leaveView = "all";
+    state.leaveView = "overview";
   }
 
   state.notifications = notificationsRes.data || [];
