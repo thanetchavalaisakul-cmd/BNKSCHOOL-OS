@@ -28,7 +28,7 @@ BEGIN
   IF TG_OP='UPDATE'
      AND OLD.status='transferred_out'
      AND NEW.status IS DISTINCT FROM OLD.status THEN
-    IF NEW.status<>'active'
+    IF NEW.status IS DISTINCT FROM 'active'
        OR auth.uid() IS NULL
        OR NOT private.can_add_general_students() THEN
       RAISE EXCEPTION 'นักเรียนที่ยืนยันย้ายออกแล้วจะคืนสถานะได้เฉพาะผ่านระบบรับย้ายเข้าเท่านั้น';
