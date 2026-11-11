@@ -51,8 +51,14 @@ test("office admin signup and Super Admin approval remain available", () => {
   assert.ok(roleMigration.includes("p_role NOT IN ('teacher','department_head','director','office_admin')"));
 });
 
-test("office admin does not receive general signature or approval workspace", () => {
+test("office admin can sign only their own leave request, not manage signatures or approvals", () => {
   assert.ok(app.includes('if(isOfficeAdminUser()) {\n    state.personnelOwnRecord = null;'));
   assert.ok(app.includes('state.approvalControlCenter = null;'));
   assert.ok(app.includes('state.signaturePreferences = null;'));
+  assert.ok(personalMigration.includes('ON public.signatures\nAS RESTRICTIVE'));
+  assert.ok(personalMigration.includes('user_id = (SELECT auth.uid())'));
+  assert.ok(personalMigration.includes('ON public.school_document_signatures\nAS RESTRICTIVE'));
+  assert.ok(personalMigration.includes("document_kind = 'leave'"));
+  assert.ok(personalMigration.includes("slot_code = 'requester'"));
+  assert.ok(personalMigration.includes('signer_user_id = (SELECT auth.uid())'));
 });
