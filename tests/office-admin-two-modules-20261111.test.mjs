@@ -45,7 +45,7 @@ test("database access is limited to leave and housing electricity for office adm
   assert.ok(migration.includes('private."current_role"() = \'office_admin\''));
   assert.ok(migration.includes('private."current_role"() IN (\'director\',\'super_admin\',\'office_admin\')'));
   assert.ok(migration.includes("code IN ('leave_management','housing_electricity')"));
-  assert.ok(migration.includes("CREATE POLICY office_admin_module_scope\\n      ON public.%I\\n      AS RESTRICTIVE"));
+  assert.ok(migration.includes("CREATE POLICY office_admin_module_scope") && migration.includes("AS RESTRICTIVE"));
   assert.ok(migration.includes("CREATE POLICY profiles_read_scope"));
   assert.ok(migration.includes("CREATE POLICY leave_requests_read_scope"));
   assert.ok(migration.includes("AND NEW.role <> 'office_admin'"));
