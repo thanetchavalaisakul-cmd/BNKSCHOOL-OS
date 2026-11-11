@@ -4572,7 +4572,7 @@ function leaveDailySessionEntries(request={}) {
 }
 function leaveDailyScheduleLabel(request={}) {
   const entries=leaveDailySessionEntries(request);
-  if(!entries.length)return leaveDailyScheduleLabel(request);
+  if(!entries.length)return leaveSessionLabel(request.leave_session);
   const sessions=new Set(entries.map(entry=>entry.session));
   if(sessions.size===1)return leaveSessionLabel(entries[0].session);
   return "แยกรายวัน: "+entries.map(entry=>thaiDateOnly(entry.date)+" "+leaveSessionLabel(entry.session)).join(" · ");
@@ -5195,7 +5195,7 @@ function leaveRequestModal(request = null) {
       </div>
       <input type="hidden" name="leave_session" id="leave-session" value="${escapeHtml(defaultLeaveSession)}">
       <section class="leave-day-schedule" aria-labelledby="leave-day-schedule-title">
-        <div class="leave-day-schedule-head"><div><strong id="leave-day-schedule-title">กำหนดช่วงเวลาการลาแยกเป็นรายวัน</strong><small>ระบบตั้งต้นทุกวันเป็นลาเต็มวัน คุณสามารถเปลี่ยนแต่ละวันเป็นครึ่งวันเช้าหรือครึ่งวันบ่ายได้อย่างอิสระ</small></div></div>
+        <div class="leave-day-schedule-head"><div><strong id="leave-day-schedule-title">กำหนดช่วงเวลาการลาแยกเป็นรายวัน</strong><small>กำหนดช่วงเวลาของแต่ละวันได้อิสระ: เต็มวัน ครึ่งวันเช้า หรือครึ่งวันบ่าย</small></div></div>
         <div class="leave-day-schedule-rows" id="leave-day-schedule-rows"><div class="leave-day-schedule-empty">เลือกวันที่เริ่มต้นและสิ้นสุด เพื่อกำหนดช่วงเวลาการลา</div></div>
         <input type="hidden" name="daily_leave_sessions" id="leave-daily-sessions-value" value="${escapeHtml(JSON.stringify(defaultDailySessions))}">
       </section>
