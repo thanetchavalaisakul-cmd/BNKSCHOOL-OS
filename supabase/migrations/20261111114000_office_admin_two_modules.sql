@@ -42,7 +42,7 @@ BEGIN
   END IF;
 
   IF p_decision IN ('approve','reactivate') THEN
-    IF p_role NOT IN ('teacher','department_head','director','office_admin') THEN
+    IF p_role IS NULL OR p_role NOT IN ('teacher','department_head','director','office_admin') THEN
       RAISE EXCEPTION 'Invalid role';
     END IF;
     IF p_role = 'department_head' AND p_department_id IS NULL THEN
@@ -123,7 +123,7 @@ AS $function$
       AND (
         r.requester_id = auth.uid()
         OR private.is_personnel_head()
-        OR private.current_role() IN ('director','super_admin','office_admin')
+        OR private."current_role"() IN ('director','super_admin','office_admin')
       )
   );
 $function$;
@@ -138,7 +138,7 @@ AS $function$
   SELECT private.is_active_user()
     AND (
       private.is_super_admin()
-      OR private.current_role() = 'office_admin'
+      OR private."current_role"() = 'office_admin'
       OR EXISTS (
         SELECT 1
         FROM public.electricity_settings s
@@ -157,11 +157,11 @@ USING (
   id = (SELECT auth.uid())
   OR (SELECT private.is_super_admin())
   OR (
-    (SELECT private.current_role()) = 'director'
+    (SELECT private."current_role"()) = 'director'
     AND account_status = 'active'
   )
   OR (
-    (SELECT private.current_role()) = 'department_head'
+    (SELECT private."current_role"()) = 'department_head'
     AND department_id = (SELECT private.current_department_id())
     AND account_status = 'active'
   )
@@ -183,7 +183,7 @@ USING (
     AND deleted_at IS NULL
   )
   OR (
-    (SELECT private.current_role()) = 'office_admin'
+    (SELECT private."current_role"()) = 'office_admin'
     AND account_status = 'active'
     AND deleted_at IS NULL
   )
@@ -200,7 +200,7 @@ USING (
     AND (
       requester_id = (SELECT auth.uid())
       OR (SELECT private.is_personnel_head())
-      OR (SELECT private.current_role()) = ANY (ARRAY['director'::text,'super_admin'::text,'office_admin'::text])
+      OR (SELECT private."current_role"()) = ANY (ARRAY['director'::text,'super_admin'::text,'office_admin'::text])
     )
   )
   OR (SELECT private.is_director_approval_executive((SELECT auth.uid())))
@@ -214,7 +214,7 @@ AS RESTRICTIVE
 FOR SELECT
 TO authenticated
 USING (
-  coalesce((SELECT private.current_role()), '') <> 'office_admin'
+  coalesce((SELECT private."current_role"()), '') <> 'office_admin'
   OR code IN ('leave_management','housing_electricity')
 );
 
@@ -253,10 +253,14 @@ BEGIN
       AND NOT (c.relname = ANY (allowed_tables))
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS office_admin_module_scope ON public.%I', r.relname);
-    EXECUTE format(
-      'CREATE POLICY office_admin_module_scope ON public.%I AS RESTRICTIVE FOR ALL TO authenticated USING (coalesce((SELECT private.current_role()), '''') <> ''office_admin'') WITH CHECK (coalesce((SELECT private.current_role()), '''') <> ''office_admin'')',
-      r.relname
-    );
+    EXECUTE format($policy$
+      CREATE POLICY office_admin_module_scope
+      ON public.%I
+      AS RESTRICTIVE
+      FOR ALL TO authenticated
+      USING (coalesce((SELECT private."current_role"()), '') <> 'office_admin')
+      WITH CHECK (coalesce((SELECT private."current_role"()), '') <> 'office_admin')
+    $policy$, r.relname);
   END LOOP;
 END;
 $$;
