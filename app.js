@@ -53,7 +53,7 @@ async function loadGeneralStudentRosterFeature(){
 let bnkPaymentEvidenceFeaturePromise=null;
 let paymentEvidenceFeature=null;
 async function loadPaymentEvidenceFeature(){
-  bnkPaymentEvidenceFeaturePromise??=import("./modules/payment-evidence-documents.js?v=20261110.6").then(mod=>{
+  bnkPaymentEvidenceFeaturePromise??=import("./modules/payment-evidence-documents.js?v=20261111.1").then(mod=>{
     paymentEvidenceFeature=mod.createPaymentEvidenceFeature({state,supabase,currentAcademicPeriod,escapeHtml,toast,renderDashboard,bnkSignatureBeforeAction,secureDeleteModal,officialPdfFontFaceCss,ensureOfficialPdfFont,isSuperAdminUser});
     return paymentEvidenceFeature;
   }).catch(error=>{bnkPaymentEvidenceFeaturePromise=null;throw error;});

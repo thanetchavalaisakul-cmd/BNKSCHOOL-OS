@@ -6,6 +6,17 @@ export function calculatePaymentEvidenceTotals(items = []) {
   };
 }
 
+/**
+ * Confirmed transfer-outs are historical records, not current payment-evidence
+ * candidates. Keep pending transfers and ghost rows available for the existing
+ * workflow; only remove records confirmed by the transfer process.
+ */
+export function paymentEvidenceFilterCurrentRoster(rows = []) {
+  if (!Array.isArray(rows)) return [];
+  return rows.filter((row) => row?.roster_status !== "transferred_out"
+    && row?.enrollment_status !== "transferred_out");
+}
+
 // Official BNK documents use TH Sarabun IT๙ and Thai numerals on print.
 export function paymentEvidenceThaiDigits(value) {
   return String(value ?? "").replace(/[0-9]/g, (digit) => "๐๑๒๓๔๕๖๗๘๙"[Number(digit)]);
@@ -749,9 +760,12 @@ export function createPaymentEvidenceFeature(ctx) {
     return rows.map((row, index) => {
       const status = row.roster_status || "active";
       const disabled = !row.student_id;
+      const historicalNote = row.isHistorical
+        ? '<div class="pe-muted pe-small">ประวัติเอกสารเดิม · ไม่ใช่รายชื่อปัจจุบัน</div>'
+        : "";
       return `<tr>
         <td><input type="checkbox" data-pe-select-student="${esc(row.student_id || "")}" ${row.selected ? "checked" : ""} ${disabled ? "disabled" : ""}></td>
-        <td><div class="pe-student-main">${esc(row.full_name || studentName(row))}</div><div class="pe-muted pe-small">${esc(row.student_code || row.student_snapshot?.student_code || "")}</div></td>
+        <td><div class="pe-student-main">${esc(row.full_name || studentName(row))}</div><div class="pe-muted pe-small">${esc(row.student_code || row.student_snapshot?.student_code || "")}</div>${historicalNote}</td>
         <td>${esc(row.citizen_id || row.student_snapshot?.citizen_id || "—")}</td>
         <td>${rosterBadge(status)}</td>
         <td><input type="number" min="0" step="0.01" data-pe-row-amount="${esc(row.student_id || "")}" value="${esc(row.amount ?? 0)}" ${disabled ? "disabled" : ""}></td>
@@ -821,7 +835,7 @@ export function createPaymentEvidenceFeature(ctx) {
       }
       const year = String(doc?.academic_year || local.year);
       const semester = Number(doc?.semester || local.semester);
-      const roster = await loadRoster(draftClassId, year, semester);
+      const roster = paymentEvidenceFilterCurrentRoster(await loadRoster(draftClassId, year, semester));
       const oldItems = doc ? local.items : [];
       const oldByStudent = new Map(oldItems.filter((item) => item.student_id).map((item) => [item.student_id, item]));
       const mode = doc?.selection_mode || "all";
