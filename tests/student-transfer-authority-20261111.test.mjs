@@ -16,8 +16,8 @@ test("DMC import skips only confirmed transfer-outs and follows DMC for other st
   assert.doesNotMatch(importer, /v_existing_status IS DISTINCT FROM 'active'/);
   assert.match(importer, /status='active',updated_by=auth\.uid\(\),updated_at=now\(\)/);
   assert.match(importer, /'skipped_transferred_out',v_skipped_transferred_out/);
-  assert.match(renumber, /set student_number=2000000000\\+ranked\\.rn/);
-  assert.match(renumber, /set student_number=ranked\\.rn/);
+  assert.match(renumber, /set student_number=2000000000\+ranked\.rn/);
+  assert.match(renumber, /set student_number=ranked\.rn/);
   assert.match(app, /master\.status==="transferred_out"/);
   assert.match(app, /blockedTransferredOut/);
   assert.doesNotMatch(app, /master\.status!=="active"/);
