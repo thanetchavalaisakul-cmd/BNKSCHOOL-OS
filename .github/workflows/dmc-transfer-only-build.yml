@@ -13,6 +13,7 @@ on:
       - supabase/migrations/20261111000245_student_transfer_authority_and_dmc_import_guard.sql
       - supabase/migrations/20261111000421_dmc_transfer_out_requires_transfer_workflow.sql
       - supabase/migrations/20261111001627_limit_dmc_skip_to_confirmed_transfer_out.sql
+      - supabase/migrations/20261111002020_fix_student_class_renumber_temp_range.sql
       - package.json
       - package-lock.json
 
