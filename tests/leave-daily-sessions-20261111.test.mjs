@@ -45,6 +45,10 @@ test("legacy requests without a daily map continue to use the previous session f
   assert.equal(helpers.leaveDailyWorkingDays("2026-11-13","2026-11-16",[],{},"afternoon"),1);
 });
 
+test("legacy request summary falls back to its original leave session", () => {
+  assert.equal(helpers.leaveDailyScheduleLabel({leave_session:"afternoon"}),"ครึ่งวันบ่าย");
+});
+
 test("mixed daily sessions are clearly summarized by date for reviewers and documents", () => {
   const label=helpers.leaveDailyScheduleLabel({
     start_date:"2026-11-16",
