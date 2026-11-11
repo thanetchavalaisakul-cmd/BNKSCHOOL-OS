@@ -4434,7 +4434,7 @@ function leaveTypeName(code, otherText = "") {
 }
 
 function leaveDateIsWeekend(value) {
-  const match=/^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(String(value||""));
+  const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||""));
   if(!match)return false;
   const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]);
   const date=new Date(Date.UTC(year,month-1,day));
@@ -4444,7 +4444,7 @@ function leaveDateIsWeekend(value) {
 }
 function leaveWorkingDayCount(start,end,weekendWorkingDates=[]) {
   const parse=value=>{
-    const match=/^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(String(value||""));
+    const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||""));
     if(!match)return null;
     const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]);
     const date=new Date(Date.UTC(year,month-1,day));
