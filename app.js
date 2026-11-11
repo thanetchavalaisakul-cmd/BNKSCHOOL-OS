@@ -1368,7 +1368,7 @@ async function loadActiveUserData() {
       ? String(state.currentView).slice(7)
       : "";
     if(!allowedOfficeModules.includes(currentModule)) state.currentView = "module:leave_management";
-    state.leaveView = "overview";
+    state.leaveView = "mine";
   }
 
   state.notifications = notificationsRes.data || [];
@@ -1563,7 +1563,7 @@ function sidebarHtml() {
       <aside class="sidebar office-admin-sidebar">
         <div class="brand">
           <div class="brand-mark sidebar-school-logo-wrap"><img class="sidebar-school-logo" src="./school-logo.png" alt="โลโก้โรงเรียน"></div>
-          <div class="brand-copy"><strong>${escapeHtml(appName())}</strong><span>Office Access</span></div>
+          <div class="brand-copy"><strong>${escapeHtml(appName())}</strong><span>Staff Access</span></div>
         </div>
         <div class="nav-section-title">ระบบที่ได้รับสิทธิ์</div>
         ${allowedModules.map(m=>`<button type="button" class="nav-item ${state.currentView === "module:" + m.code ? "active" : ""}" data-view="module:${escapeHtml(m.code)}" title="${escapeHtml(m.name_th)}"><span class="nav-icon">•</span><span class="nav-label">${escapeHtml(m.name_th)}</span></button>`).join("")}
@@ -4466,7 +4466,7 @@ function canFinalReviewLeave() {
 }
 
 function canSeeLeaveOverview() {
-  return isPersonnelHeadUser() || canFinalReviewLeave() || state.profile?.role === "super_admin" || isOfficeAdminUser();
+  return isPersonnelHeadUser() || canFinalReviewLeave() || state.profile?.role === "super_admin";
 }
 
 function leaveStatusClass(status) {
@@ -5163,7 +5163,7 @@ function leaveRequestModal(request = null) {
   const r = request || {};
   const modal = document.createElement("div");
   modal.className = "modal-backdrop";
-  const defaultAffects = r.id ? Boolean(r.affects_teaching_schedule) : !["director","super_admin"].includes(state.profile.role);
+  const defaultAffects = r.id ? Boolean(r.affects_teaching_schedule) : !["director","super_admin","office_admin"].includes(state.profile.role);
   const defaultPeriod = r.academic_year && r.semester
     ? { academicYear: Number(r.academic_year), semester: Number(r.semester) }
     : currentAcademicPeriod(r.start_date || new Date());
@@ -14264,7 +14264,7 @@ function bindSchoolLunchEvents(){
 
 // ===== BNK School OS v5.12.9.7 · General Administration: Housing Electricity =====
 const ELECTRICITY_STATUS={reading_submitted:'รอตรวจเลขมิเตอร์',reading_rejected:'แก้ไขเลขมิเตอร์',awaiting_payment:'รอชำระเงิน',payment_submitted:'รอตรวจสลิป',payment_rejected:'แก้ไขการชำระ',paid:'ชำระแล้ว',voided:'ยกเลิกรายการ'};
-function electricityManagerUi(){return isSuperAdminUser()||isOfficeAdminUser()||state.electricitySettings?.manager_user_id===state.user?.id;}
+function electricityManagerUi(){return isSuperAdminUser()||(!isOfficeAdminUser()&&state.electricitySettings?.manager_user_id===state.user?.id);}
 function electricityMonthLabel(x){if(!x)return '—';return new Intl.DateTimeFormat('th-TH',{year:'numeric',month:'long'}).format(new Date(`${x.slice(0,10)}T12:00:00`));}
 function electricityMyName(m){return m.occupant_user_id?(state.electricityStaff||[]).find(x=>x.id===m.occupant_user_id)?.full_name||m.occupant_name||'บุคลากร':m.occupant_name||'บันทึกโดยผู้รับผิดชอบ';}
 function electricityPeriod(){return (state.electricityPeriods||[]).find(x=>x.id===state.electricityPeriodId)||null;}
@@ -15683,7 +15683,7 @@ function showApprovalModal(user, action) {
           <label>กำหนดสิทธิ์</label>
           <select class="select" id="role-select">
             <option value="teacher" ${user.role === "teacher" ? "selected" : ""}>Teacher — ครูผู้สอน</option>
-            <option value="office_admin" ${user.role === "office_admin" ? "selected" : ""}>Office Admin — ธุรการ (ระบบวันลา + ค่าไฟฟ้าเท่านั้น)</option>
+            <option value="office_admin" ${user.role === "office_admin" ? "selected" : ""}>Office Admin — ธุรการ (ยื่นลาและใช้ค่าไฟฟ้าส่วนตัว)</option>
             <option value="department_head" ${user.role === "department_head" ? "selected" : ""}>Head of Department — หัวหน้ากลุ่มงาน + ครูผู้สอน</option>
             <option value="director" ${user.role === "director" ? "selected" : ""}>Director — ผู้บริหาร</option>
           </select>
