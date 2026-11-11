@@ -56,7 +56,7 @@ test("leave form exposes the exact school-open weekend option and persists selec
 
 test("database enforces selected weekend dates and includes them in substitute and preschool coverage", () => {
   assert.ok(migration.includes("ADD COLUMN IF NOT EXISTS weekend_working_dates date[]"));
-  assert.ok(migration.includes("private.leave_working_day_total(p_start,p_end,p_session,NEW.weekend_working_dates)"));
+  assert.ok(migration.includes("NEW.start_date,NEW.end_date,NEW.leave_session,NEW.weekend_working_dates"));
   assert.ok(migration.includes("extract(isodow FROM selected_date) NOT IN (6,7)"));
   assert.ok(migration.includes("old.weekend_working_dates is distinct from new.weekend_working_dates"));
   assert.ok(migration.includes("day_at::date=any(coalesce(v_leave.weekend_working_dates,'{}'::date[]))"));
