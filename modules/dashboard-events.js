@@ -471,7 +471,7 @@ function bindDashboardEvents() {
   document.querySelector("#academic-calendar-publish")?.addEventListener("click",()=>academicCalendarTogglePublish());
   document.querySelector("#academic-calendar-export-image")?.addEventListener("click",()=>academicCalendarExport("image"));
   document.querySelector("#academic-calendar-export-pdf")?.addEventListener("click",()=>academicCalendarExport("pdf"));
-  document.querySelectorAll("[data-academic-calendar-edit-item]").forEach(btn=>btn.addEventListener("click",()=>{const type=btn.dataset.academicCalendarItemType,id=btn.dataset.academicCalendarEditItem;if(type==="activity"){const item=state.academicCalendarActivities.find(x=>x.id===id);if(item)academicCalendarActivityModal(item);}else{const item=state.academicCalendarOverrides.find(x=>x.id===id);if(item)academicCalendarOverrideModal(item.override_type,item);}}));
+  document.querySelectorAll("[data-academic-calendar-edit-item]").forEach(btn=>btn.addEventListener("click",()=>{const type=btn.dataset.academicCalendarItemType,id=btn.dataset.academicCalendarEditItem;if(type==="activity"){const item=state.academicCalendarActivities.find(x=>x.id===id);if(item)academicCalendarActivityModal(item);}else{const item=(type==="special"?state.schoolSpecialOpenDays:state.academicCalendarOverrides).find(x=>x.id===id);if(item)academicCalendarOverrideModal(type==="special"?"special_school_day":item.override_type,item);}}));
   document.querySelectorAll("[data-academic-calendar-delete-item]").forEach(btn=>btn.addEventListener("click",()=>academicCalendarDeleteItem(btn.dataset.academicCalendarDeleteItem,btn.dataset.academicCalendarItemType)));
 
   document.querySelector("#system-settings-form")?.addEventListener("submit", async (e) => {
