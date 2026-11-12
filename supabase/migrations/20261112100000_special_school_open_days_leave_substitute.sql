@@ -527,54 +527,59 @@ DECLARE
   v_new_semester integer;
   v_has_active_leave boolean:=false;
 BEGIN
-  IF TG_OP IN ('UPDATE','DELETE') AND OLD.override_type='special_school_day' THEN
-    SELECT c.academic_year,c.semester
-    INTO v_old_year,v_old_semester
-    FROM public.academic_calendars c
-    WHERE c.id=OLD.calendar_id;
+  IF TG_OP IN ('UPDATE','DELETE') THEN
+    IF OLD.override_type='special_school_day' THEN
+      SELECT c.academic_year,c.semester
+      INTO v_old_year,v_old_semester
+      FROM public.academic_calendars c
+      WHERE c.id=OLD.calendar_id;
 
-    SELECT EXISTS(
-      SELECT 1
-      FROM public.leave_requests lr
-      WHERE lr.academic_year::text=v_old_year
-        AND lr.semester=v_old_semester
-        AND OLD.event_date BETWEEN lr.start_date AND lr.end_date
-        AND lr.status IN ('pending_personnel','pending_director','approved')
-    ) INTO v_has_active_leave;
+      SELECT EXISTS(
+        SELECT 1
+        FROM public.leave_requests lr
+        WHERE lr.academic_year::text=v_old_year
+          AND lr.semester=v_old_semester
+          AND OLD.event_date BETWEEN lr.start_date AND lr.end_date
+          AND lr.status IN ('pending_personnel','pending_director','approved')
+      ) INTO v_has_active_leave;
 
-    IF v_has_active_leave AND (
-      TG_OP='DELETE'
-      OR NEW.override_type IS DISTINCT FROM 'special_school_day'
-      OR NEW.calendar_id IS DISTINCT FROM OLD.calendar_id
-      OR NEW.event_date IS DISTINCT FROM OLD.event_date
-      OR NEW.timetable_weekday IS DISTINCT FROM OLD.timetable_weekday
-    ) THEN
-      RAISE EXCEPTION 'This special school day is used by an active leave request. Cancel or complete the affected leave request before changing its date or timetable.';
+      IF v_has_active_leave THEN
+        IF TG_OP='DELETE' THEN
+          RAISE EXCEPTION 'This special school day is used by an active leave request. Cancel or complete the affected leave request before changing its date or timetable.';
+        ELSIF NEW.override_type IS DISTINCT FROM 'special_school_day'
+           OR NEW.calendar_id IS DISTINCT FROM OLD.calendar_id
+           OR NEW.event_date IS DISTINCT FROM OLD.event_date
+           OR NEW.timetable_weekday IS DISTINCT FROM OLD.timetable_weekday THEN
+          RAISE EXCEPTION 'This special school day is used by an active leave request. Cancel or complete the affected leave request before changing its date or timetable.';
+        END IF;
+      END IF;
     END IF;
   END IF;
 
-  IF TG_OP IN ('INSERT','UPDATE') AND NEW.override_type='special_school_day' THEN
-    SELECT c.academic_year,c.semester
-    INTO v_new_year,v_new_semester
-    FROM public.academic_calendars c
-    WHERE c.id=NEW.calendar_id;
+  IF TG_OP IN ('INSERT','UPDATE') THEN
+    IF NEW.override_type='special_school_day' THEN
+      SELECT c.academic_year,c.semester
+      INTO v_new_year,v_new_semester
+      FROM public.academic_calendars c
+      WHERE c.id=NEW.calendar_id;
 
-    IF EXISTS(
-      SELECT 1
-      FROM public.leave_requests lr
-      JOIN public.substitute_lessons sl
-        ON sl.leave_request_id=lr.id
-       AND sl.leave_date=NEW.event_date
-       AND sl.status<>'cancelled'
-      JOIN public.timetable_entries te ON te.id=sl.timetable_entry_id
-      WHERE lr.academic_year::text=v_new_year
-        AND lr.semester=v_new_semester
-        AND NEW.event_date BETWEEN lr.start_date AND lr.end_date
-        AND lr.status IN ('pending_personnel','pending_director','approved')
-        AND lr.affects_teaching_schedule=true
-        AND te.weekday<>NEW.timetable_weekday
-    ) THEN
-      RAISE EXCEPTION 'A leave request already has substitute lessons on this date using another timetable weekday. Cancel or complete it before changing the special-day schedule.';
+      IF EXISTS(
+        SELECT 1
+        FROM public.leave_requests lr
+        JOIN public.substitute_lessons sl
+          ON sl.leave_request_id=lr.id
+         AND sl.leave_date=NEW.event_date
+         AND sl.status<>'cancelled'
+        JOIN public.timetable_entries te ON te.id=sl.timetable_entry_id
+        WHERE lr.academic_year::text=v_new_year
+          AND lr.semester=v_new_semester
+          AND NEW.event_date BETWEEN lr.start_date AND lr.end_date
+          AND lr.status IN ('pending_personnel','pending_director','approved')
+          AND lr.affects_teaching_schedule=true
+          AND te.weekday<>NEW.timetable_weekday
+      ) THEN
+        RAISE EXCEPTION 'A leave request already has substitute lessons on this date using another timetable weekday. Cancel or complete it before changing the special-day schedule.';
+      END IF;
     END IF;
   END IF;
 
@@ -582,7 +587,6 @@ BEGIN
   RETURN NEW;
 END;
 $function$;
-
 DROP TRIGGER IF EXISTS academic_calendar_day_overrides_10_special_guard
   ON public.academic_calendar_day_overrides;
 CREATE TRIGGER academic_calendar_day_overrides_10_special_guard
