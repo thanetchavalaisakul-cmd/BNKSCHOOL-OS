@@ -5194,10 +5194,10 @@ function leaveRequestModal(request = null) {
   const defaultLeaveSession = r.leave_session || "full_day";
   const existingManualWeekendDates = Array.isArray(r.manual_weekend_working_dates)
     ? r.manual_weekend_working_dates
-    : (Array.isArray(r.weekend_working_dates)
-      ? r.weekend_working_dates.filter(value=>!leaveSpecialWeekendDates(r.start_date,r.end_date,r.academic_year,r.semester).includes(String(value||"").slice(0,10)))
-      : []);
-  const defaultWeekendDates = [...new Set(existingManualWeekendDates.map(value=>String(value||"").slice(0,10)).filter(leaveDateIsWeekend))].sort();
+    : (Array.isArray(r.weekend_working_dates) ? r.weekend_working_dates : []);
+  const specialDatesForExistingRequest = leaveSpecialWeekendDates(r.start_date,r.end_date,r.academic_year,r.semester);
+  const defaultWeekendDates = [...new Set(existingManualWeekendDates.map(value=>String(value||"").slice(0,10)).filter(leaveDateIsWeekend))]
+    .filter(date=>!specialDatesForExistingRequest.includes(date)).sort();
   const defaultDailySessions = r.daily_leave_sessions && typeof r.daily_leave_sessions==="object" && !Array.isArray(r.daily_leave_sessions)
     ? {...r.daily_leave_sessions}
     : {};
