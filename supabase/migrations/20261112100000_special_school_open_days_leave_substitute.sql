@@ -762,3 +762,30 @@ WHERE EXISTS(
     AND o.override_type='special_school_day'
     AND o.event_date BETWEEN lr.start_date AND lr.end_date
 );
+
+-- Ensure existing active requests receive substitute rows even when a teacher had
+-- already selected the same Saturday/Sunday manually before this calendar integration.
+DO $backfill$
+DECLARE
+  v_leave record;
+BEGIN
+  FOR v_leave IN
+    SELECT lr.id
+    FROM public.leave_requests lr
+    WHERE lr.status IN ('pending_personnel','pending_director','approved')
+      AND lr.affects_teaching_schedule=true
+      AND EXISTS(
+        SELECT 1
+        FROM public.academic_calendars c
+        JOIN public.academic_calendar_day_overrides o ON o.calendar_id=c.id
+        WHERE c.status='published'
+          AND c.academic_year=lr.academic_year::text
+          AND c.semester=lr.semester
+          AND o.override_type='special_school_day'
+          AND o.event_date BETWEEN lr.start_date AND lr.end_date
+      )
+  LOOP
+    PERFORM private.sync_substitute_lessons_for_leave(v_leave.id,true);
+  END LOOP;
+END;
+$backfill$;
