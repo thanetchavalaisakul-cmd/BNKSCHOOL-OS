@@ -21,6 +21,8 @@ jobs:
         run: node --test tests/performance-regression.test.mjs
       - name: Leave weekday and school-open weekend checks
         run: node --test tests/leave-half-day-weekday-quota-20261111.test.mjs tests/leave-weekend-school-days-20261111.test.mjs tests/leave-daily-sessions-20261111.test.mjs
+      - name: Special school-open day integration checks
+        run: node --test tests/special-school-open-days-20261112.test.mjs
       - name: Office admin role and module scope checks
         run: node --test tests/office-admin-two-modules-20261111.test.mjs
       - name: Academic certificate registry checks

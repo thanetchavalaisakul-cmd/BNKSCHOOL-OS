@@ -97,7 +97,7 @@ async function loadStudentDialogsFeature(){
 
 let bnkDashboardEventsFeaturePromise=null;
 async function loadDashboardEventsFeature(){
- bnkDashboardEventsFeaturePromise??=import("./modules/dashboard-events.js?v=5.12.9.65").then(mod=>mod.createDashboardEventsFeature({preschoolCoverEndorse,TIMETABLE_DAY_LABEL,TIMETABLE_REENTRY_CACHE_MS,academicCalendarActivityModal,academicCalendarCurrent,academicCalendarDeleteItem,academicCalendarEditorModal,academicCalendarExport,academicCalendarLoadDraftModal,academicCalendarOverrideModal,academicCalendarSaveDraft,academicCalendarTogglePublish,academicCertificateFormModal,academicCertificateRoleSettingsModal,academicDocumentServiceFormModal,academicDocumentServiceSettingsModal,academicPlcPlanModal,academicRegistrationRoleSettingsModal,academicSubmissionApplyMonitoringFilter,academicSubmissionDeadlineModal,academicSubmissionOpenMonitoringTarget,academicSubmissionOpenSection,academicSupervisionManageWeekModal,academicSupervisionWeekModal,academicTransferFormModal,acknowledgePreschoolCover,applySchoolPeriodTemplateToAll,applyStudentPromotion,archiveTeachingAssignment,behaviorFeature,bindApprovalCenterEvents,bindDataCenterEvents,bindElectricityEvents,bindExamEvents,bindLearningSourceEvents,bindOfficialAttendanceEvents,bindPersonnelPaEvents,bindProcurementControlEvents,bindProcurementEvents,bindSchoolLunchEvents,bindSignatureSettingsEvents,bindStudentFollowupEvents,bnkRecordActionSignature,bnkSignatureBeforeAction,budgetControlSettingsModal,budgetRequestModal,budgetRequestEditModal,budgetRequestPdfPreview,budgetSignerActionModal,budgetSignersModal,buttonLoading,canManageTimetableClassLocal,cancelSubstituteAllDay,candidateDetailText,classroomResearchDelete,classroomResearchFormModal,classroomResearchOpenOriginal,classroomResearchPreviewPdf,classroomResearchReportById,classroomResearchReviewModal,classroomResearchSubmitModal,classroomResearchVersionHistoryModal,clearSelectedTimetable,clubActivityAttendanceModal,clubActivityDelete,clubActivityFormModal,clubActivityMembersModal,clubActivityPhotosModal,clubActivityPreviewPdf,clubActivityReportById,clubActivityReviewModal,clubActivitySignModal,clubActivitySubmitModal,confirmSubstituteAllDay,copyStudentRegistryToSemester2,currentAcademicPeriod,deleteDraftLessonPlan,deleteLeaveDraft,deleteLessonFile,deletePreschoolUnit,deleteSelectedBudgetRequest,deleteSelectedHomeVisitRecord,deleteSelectedProject,deleteSelectedProjectActivity,deleteSelectedSubstituteRecord,deleteUserAccount,downloadApprovedPdf,dropTimetableItem,educationFeeFeature,escapeHtml,generateApprovedPdfFromDetail,homeVisitCreateModal,homeVisitFilteredRecords,homeVisitPdfPreview,homeVisitPeriodSettingsModal,homeVisitRecord,homeVisitSignatureModal,householdRowsHtml,hydrateHomeVisitPhotoPreviews,isPersonnelReviewer,isPlanBudgetHead,learnerActivityDelete,learnerActivityFormModal,learnerActivityPreviewPdf,learnerActivityReportById,learnerActivityResultsModal,learnerActivityReviewModal,learnerActivitySettingsModal,learnerActivitySignModal,learnerActivitySubmitModal,learningMediaDelete,learningMediaDirectorModal,learningMediaFormModal,learningMediaPreviewPdf,learningMediaReportById,learningMediaReviewModal,learningMediaSubmitModal,leaveA4Preview,leaveRequestModal,leaveReviewModal,lessonA4PreviewModal,lessonPlanModal,lessonUsageDelete,lessonUsageDirectorModal,lessonUsageDocumentSettingsModal,lessonUsageFormModal,lessonUsagePreviewPdf,lessonUsageReportById,lessonUsageReviewModal,lessonUsageSubmitModal,loadAcademicSubmissionWorkspace,loadActiveUserData,loadPublicData,money,officialAttendanceDateValue,officialAttendanceMonthValue,openCentralApprovalNotification,openJointActivityModal,openLeaveReportPreview,openPrivateFile,openStudentSeedImport,openSubstituteDayPlanner,openTimetablePeriodModal,personnelA4Preview,personnelPaCanReviewUi,personnelPaIsRequiredUi,personnelRecordModal,postLessonDelete,postLessonExecutiveSignModal,postLessonFormModal,postLessonPreviewPdf,postLessonReportById,postLessonReviewModal,postLessonSubmitModal,postLessonSystemCode,postLessonWorkflowSettingsModal,prepareBudgetRequest,preschoolCoverPdfPreview,preschoolRosterModal,preschoolUnitModal,previewSignature,projectActivityModal,projectModal,projectPdfPreview,renderAuth,renderDashboard,renderTimetableNavigation,reviewModal,revokeStudentCard,runUserDecision,saveHomeVisitStep,saveSubstituteAllDay,saveSubstituteDayAssignments,schoolClassLabel,schoolLunchCurrentFiscalYear,selectedBudgetRequest,selectedLeaveRequest,selectedProject,setMobileSidebar,setStudentCurrentAcademicTerm,setTimetablePeriodMode,showApprovalModal,showHomeVisitLocalPhotoPreview,showModuleLoadingScreen,showNotificationModal,showSchoolDocumentSignatureModal,signatureManagerModal,state,studentAcademicYearModal,studentApplyRoleScope,studentCardApplyRoleScope,studentCardBatchPrint,studentCardCertifierSettingsModal,studentCardIssueModal,studentCardPhotoModal,studentCardPreview,studentCardVisibleEnrollments,studentClassListPdf,studentClassListXlsx,studentDetailModal,studentExitEnrollmentModal,studentExportXlsx,studentImportModal,studentImportReconciliationModal,studentRegistryPdf,studentRoomModal,studentTemplateDownload,submitSelectedLeaveRequest,submitSelectedLessonPlan,substituteActiveDay,substituteAllDayPdfPreview,substituteAssignModal,substituteBatchDates,substitutePdfPreview,supabase,syncPreschoolCovers,syncSubstituteTeaching,teachingAssignmentModal,timetableBatchPdfPreview,timetableClassModal,timetableConstraintFeature,timetableCopySubjectsModal,timetableEditSubjectModal,timetableFilteredClasses,timetablePdfPreview,timetableSchoolPeriodTemplateModal,timetableStudentExportClassIds,timetableSubjectModal,timetableTeacherCapabilityModal,timetableTeacherName,toast,toggleTimetablePublish,unassignSelectedSubstitute,uploadHomeVisitPhoto,withWorkflowSignature})).catch(error=>{bnkDashboardEventsFeaturePromise=null;throw error;});
+ bnkDashboardEventsFeaturePromise??=import("./modules/dashboard-events.js?v=5.12.9.66").then(mod=>mod.createDashboardEventsFeature({preschoolCoverEndorse,TIMETABLE_DAY_LABEL,TIMETABLE_REENTRY_CACHE_MS,academicCalendarActivityModal,academicCalendarCurrent,academicCalendarDeleteItem,academicCalendarEditorModal,academicCalendarExport,academicCalendarLoadDraftModal,academicCalendarOverrideModal,academicCalendarSaveDraft,academicCalendarTogglePublish,academicCertificateFormModal,academicCertificateRoleSettingsModal,academicDocumentServiceFormModal,academicDocumentServiceSettingsModal,academicPlcPlanModal,academicRegistrationRoleSettingsModal,academicSubmissionApplyMonitoringFilter,academicSubmissionDeadlineModal,academicSubmissionOpenMonitoringTarget,academicSubmissionOpenSection,academicSupervisionManageWeekModal,academicSupervisionWeekModal,academicTransferFormModal,acknowledgePreschoolCover,applySchoolPeriodTemplateToAll,applyStudentPromotion,archiveTeachingAssignment,behaviorFeature,bindApprovalCenterEvents,bindDataCenterEvents,bindElectricityEvents,bindExamEvents,bindLearningSourceEvents,bindOfficialAttendanceEvents,bindPersonnelPaEvents,bindProcurementControlEvents,bindProcurementEvents,bindSchoolLunchEvents,bindSignatureSettingsEvents,bindStudentFollowupEvents,bnkRecordActionSignature,bnkSignatureBeforeAction,budgetControlSettingsModal,budgetRequestModal,budgetRequestEditModal,budgetRequestPdfPreview,budgetSignerActionModal,budgetSignersModal,buttonLoading,canManageTimetableClassLocal,cancelSubstituteAllDay,candidateDetailText,classroomResearchDelete,classroomResearchFormModal,classroomResearchOpenOriginal,classroomResearchPreviewPdf,classroomResearchReportById,classroomResearchReviewModal,classroomResearchSubmitModal,classroomResearchVersionHistoryModal,clearSelectedTimetable,clubActivityAttendanceModal,clubActivityDelete,clubActivityFormModal,clubActivityMembersModal,clubActivityPhotosModal,clubActivityPreviewPdf,clubActivityReportById,clubActivityReviewModal,clubActivitySignModal,clubActivitySubmitModal,confirmSubstituteAllDay,copyStudentRegistryToSemester2,currentAcademicPeriod,deleteDraftLessonPlan,deleteLeaveDraft,deleteLessonFile,deletePreschoolUnit,deleteSelectedBudgetRequest,deleteSelectedHomeVisitRecord,deleteSelectedProject,deleteSelectedProjectActivity,deleteSelectedSubstituteRecord,deleteUserAccount,downloadApprovedPdf,dropTimetableItem,educationFeeFeature,escapeHtml,generateApprovedPdfFromDetail,homeVisitCreateModal,homeVisitFilteredRecords,homeVisitPdfPreview,homeVisitPeriodSettingsModal,homeVisitRecord,homeVisitSignatureModal,householdRowsHtml,hydrateHomeVisitPhotoPreviews,isPersonnelReviewer,isPlanBudgetHead,learnerActivityDelete,learnerActivityFormModal,learnerActivityPreviewPdf,learnerActivityReportById,learnerActivityResultsModal,learnerActivityReviewModal,learnerActivitySettingsModal,learnerActivitySignModal,learnerActivitySubmitModal,learningMediaDelete,learningMediaDirectorModal,learningMediaFormModal,learningMediaPreviewPdf,learningMediaReportById,learningMediaReviewModal,learningMediaSubmitModal,leaveA4Preview,leaveRequestModal,leaveReviewModal,lessonA4PreviewModal,lessonPlanModal,lessonUsageDelete,lessonUsageDirectorModal,lessonUsageDocumentSettingsModal,lessonUsageFormModal,lessonUsagePreviewPdf,lessonUsageReportById,lessonUsageReviewModal,lessonUsageSubmitModal,loadAcademicSubmissionWorkspace,loadActiveUserData,loadPublicData,money,officialAttendanceDateValue,officialAttendanceMonthValue,openCentralApprovalNotification,openJointActivityModal,openLeaveReportPreview,openPrivateFile,openStudentSeedImport,openSubstituteDayPlanner,openTimetablePeriodModal,personnelA4Preview,personnelPaCanReviewUi,personnelPaIsRequiredUi,personnelRecordModal,postLessonDelete,postLessonExecutiveSignModal,postLessonFormModal,postLessonPreviewPdf,postLessonReportById,postLessonReviewModal,postLessonSubmitModal,postLessonSystemCode,postLessonWorkflowSettingsModal,prepareBudgetRequest,preschoolCoverPdfPreview,preschoolRosterModal,preschoolUnitModal,previewSignature,projectActivityModal,projectModal,projectPdfPreview,renderAuth,renderDashboard,renderTimetableNavigation,reviewModal,revokeStudentCard,runUserDecision,saveHomeVisitStep,saveSubstituteAllDay,saveSubstituteDayAssignments,schoolClassLabel,schoolLunchCurrentFiscalYear,selectedBudgetRequest,selectedLeaveRequest,selectedProject,setMobileSidebar,setStudentCurrentAcademicTerm,setTimetablePeriodMode,showApprovalModal,showHomeVisitLocalPhotoPreview,showModuleLoadingScreen,showNotificationModal,showSchoolDocumentSignatureModal,signatureManagerModal,state,studentAcademicYearModal,studentApplyRoleScope,studentCardApplyRoleScope,studentCardBatchPrint,studentCardCertifierSettingsModal,studentCardIssueModal,studentCardPhotoModal,studentCardPreview,studentCardVisibleEnrollments,studentClassListPdf,studentClassListXlsx,studentDetailModal,studentExitEnrollmentModal,studentExportXlsx,studentImportModal,studentImportReconciliationModal,studentRegistryPdf,studentRoomModal,studentTemplateDownload,submitSelectedLeaveRequest,submitSelectedLessonPlan,substituteActiveDay,substituteAllDayPdfPreview,substituteAssignModal,substituteBatchDates,substitutePdfPreview,supabase,syncPreschoolCovers,syncSubstituteTeaching,teachingAssignmentModal,timetableBatchPdfPreview,timetableClassModal,timetableConstraintFeature,timetableCopySubjectsModal,timetableEditSubjectModal,timetableFilteredClasses,timetablePdfPreview,timetableSchoolPeriodTemplateModal,timetableStudentExportClassIds,timetableSubjectModal,timetableTeacherCapabilityModal,timetableTeacherName,toast,toggleTimetablePublish,unassignSelectedSubstitute,uploadHomeVisitPhoto,withWorkflowSignature})).catch(error=>{bnkDashboardEventsFeaturePromise=null;throw error;});
  return bnkDashboardEventsFeaturePromise;
 }
 
@@ -364,6 +364,7 @@ const state = {
   dashboardShowAllModules: false,
   leaveTypes: [],
   leaveRequests: [],
+  leaveSpecialSchoolDates: [],
   leaveActions: [],
   leaveRoster: [],
   leavePersonnelRecords: [],
@@ -1604,7 +1605,7 @@ function sidebarHtml() {
       <button class="nav-item ${state.currentView === "dashboard" ? "active" : ""}" data-view="dashboard"><span class="nav-icon">⌂</span><span class="nav-label">Dashboard</span></button>
       ${state.approvalControlCenter?.can_access ? `<button class="nav-item ${state.currentView === "approval_center" ? "active" : ""}" data-view="approval_center"><span class="nav-icon">✓</span><span class="nav-label">ศูนย์อนุมัติและลายเซ็น</span></button>` : ""}
       <button class="nav-item ${state.currentView === "signature_settings" ? "active" : ""}" data-view="signature_settings"><span class="nav-icon">✍</span><span class="nav-label">ลายเซ็นของฉัน</span></button>
-      ${state.profile.role === "super_admin" ? `<button class="nav-item ${state.currentView === "users" ? "active" : ""}" data-view="users"><span class="nav-icon">♙</span><span class="nav-label">จัดการผู้ใช้งาน</span></button><button class="nav-item ${state.currentView === "settings" ? "active" : ""}" data-view="settings"><span class="nav-icon">⚙</span><span class="nav-label">ตั้งค่าระบบ</span></button><button class="nav-item ${state.currentView === "data_center" ? "active" : ""}" data-view="data_center"><span class="nav-icon">▤</span><span class="nav-label">ศูนย์จัดการข้อมูลระบบ</span></button>` : ""}
+      ${state.profile.role === "super_admin" ? `<button class="nav-item ${state.currentView === "users" ? "active" : ""}" data-view="users"><span class="nav-icon">♙</span><span class="nav-label">จัดการผู้ใช้งาน</span></button><button class="nav-item ${state.currentView === "settings" ? "active" : ""}" data-view="settings"><span class="nav-icon">⚙</span><span class="nav-label">ตั้งค่าระบบ</span></button><button class="nav-item ${state.currentView === "data_center" ? "active" : ""}" data-view="data_center"><span class="nav-icon">▤</span><span class="nav-label">ศูนย์จัดการข้อมูลระบบ</span></button><button class="nav-item ${state.currentView === "module:academic_calendar" && state.academicCalendarSection==="special" ? "active" : ""}" data-view="module:academic_calendar" data-academic-calendar-special-open="true"><span class="nav-icon">✦</span><span class="nav-label">วันเปิดเรียนกรณีพิเศษ</span></button>` : ""}
       <div class="nav-section-title">กลุ่มงาน</div>
       ${grouped || `<div class="empty" style="color:#94a3b8;border-color:#334155">ยังไม่มีระบบย่อยที่เปิดใช้งาน</div>`}
       <div class="sidebar-user">
@@ -1794,6 +1795,7 @@ function pageTitle() {
   if (state.currentView === "users") return "จัดการผู้ใช้งาน";
   if (state.currentView === "settings") return "ตั้งค่าระบบ";
   if (state.currentView === "data_center" && state.profile?.role === "super_admin") return "ศูนย์จัดการข้อมูลระบบ";
+  if (state.currentView === "module:academic_calendar" && state.academicCalendarSection==="special" && isSuperAdminUser()) return "วันเปิดเรียนกรณีพิเศษ";
   if (state.currentView === "approval_center") return "ศูนย์อนุมัติและลายเซ็น";
   if (state.currentView === "signature_settings") return "ลายเซ็นของฉัน";
   if (state.currentView.startsWith("module:")) {
@@ -4528,6 +4530,18 @@ function leaveSessionLabel(session) {
   return "เต็มวัน";
 }
 
+function leaveSpecialWeekendDates(start,end,academicYear,semester) {
+  const first=String(start||"").slice(0,10),last=String(end||"").slice(0,10);
+  if(!first||!last||last<first)return [];
+  return [...new Set((state.leaveSpecialSchoolDates||[])
+    .filter(row=>String(row.academic_year)===String(academicYear)
+      && Number(row.semester)===Number(semester)
+      && String(row.event_date).slice(0,10)>=first
+      && String(row.event_date).slice(0,10)<=last
+      && leaveDateIsWeekend(row.event_date))
+    .map(row=>String(row.event_date).slice(0,10)))].sort();
+}
+
 function leaveWorkingDates(start,end,weekendWorkingDates=[]) {
   const parse=value=>{
     const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||""));
@@ -4767,7 +4781,7 @@ function leaveRequestsForView() {
 
 async function loadLeaveWorkspace() {
   const reviewer = canSeeLeaveOverview();
-  const [requestsRes, actionsRes, typesRes, rosterRes, personnelRes, substituteRes, preschoolRes] = await Promise.all([
+  const [requestsRes, actionsRes, typesRes, rosterRes, personnelRes, substituteRes, preschoolRes, specialCalendarsRes, specialOverridesRes] = await Promise.all([
     supabase.from("leave_requests").select("*").order("created_at", { ascending: false }),
     supabase.from("leave_actions").select("*").order("created_at", { ascending: true }),
     supabase.from("leave_types").select("*").eq("is_active", true).order("sort_order"),
@@ -4784,6 +4798,11 @@ async function loadLeaveWorkspace() {
       : Promise.resolve({ data: state.personnelOwnRecord ? [state.personnelOwnRecord] : [], error: null }),
     supabase.from("substitute_lessons").select("*").order("leave_date").order("period_no"),
     supabase.from("preschool_group_covers").select("*").eq("status","active"),
+    supabase.from("academic_calendars").select("id,academic_year,semester,status").eq("status","published"),
+    supabase.from("academic_calendar_day_overrides")
+      .select("calendar_id,event_date,category,title,make_up_for,timetable_weekday")
+      .eq("override_type","special_school_day")
+      .order("event_date"),
   ]);
 
   if (requestsRes.error) {
@@ -4801,6 +4820,11 @@ async function loadLeaveWorkspace() {
   state.leavePersonnelRecords = personnelRes.error ? [] : (personnelRes.data || []);
   state.leaveSubstituteLessons = substituteRes.error ? [] : (substituteRes.data || []);
   state.leavePreschoolCovers = preschoolRes.error ? [] : (preschoolRes.data || []);
+  const specialCalendarMap = new Map((specialCalendarsRes.error ? [] : (specialCalendarsRes.data || [])).map(row=>[row.id,row]));
+  state.leaveSpecialSchoolDates = specialOverridesRes.error ? [] : (specialOverridesRes.data || []).flatMap(row=>{
+    const calendar=specialCalendarMap.get(row.calendar_id);
+    return calendar ? [{...row,academic_year:Number(calendar.academic_year),semester:Number(calendar.semester)}] : [];
+  });
 
   if (!state.leaveReportAcademicYear) {
     state.leaveReportAcademicYear = currentAcademicPeriod().academicYear;
@@ -5168,9 +5192,12 @@ function leaveRequestModal(request = null) {
     ? { academicYear: Number(r.academic_year), semester: Number(r.semester) }
     : currentAcademicPeriod(r.start_date || new Date());
   const defaultLeaveSession = r.leave_session || "full_day";
-  const defaultWeekendDates = Array.isArray(r.weekend_working_dates)
-    ? [...new Set(r.weekend_working_dates.map(value=>String(value||"").slice(0,10)).filter(leaveDateIsWeekend))].sort()
-    : [];
+  const existingManualWeekendDates = Array.isArray(r.manual_weekend_working_dates)
+    ? r.manual_weekend_working_dates
+    : (Array.isArray(r.weekend_working_dates) ? r.weekend_working_dates : []);
+  const specialDatesForExistingRequest = leaveSpecialWeekendDates(r.start_date,r.end_date,r.academic_year,r.semester);
+  const defaultWeekendDates = [...new Set(existingManualWeekendDates.map(value=>String(value||"").slice(0,10)).filter(leaveDateIsWeekend))]
+    .filter(date=>!specialDatesForExistingRequest.includes(date)).sort();
   const defaultDailySessions = r.daily_leave_sessions && typeof r.daily_leave_sessions==="object" && !Array.isArray(r.daily_leave_sessions)
     ? {...r.daily_leave_sessions}
     : {};
@@ -5199,7 +5226,7 @@ function leaveRequestModal(request = null) {
         <div class="leave-day-schedule-rows" id="leave-day-schedule-rows"><div class="leave-day-schedule-empty">เลือกวันที่เริ่มต้นและสิ้นสุด เพื่อกำหนดช่วงเวลาการลา</div></div>
         <input type="hidden" name="daily_leave_sessions" id="leave-daily-sessions-value" value="${escapeHtml(JSON.stringify(defaultDailySessions))}">
       </section>
-      <label class="leave-teaching-check leave-weekend-check"><input type="checkbox" id="leave-weekend-enabled" name="weekend_working_enabled" ${defaultWeekendDates.length ? "checked" : ""}><span><strong>ลาในวันหยุดที่โรงเรียนเปิดเรียน</strong><small>เลือกวันที่เป็นวันเสาร์หรือวันอาทิตย์ที่โรงเรียนเปิดเรียน ระบบจะนับเฉพาะวันที่เลือกเป็นวันทำการ</small></span></label>
+      <label class="leave-teaching-check leave-weekend-check"><input type="checkbox" id="leave-weekend-enabled" name="weekend_working_enabled" ${defaultWeekendDates.length ? "checked" : ""}><span><strong>ลาในวันหยุดที่โรงเรียนเปิดเรียน</strong><small>เลือกวันเสาร์–อาทิตย์ที่เปิดเรียนเพิ่มเติมได้ ส่วนวันเปิดเรียนกรณีพิเศษที่ผู้ดูแลกำหนดในปฏิทินจะถูกนับให้อัตโนมัติ</small></span></label>
       <input type="hidden" name="weekend_working_dates" id="leave-weekend-dates-value" value="${escapeHtml(JSON.stringify(defaultWeekendDates))}">
       <div id="leave-weekend-panel" class="leave-weekend-panel" style="display:${defaultWeekendDates.length ? "block" : "none"}">
         <div class="form-row"><div class="field"><label for="leave-weekend-date">เลือกวันที่โรงเรียนเปิดเรียน</label><input class="input" type="date" id="leave-weekend-date"></div><div class="field"><label> </label><button type="button" class="btn btn-secondary" id="leave-weekend-add">เพิ่มวันที่</button></div></div>
@@ -5228,17 +5255,32 @@ function leaveRequestModal(request = null) {
   const weekendDatesHidden = modal.querySelector("#leave-weekend-dates-value");
   let selectedDailySessions = {...defaultDailySessions};
   const dailySessionsHidden = modal.querySelector("#leave-daily-sessions-value");
+  const currentLeavePeriod = () => ({
+    academicYear:Number(modal.querySelector("[name='academic_year']").value||defaultPeriod.academicYear),
+    semester:Number(modal.querySelector("[name='semester']").value||defaultPeriod.semester),
+  });
+  const effectiveWeekendDates = (start,end) => {
+    const period=currentLeavePeriod();
+    const manual=weekendEnabledInput.checked?selectedWeekendDates:[];
+    return [...new Set([...manual,...leaveSpecialWeekendDates(start,end,period.academicYear,period.semester)])].sort();
+  };
   const renderWeekendDates = () => {
     const target = modal.querySelector("#leave-weekend-selected");
-    target.innerHTML = selectedWeekendDates.length
-      ? selectedWeekendDates.map(date=>`<div class="form-row" style="align-items:center;margin-top:8px"><span class="table-muted">${escapeHtml(thaiDateOnly(date))}</span><button type="button" class="btn btn-ghost" data-remove-weekend-date="${escapeHtml(date)}">นำออก</button></div>`).join("")
-      : '<small class="helper">ยังไม่ได้เลือกวันที่โรงเรียนเปิดเรียน</small>';
+    const start=modal.querySelector("#leave-start-date").value;
+    const end=modal.querySelector("#leave-end-date").value;
+    const period=currentLeavePeriod();
+    const specialDates=leaveSpecialWeekendDates(start,end,period.academicYear,period.semester);
+    const manualRows=selectedWeekendDates.map(date=>`<div class="form-row" style="align-items:center;margin-top:8px"><span class="table-muted">${escapeHtml(thaiDateOnly(date))} · เพิ่มเอง</span><button type="button" class="btn btn-ghost" data-remove-weekend-date="${escapeHtml(date)}">นำออก</button></div>`).join("");
+    const specialRows=specialDates.map(date=>{
+      const item=(state.leaveSpecialSchoolDates||[]).find(row=>String(row.event_date).slice(0,10)===date&&String(row.academic_year)===String(period.academicYear)&&Number(row.semester)===period.semester);
+      return `<div class="form-row" style="align-items:center;margin-top:8px"><span class="table-muted">${escapeHtml(thaiDateOnly(date))} · ${escapeHtml(item?.title||"วันเปิดเรียนกรณีพิเศษ")}</span><small class="helper">กำหนดโดยผู้ดูแล · นับอัตโนมัติ</small></div>`;
+    }).join("");
+    target.innerHTML = manualRows+specialRows || '<small class="helper">ยังไม่มีวันที่เปิดเรียนพิเศษในช่วงวันที่เลือก</small>';
     target.querySelectorAll("[data-remove-weekend-date]").forEach(button=>{
       button.addEventListener("click",()=>{
         const date=button.getAttribute("data-remove-weekend-date");
         const index=selectedWeekendDates.indexOf(date);
         if(index>=0)selectedWeekendDates.splice(index,1);
-        renderWeekendDates();
         refresh();
       });
     });
@@ -5247,17 +5289,21 @@ function leaveRequestModal(request = null) {
     const start=modal.querySelector("#leave-start-date").value;
     const end=modal.querySelector("#leave-end-date").value;
     const session=modal.querySelector("#leave-session").value||"full_day";
-    const weekendDates=weekendEnabledInput.checked?selectedWeekendDates:[];
+    const weekendDates=effectiveWeekendDates(start,end);
     const days=leaveDailyWorkingDays(start,end,weekendDates,selectedDailySessions,session);
-    const previewLabel=weekendDates.length
-      ?"จำนวนวันลา · คำนวณแยกรายวัน รวมวันที่โรงเรียนเปิดเรียน"
-      :"จำนวนวันลา · คำนวณตามช่วงเวลาของแต่ละวัน";
+    const hasSpecial=leaveSpecialWeekendDates(start,end,currentLeavePeriod().academicYear,currentLeavePeriod().semester).length>0;
+    const previewLabel=hasSpecial
+      ?"จำนวนวันลา · รวมวันเปิดเรียนกรณีพิเศษจากปฏิทินแล้ว"
+      :weekendDates.length
+        ?"จำนวนวันลา · คำนวณรวมวันที่โรงเรียนเปิดเรียน"
+        :"จำนวนวันลา · คำนวณตามช่วงเวลาของแต่ละวัน";
     modal.querySelector("#leave-days-preview").innerHTML="<span>"+previewLabel+"</span><strong>"+(days?formatLeaveDays(days)+" วัน":"—")+"</strong>";
   };
   const renderDailySchedule = () => {
     const start=modal.querySelector("#leave-start-date").value;
     const end=modal.querySelector("#leave-end-date").value;
-    const weekendDates=weekendEnabledInput.checked?selectedWeekendDates:[];
+    const period=currentLeavePeriod();
+    const weekendDates=effectiveWeekendDates(start,end);
     const dates=leaveWorkingDates(start,end,weekendDates);
     const allowed=new Set(dates);
     Object.keys(selectedDailySessions).forEach(date=>{if(!allowed.has(date))delete selectedDailySessions[date];});
@@ -5266,7 +5312,11 @@ function leaveRequestModal(request = null) {
     });
     dailySessionsHidden.value=JSON.stringify(selectedDailySessions);
     const target=modal.querySelector("#leave-day-schedule-rows");
-    target.innerHTML=dates.length?dates.map(date=>'<div class="leave-day-schedule-row"><div class="leave-day-schedule-date"><strong>'+escapeHtml(leaveDayScheduleDateLabel(date))+'</strong><small>กำหนดช่วงเวลาสำหรับวันนี้</small></div><select class="select" data-leave-day-session="'+escapeHtml(date)+'" aria-label="ช่วงเวลาการลา '+escapeHtml(leaveDayScheduleDateLabel(date))+'"><option value="full_day" '+(selectedDailySessions[date]==="full_day"?"selected":"") +'>เต็มวัน (1 วัน)</option><option value="morning" '+(selectedDailySessions[date]==="morning"?"selected":"") +'>ครึ่งวันเช้า (0.5 วัน)</option><option value="afternoon" '+(selectedDailySessions[date]==="afternoon"?"selected":"") +'>ครึ่งวันบ่าย (0.5 วัน)</option></select></div>').join(""):'<div class="leave-day-schedule-empty">เลือกช่วงวันที่ลา หรือเพิ่มวันที่โรงเรียนเปิดเรียน เพื่อกำหนดช่วงเวลารายวัน</div>';
+    target.innerHTML=dates.length?dates.map(date=>{
+      const special=(state.leaveSpecialSchoolDates||[]).find(row=>String(row.event_date).slice(0,10)===date&&String(row.academic_year)===String(period.academicYear)&&Number(row.semester)===period.semester);
+      const note=special?"วันเปิดเรียนกรณีพิเศษ · "+(special.title||"กำหนดโดยผู้ดูแล"):"กำหนดช่วงเวลาสำหรับวันนี้";
+      return '<div class="leave-day-schedule-row"><div class="leave-day-schedule-date"><strong>'+escapeHtml(leaveDayScheduleDateLabel(date))+'</strong><small>'+escapeHtml(note)+'</small></div><select class="select" data-leave-day-session="'+escapeHtml(date)+'" aria-label="ช่วงเวลาการลา '+escapeHtml(leaveDayScheduleDateLabel(date))+'"><option value="full_day" '+(selectedDailySessions[date]==="full_day"?"selected":"") +'>เต็มวัน (1 วัน)</option><option value="morning" '+(selectedDailySessions[date]==="morning"?"selected":"") +'>ครึ่งวันเช้า (0.5 วัน)</option><option value="afternoon" '+(selectedDailySessions[date]==="afternoon"?"selected":"") +'>ครึ่งวันบ่าย (0.5 วัน)</option></select></div>';
+    }).join(""):'<div class="leave-day-schedule-empty">เลือกช่วงวันที่ลา หรือเพิ่มวันที่โรงเรียนเปิดเรียน เพื่อกำหนดช่วงเวลารายวัน</div>';
     target.querySelectorAll("[data-leave-day-session]").forEach(select=>select.addEventListener("change",()=>{
       selectedDailySessions[select.dataset.leaveDaySession]=select.value;
       dailySessionsHidden.value=JSON.stringify(selectedDailySessions);
@@ -5277,20 +5327,23 @@ function leaveRequestModal(request = null) {
     const start=modal.querySelector("#leave-start-date").value;
     const end=modal.querySelector("#leave-end-date").value;
     const weekendEnabled=weekendEnabledInput.checked;
-    const weekendDates=weekendEnabled?selectedWeekendDates:[];
-    weekendPanel.style.display=weekendEnabled?"block":"none";
+    const period=currentLeavePeriod();
+    const specialDates=leaveSpecialWeekendDates(start,end,period.academicYear,period.semester);
+    const manualDates=weekendEnabled?selectedWeekendDates:[];
+    const effectiveDates=[...new Set([...manualDates,...specialDates])].sort();
+    weekendPanel.style.display=(weekendEnabled||specialDates.length)?"block":"none";
     weekendDateInput.min=start||"";
     weekendDateInput.max=end||"";
-    weekendDatesHidden.value=JSON.stringify(weekendDates);
-    const outOfRange=weekendDates.filter(date=>!start||!end||date<start||date>end);
+    weekendDatesHidden.value=JSON.stringify(manualDates);
+    const outOfRange=manualDates.filter(date=>!start||!end||date<start||date>end);
     modal.querySelector("#leave-weekend-range-warning").style.display=outOfRange.length?"block":"none";
+    renderWeekendDates();
     renderDailySchedule();
     refreshPreview();
     const other=modal.querySelector("#leave-type-code").value==="other";
     modal.querySelector("[name='other_leave_text']").required=other;
     modal.querySelector("#leave-other-field").classList.toggle("leave-field-muted",!other);
   };
-  renderWeekendDates();
   modal.querySelector("#leave-weekend-enabled").addEventListener("change",refresh);
   modal.querySelector("#leave-weekend-add").addEventListener("click",()=>{
     const value=weekendDateInput.value;
@@ -5311,6 +5364,8 @@ function leaveRequestModal(request = null) {
   modal.querySelector("#leave-end-date").addEventListener("change",refresh);
   modal.querySelector("#leave-session").addEventListener("change",refresh);
   modal.querySelector("#leave-type-code").addEventListener("change",refresh);
+  modal.querySelector("[name='academic_year']").addEventListener("change",refresh);
+  modal.querySelector("[name='semester']").addEventListener("change",refresh);
   refresh();
 
   modal.querySelector("#save-leave-draft").addEventListener("click",e=>saveLeaveRequest(modal,request,false,e.currentTarget));
@@ -5339,7 +5394,9 @@ async function saveLeaveRequest(modal,existing,submitAfter,button) {
     if (Array.isArray(parsed)) weekendWorkingDates = [...new Set(parsed.map(value=>String(value||"").slice(0,10)))].sort();
   } catch {}
   if (!weekendEnabled) weekendWorkingDates = [];
-  if (weekendEnabled && !weekendWorkingDates.length) return toast("กรุณาเลือกวันที่โรงเรียนเปิดเรียน","เลือกวันเสาร์หรือวันอาทิตย์ที่ต้องการลาอย่างน้อย 1 วัน","error");
+  const specialWeekendDates=leaveSpecialWeekendDates(start,end,Number(fd.get("academic_year")),Number(fd.get("semester")));
+  const effectiveWeekendWorkingDates=[...new Set([...weekendWorkingDates,...specialWeekendDates])].sort();
+  if (weekendEnabled && !effectiveWeekendWorkingDates.length) return toast("กรุณาเลือกวันที่โรงเรียนเปิดเรียน","เลือกวันเสาร์หรือวันอาทิตย์ที่ต้องการลาอย่างน้อย 1 วัน","error");
   const invalidWeekendDate = weekendWorkingDates.find(date=>!leaveDateIsWeekend(date)||date<start||date>end);
   if (invalidWeekendDate) return toast("วันที่เปิดเรียนไม่ถูกต้อง","วันที่เลือกต้องเป็นวันเสาร์หรือวันอาทิตย์ และอยู่ภายในช่วงวันที่ลา","error");
   let dailyLeaveSessions={};
@@ -5347,14 +5404,14 @@ async function saveLeaveRequest(modal,existing,submitAfter,button) {
     const parsed=JSON.parse(String(fd.get("daily_leave_sessions")||"{}"));
     if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))dailyLeaveSessions=parsed;
   }catch{}
-  const workingDates=leaveWorkingDates(start,end,weekendWorkingDates);
+  const workingDates=leaveWorkingDates(start,end,effectiveWeekendWorkingDates);
   const validSessions=new Set(["full_day","morning","afternoon"]);
   const invalidDailyEntry=Object.entries(dailyLeaveSessions).find(([date,value])=>!workingDates.includes(date)||!validSessions.has(value));
   if(invalidDailyEntry)return toast("ช่วงเวลาการลาไม่ถูกต้อง","กรุณากำหนดช่วงเวลาของแต่ละวันใหม่อีกครั้ง","error");
   const normalizedDailyLeaveSessions=Object.fromEntries(workingDates.map(date=>[
     date,validSessions.has(dailyLeaveSessions[date])?dailyLeaveSessions[date]:session
   ]));
-  const days=leaveDailyWorkingDays(start,end,weekendWorkingDates,normalizedDailyLeaveSessions,session);
+  const days=leaveDailyWorkingDays(start,end,effectiveWeekendWorkingDates,normalizedDailyLeaveSessions,session);
   if(!days)return toast("ช่วงวันที่ลาไม่ถูกต้อง","กรุณาเลือกช่วงที่มีวันทำการ หรือเลือกวันที่โรงเรียนเปิดเรียนในวันเสาร์–อาทิตย์","error");
 
   const payload = {
@@ -5366,6 +5423,7 @@ async function saveLeaveRequest(modal,existing,submitAfter,button) {
     leave_session: session,
     daily_leave_sessions: normalizedDailyLeaveSessions,
     weekend_working_dates: weekendWorkingDates,
+    manual_weekend_working_dates: weekendWorkingDates,
     leave_days: days,
     leave_year: dateOnly(start)?.getFullYear() || currentLeaveYear(),
     academic_year: Number(fd.get("academic_year")),
@@ -9357,7 +9415,7 @@ function academicCalendarDocumentHtml(calendar,{interactive=false}={}){
   const statusText=calendar.status==="published"?"ประกาศใช้แล้ว":"ฉบับร่าง";
   const activityRows=activities.length?activities.map(a=>`<li><strong>${academicCalendarThaiDate(a.event_date)}</strong> ${escapeHtml(a.title)}${a.note?` <span>${escapeHtml(a.note)}</span>`:""}</li>`).join(""):`<li class="muted">ยังไม่มีกิจกรรม</li>`;
   const holidayRows=holidays.length?holidays.map(h=>`<li><strong>${academicCalendarThaiDate(h.event_date)}</strong> ${escapeHtml(h.title)}${h.note?` <span>${escapeHtml(h.note)}</span>`:""}</li>`).join(""):`<li class="muted">ยังไม่มีวันหยุดที่เพิ่มไว้</li>`;
-  const specialRows=specials.length?specials.map(s=>`<li><strong>${academicCalendarThaiDate(s.event_date)}</strong> ${escapeHtml(s.title)}${s.make_up_for?` <span>ชดเชยแทน ${academicCalendarThaiDate(s.make_up_for)}</span>`:""}</li>`).join(""):`<li class="muted">ยังไม่มีวันเปิดเรียนกรณีพิเศษ</li>`;
+  const specialRows=specials.length?specials.map(s=>`<li><strong>${academicCalendarThaiDate(s.event_date)}</strong> ${escapeHtml(s.title)}${s.make_up_for?` <span>ชดเชยแทน ${academicCalendarThaiDate(s.make_up_for)}</span>`:""}${s.timetable_weekday?` <span>· ใช้ตารางเรียน${escapeHtml(TIMETABLE_DAY_LABEL[s.timetable_weekday]||"")}</span>`:""}</li>`).join(""):`<li class="muted">ยังไม่มีวันเปิดเรียนกรณีพิเศษ</li>`;
   const warning=visibleCount<100?`<div class="academic-calendar-warning">⚠ เดือนที่เลือกแสดงวันเรียนได้ ${visibleCount}/100 วัน กรุณาเพิ่มเดือนให้ครอบคลุมถึงวันเรียนที่ 100 (${academicCalendarThaiDate(computed.endDate)})</div>`:"";
   return `<div class="academic-calendar-document ${interactive?"interactive":""}" id="academic-calendar-export-document">
     <header class="academic-calendar-doc-head"><img src="./school-logo.png" alt="ตราโรงเรียน"><div><h1>ปฏิทินการศึกษา ${escapeHtml(schoolName())}</h1><h2>ภาคเรียนที่ ${calendar.semester} ปีการศึกษา ${escapeHtml(calendar.academic_year)}</h2><p>${escapeHtml(educationOffice())}</p><small>เปิดเรียน ${academicCalendarThaiWeekday(calendar.start_date)}ที่ ${academicCalendarThaiDate(calendar.start_date)} · ${statusText}</small></div></header>
@@ -9403,8 +9461,27 @@ async function loadAcademicCalendarWorkspace(){
   }
 }
 
+function academicCalendarSpecialOpenDaysWorkspaceHtml(module){
+  if(!isSuperAdminUser())return '<section class="panel"><div class="empty">ไม่มีสิทธิ์เข้าถึงเมนูนี้</div></section>';
+  const canManage=academicCalendarCanManageUi(),calendar=academicCalendarCurrent(),years=academicCalendarYears();
+  const specials=calendar?academicCalendarOverridesFor(calendar.id).filter(row=>row.override_type==="special_school_day"):[];
+  const rows=specials.length?specials.map(row=>{
+    const schedule=TIMETABLE_DAY_LABEL[row.timetable_weekday]||"ยังไม่กำหนด";
+    const category=row.category==="makeup"?"เปิดเรียนชดเชย":"เปิดเรียนกรณีพิเศษ";
+    return `<tr><td><strong>${academicCalendarThaiDate(row.event_date)}</strong><small>${academicCalendarThaiWeekday(row.event_date)}</small></td><td>${escapeHtml(category)}</td><td>${escapeHtml(schedule)}</td><td>${row.make_up_for?academicCalendarThaiDate(row.make_up_for):"—"}</td><td><strong>${escapeHtml(row.title)}</strong>${row.note?`<small>${escapeHtml(row.note)}</small>`:""}</td><td><div class="action-row"><button class="btn btn-ghost btn-small" data-academic-calendar-edit-item="${row.id}" data-academic-calendar-item-type="override">แก้ไข</button><button class="btn btn-danger btn-small" data-academic-calendar-delete-item="${row.id}" data-academic-calendar-item-type="override">ลบ</button></div></td></tr>`;
+  }).join(""):'<tr><td colspan="6"><div class="empty compact">ยังไม่มีวันเปิดเรียนกรณีพิเศษในภาคเรียนนี้</div></td></tr>';
+  return `<section class="academic-calendar-shell">
+    <div class="academic-calendar-hero"><div><span class="eyebrow">สำหรับผู้ดูแลระบบ · Special School Days</span><h2>วันเปิดเรียนกรณีพิเศษ</h2><p>กำหนดวันเปิดเรียนชดเชยหรือวันเปิดเรียนพิเศษ พร้อมเลือกตารางเรียนต้นแบบให้ระบบวันลาและจัดสอนแทนอ้างอิงร่วมกัน</p></div><div class="academic-calendar-hero-status"><span>${calendar?.status==="published"?"● ปฏิทินประกาศใช้แล้ว":"● ยังไม่ประกาศใช้"}</span><strong>${specials.length} วัน</strong></div></div>
+    <section class="panel academic-calendar-toolbar"><div class="academic-calendar-period-fields"><div class="field"><label>ปีการศึกษา</label><select class="select" id="academic-calendar-year">${years.map(y=>`<option value="${y}" ${Number(state.academicCalendarAcademicYear)===y?"selected":""}>${y}</option>`).join("")}</select></div><div class="field"><label>ภาคเรียน</label><select class="select" id="academic-calendar-semester"><option value="1" ${Number(state.academicCalendarSemester)===1?"selected":""}>ภาคเรียนที่ 1</option><option value="2" ${Number(state.academicCalendarSemester)===2?"selected":""}>ภาคเรียนที่ 2</option></select></div></div><div class="academic-calendar-actions"><button class="btn btn-ghost" data-academic-calendar-section="hundred">กลับปฏิทิน 100 วัน</button>${calendar&&canManage?`<button class="btn btn-primary" id="academic-calendar-add-special">+ เพิ่มวันเปิดเรียนกรณีพิเศษ</button>`:""}</div></section>
+    <section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>รายการวันเปิดเรียนพิเศษ</h3><p>วันชดเชยจะใช้ตารางเรียนจากวันที่ถูกชดเชย ส่วนวันเปิดเรียนกรณีพิเศษเลือกวันต้นแบบได้เอง</p></div></div>${calendar?`<div class="table-wrap"><table class="data-table"><thead><tr><th>วันที่เปิดเรียน</th><th>ประเภท</th><th>ใช้ตารางเรียน</th><th>ชดเชยแทนวันที่</th><th>เหตุผล / รายละเอียด</th><th>จัดการ</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty"><strong>ยังไม่มีปฏิทินสำหรับช่วงเวลานี้</strong><span>กลับไปสร้างปฏิทิน 100 วันก่อน แล้วจึงเพิ่มวันเปิดเรียนกรณีพิเศษได้</span></div>'}</section>
+    <div class="drive-permission-warning"><strong>การเชื่อมโยงระบบ</strong><span>เมื่อปฏิทินประกาศใช้ วันเสาร์–อาทิตย์ที่กำหนดจะถูกนับเป็นวันทำงานในระบบลาโดยอัตโนมัติ และระบบสอนแทนจะดึงตารางเรียนจากวันต้นแบบที่ระบุ การแก้ไขวันซึ่งมีใบลาใช้งานอยู่จะถูกป้องกันเพื่อรักษาข้อมูลเดิม</span></div>
+  </section>`;
+}
+
 function academicCalendarWorkspaceHtml(module){
   const canManage=academicCalendarCanManageUi(),calendar=academicCalendarCurrent(),years=academicCalendarYears();
+  if(state.academicCalendarSection==="special"&&isSuperAdminUser())return academicCalendarSpecialOpenDaysWorkspaceHtml(module);
+  if(state.academicCalendarSection==="special")state.academicCalendarSection="hundred";
   if(state.academicCalendarSection==="supervision")return academicSupervisionWorkspaceHtml(module);
   if(state.academicCalendarSection==="plc")return academicPlcWorkspaceHtml(module);
   return `<section class="academic-calendar-shell">
@@ -9513,7 +9590,7 @@ async function academicPlcPlanModal(...args){return (await loadAcademicDialogsFe
 
 function academicCalendarManageListsHtml(calendar){
   const overrides=academicCalendarOverridesFor(calendar.id),activities=academicCalendarActivitiesFor(calendar.id),holidays=overrides.filter(x=>x.override_type==="holiday"),specials=overrides.filter(x=>x.override_type==="special_school_day");
-  const row=(x,type)=>`<div class="academic-calendar-manage-row"><div><strong>${academicCalendarThaiDate(x.event_date)}</strong><span>${escapeHtml(x.title)}${x.note?` · ${escapeHtml(x.note)}`:""}${x.make_up_for?` · ชดเชยแทน ${academicCalendarThaiDate(x.make_up_for)}`:""}</span></div><div><button class="btn btn-ghost btn-small" data-academic-calendar-edit-item="${x.id}" data-academic-calendar-item-type="${type}">แก้ไข</button><button class="btn btn-danger btn-small" data-academic-calendar-delete-item="${x.id}" data-academic-calendar-item-type="${type}">ลบ</button></div></div>`;
+  const row=(x,type)=>{const schedule=x.override_type==="special_school_day"&&x.timetable_weekday?` · ใช้ตารางเรียน${TIMETABLE_DAY_LABEL[x.timetable_weekday]||""}`:"";return `<div class="academic-calendar-manage-row"><div><strong>${academicCalendarThaiDate(x.event_date)}</strong><span>${escapeHtml(x.title)}${x.note?` · ${escapeHtml(x.note)}`:""}${x.make_up_for?` · ชดเชยแทน ${academicCalendarThaiDate(x.make_up_for)}`:""}${escapeHtml(schedule)}</span></div><div><button class="btn btn-ghost btn-small" data-academic-calendar-edit-item="${x.id}" data-academic-calendar-item-type="${type}">แก้ไข</button><button class="btn btn-danger btn-small" data-academic-calendar-delete-item="${x.id}" data-academic-calendar-item-type="${type}">ลบ</button></div></div>`;};
   return `<section class="academic-calendar-manage-grid"><div class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>วันหยุด</h3><p>วันเหล่านี้ไม่ถูกนับเป็น 1 ใน 100 วัน</p></div></div>${holidays.length?holidays.map(x=>row(x,"override")).join(""):`<div class="empty compact">ยังไม่มีวันหยุดที่เพิ่มเอง</div>`}</div><div class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>เปิดเรียนกรณีพิเศษ</h3><p>รวมวันเรียนชดเชยในวันเสาร์/อาทิตย์</p></div></div>${specials.length?specials.map(x=>row(x,"override")).join(""):`<div class="empty compact">ยังไม่มีวันเปิดเรียนกรณีพิเศษ</div>`}</div><div class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>กิจกรรม</h3><p>กิจกรรมไม่เปลี่ยนสถานะวันเรียนโดยอัตโนมัติ</p></div></div>${activities.length?activities.map(x=>row(x,"activity")).join(""):`<div class="empty compact">ยังไม่มีกิจกรรม</div>`}</div></section>`;
 }
 function academicCalendarLoadDraftModal(){
@@ -9541,8 +9618,38 @@ function academicCalendarEditorModal(calendar=null){
   const m=document.createElement("div");m.className="modal-backdrop";m.innerHTML=`<div class="modal wide"><div class="modal-head"><div><h3>${calendar?"แก้ไข":"สร้าง"}ปฏิทิน 100 วัน</h3><p>กำหนดวันเปิดเรียนและเดือนที่ต้องการแสดง ระบบจะคำนวณวันเรียน 1–100 ให้อัตโนมัติ</p></div><button class="modal-close">×</button></div><form id="academic-calendar-editor-form" class="form-grid"><div class="form-row"><div class="field"><label>ปีการศึกษา</label><input class="input" id="academic-calendar-form-year" type="number" min="2500" max="2800" required value="${year}" ${calendar?"disabled":""}></div><div class="field"><label>ภาคเรียน</label><select class="select" id="academic-calendar-form-semester" ${calendar?"disabled":""}><option value="1" ${semester===1?"selected":""}>ภาคเรียนที่ 1</option><option value="2" ${semester===2?"selected":""}>ภาคเรียนที่ 2</option></select></div></div><div class="field"><label>วันเปิดเรียนวันแรก</label><input class="input" id="academic-calendar-start-date" type="date" required value="${escapeHtml(defaultStart)}"><span class="helper" id="academic-calendar-start-help">${defaultStart?`${academicCalendarThaiWeekday(defaultStart)} ${academicCalendarThaiDate(defaultStart)}`:"เลือกวันเปิดเรียนเพื่อเริ่มนับวันเรียนที่ 1"}</span></div><div class="field"><label>เดือนที่แสดงในปฏิทิน</label><div class="academic-calendar-month-picker"><input class="input" id="academic-calendar-month-input" type="month"><button class="btn btn-ghost" type="button" id="academic-calendar-month-add">+ เพิ่มเดือน</button></div><div id="academic-calendar-month-chips" class="academic-calendar-month-chips"></div><span class="helper">เลือกเองได้ตามช่วงเปิดภาคเรียน และสามารถข้าม/เพิ่มเดือนได้</span></div><div class="modal-actions"><button class="btn btn-ghost modal-cancel" type="button">ยกเลิก</button><button class="btn btn-primary" type="submit">บันทึกแบบร่าง</button></div></form></div>`;document.body.appendChild(m);const close=()=>m.remove(),chips=m.querySelector("#academic-calendar-month-chips");const draw=()=>{chips.innerHTML=months.sort().map(v=>`<button type="button" class="academic-calendar-month-chip" data-remove-month="${v}">${academicCalendarMonthLabel(`${v}-01`,true)} ×</button>`).join("");chips.querySelectorAll("[data-remove-month]").forEach(b=>b.onclick=()=>{months=months.filter(x=>x!==b.dataset.removeMonth);draw();});};draw();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;m.querySelector("#academic-calendar-start-date").onchange=e=>{m.querySelector("#academic-calendar-start-help").textContent=e.target.value?`${academicCalendarThaiWeekday(e.target.value)} ${academicCalendarThaiDate(e.target.value)}`:"";};m.querySelector("#academic-calendar-month-add").onclick=()=>{const v=m.querySelector("#academic-calendar-month-input").value;if(v&&!months.includes(v)){months.push(v);draw();}};m.querySelector("#academic-calendar-editor-form").onsubmit=async e=>{e.preventDefault();if(!months.length)return toast("เลือกเดือนก่อน","ปฏิทินต้องมีอย่างน้อย 1 เดือน","error");const btn=e.submitter;buttonLoading(btn,true,"กำลังบันทึก...");const payload={academic_year:String(calendar?.academic_year||m.querySelector("#academic-calendar-form-year").value),semester:Number(calendar?.semester||m.querySelector("#academic-calendar-form-semester").value),start_date:m.querySelector("#academic-calendar-start-date").value,display_months:months.sort().map(v=>`${v}-01`),status:"draft",published_at:null,published_by:null,updated_at:new Date().toISOString(),updated_by:state.user.id};let res;if(calendar){res=await supabase.from("academic_calendars").update(payload).eq("id",calendar.id);}else{const existing=await supabase.from("academic_calendars").select("id").eq("academic_year",payload.academic_year).eq("semester",payload.semester).maybeSingle();if(existing.error){buttonLoading(btn,false);return toast("ตรวจสอบปฏิทินเดิมไม่สำเร็จ",existing.error.message,"error");}if(existing.data?.id){res=await supabase.from("academic_calendars").update(payload).eq("id",existing.data.id);}else{res=await supabase.from("academic_calendars").insert({...payload,created_by:state.user.id});}}buttonLoading(btn,false);if(res.error)return toast("บันทึกปฏิทินไม่สำเร็จ",res.error.message,"error");state.academicCalendarAcademicYear=Number(payload.academic_year);state.academicCalendarSemester=payload.semester;close();toast("บันทึกแบบร่างแล้ว","ระบบบันทึกข้อมูลลงปฏิทินของปีการศึกษาและภาคเรียนนี้ โดยไม่สร้างรายการซ้ำ","success");await renderDashboard();};
 }
 function academicCalendarOverrideModal(kind,existing=null){
-  const calendar=academicCalendarCurrent();if(!calendar||!academicCalendarCanManageUi())return;const isHoliday=kind==="holiday"||(existing?.override_type==="holiday"),m=document.createElement("div");m.className="modal-backdrop";m.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>${existing?"แก้ไข":isHoliday?"เพิ่มวันหยุด":"เปิดเรียนกรณีพิเศษ"}</h3><p>${isHoliday?"วันที่บันทึกเป็นวันหยุดจะไม่ถูกนับใน 100 วันเรียน":"วันเสาร์/อาทิตย์ที่กำหนดจะถูกนำมานับเป็นวันเรียน"}</p></div><button class="modal-close">×</button></div><form id="academic-calendar-override-form" class="form-grid"><div class="field"><label>วันที่</label><input class="input" name="event_date" type="date" required value="${escapeHtml(existing?.event_date||"")}"></div>${isHoliday?`<div class="field"><label>ประเภทวันหยุด</label><select class="select" name="category">${Object.entries(ACADEMIC_CALENDAR_HOLIDAY_LABEL).map(([v,l])=>`<option value="${v}" ${existing?.category===v?"selected":""}>${l}</option>`).join("")}</select></div>`:`<div class="field"><label>ประเภทการเปิดเรียน</label><select class="select" name="category" id="academic-special-category"><option value="makeup" ${existing?.category==="makeup"?"selected":""}>เปิดเรียนชดเชย</option><option value="special_opening" ${existing?.category==="special_opening"?"selected":""}>เปิดเรียนกรณีพิเศษ</option></select></div><div class="field" id="academic-makeup-for-wrap"><label>เปิดเรียนชดเชยแทนวันที่</label><input class="input" name="make_up_for" type="date" value="${escapeHtml(existing?.make_up_for||"")}"><span class="helper">บังคับกรอกเมื่อเลือก “เปิดเรียนชดเชย”</span></div>`}<div class="field"><label>${isHoliday?"ชื่อวันหยุด / เหตุผล":"เหตุผล / ชื่อกิจกรรม"}</label><input class="input" name="title" required maxlength="180" value="${escapeHtml(existing?.title||"")}"></div><div class="field"><label>หมายเหตุเพิ่มเติม</label><textarea class="input textarea" name="note">${escapeHtml(existing?.note||"")}</textarea></div><div class="modal-actions"><button class="btn btn-ghost modal-cancel" type="button">ยกเลิก</button><button class="btn btn-primary" type="submit">บันทึก</button></div></form></div>`;document.body.appendChild(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;const cat=m.querySelector("#academic-special-category"),wrap=m.querySelector("#academic-makeup-for-wrap");if(cat){const sync=()=>{wrap.style.display=cat.value==="makeup"?"":"none";};cat.onchange=sync;sync();}m.querySelector("#academic-calendar-override-form").onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),category=fd.get("category"),makeup=fd.get("make_up_for")||null;if(!isHoliday&&category==="makeup"&&!makeup)return toast("กรุณาระบุวันชดเชย","เปิดเรียนชดเชยต้องระบุว่าแทนวันที่ใด","error");const payload={calendar_id:calendar.id,event_date:fd.get("event_date"),override_type:isHoliday?"holiday":"special_school_day",category,title:String(fd.get("title")||"").trim(),make_up_for:isHoliday?null:makeup,note:String(fd.get("note")||"").trim()||null,updated_at:new Date().toISOString(),updated_by:state.user.id};const btn=e.submitter;buttonLoading(btn,true,"กำลังบันทึก...");let res;if(existing)res=await supabase.from("academic_calendar_day_overrides").update(payload).eq("id",existing.id);else res=await supabase.from("academic_calendar_day_overrides").insert({...payload,created_by:state.user.id});buttonLoading(btn,false);if(res.error)return toast("บันทึกไม่สำเร็จ",res.error.message,"error");close();toast("บันทึกแล้ว","ปฏิทิน 100 วันถูกคำนวณใหม่อัตโนมัติ","success");await renderDashboard();};
+  const calendar=academicCalendarCurrent();if(!calendar||!academicCalendarCanManageUi())return;
+  const isHoliday=kind==="holiday"||(existing?.override_type==="holiday");
+  const weekdayFromDate=value=>{const d=academicCalendarDate(value);return d?(d.getDay()===0?7:d.getDay()):"";};
+  const initialWeekday=Number(existing?.timetable_weekday||(
+    existing?.make_up_for?weekdayFromDate(existing.make_up_for):
+    (weekdayFromDate(existing?.event_date)<=5?weekdayFromDate(existing?.event_date):"")
+  ));
+  const m=document.createElement("div");m.className="modal-backdrop";
+  m.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>${existing?"แก้ไข":isHoliday?"เพิ่มวันหยุด":"เปิดเรียนกรณีพิเศษ"}</h3><p>${isHoliday?"วันที่บันทึกเป็นวันหยุดจะไม่ถูกนับใน 100 วันเรียน":"ระบบวันลาและจัดสอนแทนจะใช้วันเปิดเรียนและตารางเรียนที่กำหนดนี้เมื่อปฏิทินประกาศใช้แล้ว"}</p></div><button class="modal-close">×</button></div><form id="academic-calendar-override-form" class="form-grid"><div class="field"><label>วันที่</label><input class="input" name="event_date" type="date" required value="${escapeHtml(existing?.event_date||"")}"></div>${isHoliday?`<div class="field"><label>ประเภทวันหยุด</label><select class="select" name="category">${Object.entries(ACADEMIC_CALENDAR_HOLIDAY_LABEL).map(([v,l])=>`<option value="${v}" ${existing?.category===v?"selected":""}>${l}</option>`).join("")}</select></div>`:`<div class="field"><label>ประเภทการเปิดเรียน</label><select class="select" name="category" id="academic-special-category"><option value="makeup" ${existing?.category==="makeup"?"selected":""}>เปิดเรียนชดเชย</option><option value="special_opening" ${existing?.category==="special_opening"?"selected":""}>เปิดเรียนกรณีพิเศษ</option></select></div><div class="field" id="academic-makeup-for-wrap"><label>เปิดเรียนชดเชยแทนวันที่</label><input class="input" name="make_up_for" id="academic-makeup-for" type="date" value="${escapeHtml(existing?.make_up_for||"")}"><span class="helper">ระบบจะใช้ตารางเรียนของวันในวันที่เลือกนี้โดยอัตโนมัติ</span></div><div class="field" id="academic-special-weekday-wrap"><label>ใช้ตารางเรียนของวัน</label><select class="select" name="timetable_weekday" id="academic-special-timetable-weekday"><option value="">— เลือกวันต้นแบบ —</option>${Object.entries(TIMETABLE_DAY_LABEL).map(([v,l])=>`<option value="${v}" ${initialWeekday===Number(v)?"selected":""}>${l}</option>`).join("")}</select><span class="helper">ใช้เมื่อเลือก “เปิดเรียนกรณีพิเศษ” ที่ไม่ได้ชดเชยแทนวันที่อื่น</span></div>`}<div class="field"><label>${isHoliday?"ชื่อวันหยุด / เหตุผล":"เหตุผล / ชื่อกิจกรรม"}</label><input class="input" name="title" required maxlength="180" value="${escapeHtml(existing?.title||"")}"></div><div class="field"><label>หมายเหตุเพิ่มเติม</label><textarea class="input textarea" name="note">${escapeHtml(existing?.note||"")}</textarea></div><div class="modal-actions"><button class="btn btn-ghost modal-cancel" type="button">ยกเลิก</button><button class="btn btn-primary" type="submit">บันทึก</button></div></form></div>`;
+  document.body.appendChild(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;
+  const cat=m.querySelector("#academic-special-category"),makeupWrap=m.querySelector("#academic-makeup-for-wrap"),weekdayWrap=m.querySelector("#academic-special-weekday-wrap"),makeupInput=m.querySelector("#academic-makeup-for"),weekdaySelect=m.querySelector("#academic-special-timetable-weekday");
+  if(cat){const sync=()=>{
+    const isMakeup=cat.value==="makeup";
+    makeupWrap.style.display=isMakeup?"":"none";
+    weekdayWrap.style.display=isMakeup?"none":"";
+    if(isMakeup&&makeupInput.value){const mapped=weekdayFromDate(makeupInput.value);if(mapped)weekdaySelect.value=String(mapped);}
+    if(!isMakeup&&!weekdaySelect.value){const eventDay=weekdayFromDate(m.querySelector("[name='event_date']").value);if(eventDay&&eventDay<=5)weekdaySelect.value=String(eventDay);}
+  };cat.onchange=sync;makeupInput.onchange=sync;m.querySelector("[name='event_date']").onchange=sync;sync();}
+  m.querySelector("#academic-calendar-override-form").onsubmit=async e=>{
+    e.preventDefault();
+    const fd=new FormData(e.currentTarget),category=fd.get("category"),makeup=fd.get("make_up_for")||null;
+    if(!isHoliday&&category==="makeup"&&!makeup)return toast("กรุณาระบุวันชดเชย","เปิดเรียนชดเชยต้องระบุว่าแทนวันที่ใด","error");
+    const timetableWeekday=isHoliday?null:(category==="makeup"?weekdayFromDate(makeup):Number(fd.get("timetable_weekday")||0));
+    if(!isHoliday&&(!timetableWeekday||timetableWeekday<1||timetableWeekday>7))return toast("กรุณาเลือกตารางเรียนต้นแบบ","เลือกวันที่ต้องการใช้ตารางเรียนวันจันทร์–อาทิตย์ให้ถูกต้อง","error");
+    const payload={calendar_id:calendar.id,event_date:fd.get("event_date"),override_type:isHoliday?"holiday":"special_school_day",category,title:String(fd.get("title")||"").trim(),make_up_for:isHoliday?null:(category==="makeup"?makeup:null),timetable_weekday:timetableWeekday,note:String(fd.get("note")||"").trim()||null,updated_at:new Date().toISOString(),updated_by:state.user.id};
+    const btn=e.submitter;buttonLoading(btn,true,"กำลังบันทึก...");
+    let res;if(existing)res=await supabase.from("academic_calendar_day_overrides").update(payload).eq("id",existing.id);else res=await supabase.from("academic_calendar_day_overrides").insert({...payload,created_by:state.user.id});
+    buttonLoading(btn,false);if(res.error)return toast("บันทึกไม่สำเร็จ",res.error.message,"error");
+    close();toast("บันทึกแล้ว","วันเปิดเรียนกรณีพิเศษจะเชื่อมระบบวันลาและจัดสอนแทนเมื่อปฏิทินประกาศใช้แล้ว","success");await renderDashboard();
+  };
 }
+
 function academicCalendarActivityModal(existing=null){const calendar=academicCalendarCurrent();if(!calendar||!academicCalendarCanManageUi())return;const m=document.createElement("div");m.className="modal-backdrop";m.innerHTML=`<div class="modal"><div class="modal-head"><div><h3>${existing?"แก้ไข":"เพิ่ม"}กิจกรรม</h3><p>กิจกรรมจะแสดงใต้ปฏิทิน แต่ไม่เปลี่ยนสถานะวันเรียน/วันหยุดโดยอัตโนมัติ</p></div><button class="modal-close">×</button></div><form id="academic-calendar-activity-form" class="form-grid"><div class="field"><label>วันที่</label><input class="input" name="event_date" type="date" required value="${escapeHtml(existing?.event_date||"")}"></div><div class="field"><label>ชื่อกิจกรรม</label><input class="input" name="title" required maxlength="180" value="${escapeHtml(existing?.title||"")}"></div><div class="field"><label>หมายเหตุ</label><textarea class="input textarea" name="note">${escapeHtml(existing?.note||"")}</textarea></div><div class="modal-actions"><button class="btn btn-ghost modal-cancel" type="button">ยกเลิก</button><button class="btn btn-primary" type="submit">บันทึก</button></div></form></div>`;document.body.appendChild(m);const close=()=>m.remove();m.querySelector(".modal-close").onclick=close;m.querySelector(".modal-cancel").onclick=close;m.querySelector("#academic-calendar-activity-form").onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),payload={calendar_id:calendar.id,event_date:fd.get("event_date"),title:String(fd.get("title")||"").trim(),note:String(fd.get("note")||"").trim()||null,updated_at:new Date().toISOString(),updated_by:state.user.id};const btn=e.submitter;buttonLoading(btn,true,"กำลังบันทึก...");let res;if(existing)res=await supabase.from("academic_calendar_activities").update(payload).eq("id",existing.id);else res=await supabase.from("academic_calendar_activities").insert({...payload,created_by:state.user.id});buttonLoading(btn,false);if(res.error)return toast("บันทึกกิจกรรมไม่สำเร็จ",res.error.message,"error");close();await renderDashboard();};}
 async function academicCalendarDeleteItem(id,type){if(!academicCalendarCanManageUi()||!confirm("ลบรายการนี้หรือไม่? ปฏิทินจะคำนวณใหม่ทันที"))return;const table=type==="activity"?"academic_calendar_activities":"academic_calendar_day_overrides",{error}=await supabase.from(table).delete().eq("id",id);if(error)return toast("ลบไม่สำเร็จ",error.message,"error");toast("ลบรายการแล้ว","ปฏิทินถูกคำนวณใหม่","success");await renderDashboard();}
 async function academicCalendarSaveDraft(){

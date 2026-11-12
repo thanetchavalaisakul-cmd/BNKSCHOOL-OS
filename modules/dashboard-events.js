@@ -8,10 +8,12 @@ function bindDashboardEvents() {
     if (el.dataset.view === "module:official_attendance") return;
     el.addEventListener("click", () => {
       const nextView = el.dataset.view;
-      if (nextView === "module:academic_calendar" && state.currentView !== "module:academic_calendar") {
-        state.academicCalendarAcademicYear=currentAcademicPeriod().academicYear;
-        state.academicCalendarSemester=currentAcademicPeriod().semester;
-        state.academicCalendarSection="hundred";
+      if (nextView === "module:academic_calendar") {
+        if (state.currentView !== "module:academic_calendar") {
+          state.academicCalendarAcademicYear=currentAcademicPeriod().academicYear;
+          state.academicCalendarSemester=currentAcademicPeriod().semester;
+        }
+        state.academicCalendarSection=el.dataset.academicCalendarSpecialOpen==="true"?"special":"hundred";
       }
       if (nextView === "module:academic_registration" && state.currentView !== "module:academic_registration") {
         state.academicRegistrationSection="home";
