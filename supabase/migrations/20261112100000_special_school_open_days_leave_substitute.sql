@@ -525,21 +525,24 @@ DECLARE
   v_old_semester integer;
   v_new_year text;
   v_new_semester integer;
+  v_has_active_leave boolean:=false;
 BEGIN
-  IF TG_OP <> 'INSERT' AND OLD.override_type='special_school_day' THEN
+  IF TG_OP IN ('UPDATE','DELETE') AND OLD.override_type='special_school_day' THEN
     SELECT c.academic_year,c.semester
     INTO v_old_year,v_old_semester
     FROM public.academic_calendars c
     WHERE c.id=OLD.calendar_id;
 
-    IF EXISTS(
+    SELECT EXISTS(
       SELECT 1
       FROM public.leave_requests lr
       WHERE lr.academic_year::text=v_old_year
         AND lr.semester=v_old_semester
         AND OLD.event_date BETWEEN lr.start_date AND lr.end_date
         AND lr.status IN ('pending_personnel','pending_director','approved')
-    ) AND (
+    ) INTO v_has_active_leave;
+
+    IF v_has_active_leave AND (
       TG_OP='DELETE'
       OR NEW.override_type IS DISTINCT FROM 'special_school_day'
       OR NEW.calendar_id IS DISTINCT FROM OLD.calendar_id
@@ -550,7 +553,7 @@ BEGIN
     END IF;
   END IF;
 
-  IF TG_OP <> 'DELETE' AND NEW.override_type='special_school_day' THEN
+  IF TG_OP IN ('INSERT','UPDATE') AND NEW.override_type='special_school_day' THEN
     SELECT c.academic_year,c.semester
     INTO v_new_year,v_new_semester
     FROM public.academic_calendars c
@@ -642,14 +645,18 @@ DECLARE
   v_new_calendar_id uuid;
   v_new_date date;
 BEGIN
-  IF TG_OP<>'INSERT' AND OLD.override_type='special_school_day' THEN
-    v_old_calendar_id:=OLD.calendar_id;
-    v_old_date:=OLD.event_date;
+  IF TG_OP IN ('UPDATE','DELETE') THEN
+    IF OLD.override_type='special_school_day' THEN
+      v_old_calendar_id:=OLD.calendar_id;
+      v_old_date:=OLD.event_date;
+    END IF;
   END IF;
 
-  IF TG_OP<>'DELETE' AND NEW.override_type='special_school_day' THEN
-    v_new_calendar_id:=NEW.calendar_id;
-    v_new_date:=NEW.event_date;
+  IF TG_OP IN ('INSERT','UPDATE') THEN
+    IF NEW.override_type='special_school_day' THEN
+      v_new_calendar_id:=NEW.calendar_id;
+      v_new_date:=NEW.event_date;
+    END IF;
   END IF;
 
   IF v_old_calendar_id IS NOT NULL THEN
