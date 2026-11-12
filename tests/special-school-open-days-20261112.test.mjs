@@ -66,7 +66,7 @@ test("database keeps manual dates distinct while deriving effective special scho
 
 test("substitute lessons, candidate conflicts and whole-day previews use the mapped timetable weekday", () => {
   assert.ok(migration.includes("te.weekday=gs.timetable_weekday"));
-  assert.ok(migration.includes("private.school_timetable_weekday(p_leave_date,lr.academic_year,lr.semester)"));
+  assert.match(migration,/private\.school_timetable_weekday\(\s*p_leave_date,lr\.academic_year,lr\.semester\s*\)/);
   assert.ok(migration.includes("Could not patch get_substitute_candidates weekday mapping"));
   assert.ok(migration.includes("Could not patch assign_substitute_teacher weekday mapping"));
   assert.ok(migration.includes("Could not patch get_substitute_day_candidates weekday mapping"));
