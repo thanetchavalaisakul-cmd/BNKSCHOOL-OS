@@ -2977,18 +2977,45 @@ async function loadPersonnelWorkspace() {
   state.publicPersonnelDirectory = publicRes.error ? [] : (publicRes.data || []).filter(p => p.role !== "pa_evaluator");
   state.personnelOwnRecord = state.personnelRecords.find(r => r.user_id === state.user.id) || state.personnelOwnRecord || null;
 
+  // Avoid signing one photo at a time (and twice for duplicate roster entries).
+  // Missing or slow Storage images must never prevent the personnel module from opening.
   const photoUrls = {};
-  await Promise.all(state.personnelRecords.filter(r => r.photo_path).map(async r => {
-    const { data, error } = await supabase.storage.from(r.photo_bucket || "personnel-photos").createSignedUrl(r.photo_path, 600);
-    if (!error && data?.signedUrl) photoUrls[r.user_id] = data.signedUrl;
-  }));
-  state.personnelPhotoUrls = photoUrls;
-
   const publicPhotoUrls = {};
-  await Promise.all(state.publicPersonnelDirectory.filter(r => r.photo_path).map(async r => {
-    const { data, error } = await supabase.storage.from(r.photo_bucket || "personnel-photos").createSignedUrl(r.photo_path, 600);
-    if (!error && data?.signedUrl) publicPhotoUrls[r.user_id] = data.signedUrl;
-  }));
+  const photoGroups = new Map();
+  for (const [records, output] of [[state.personnelRecords, photoUrls], [state.publicPersonnelDirectory, publicPhotoUrls]]) {
+    for (const record of records) {
+      if (!record.photo_path) continue;
+      const bucket = record.photo_bucket || "personnel-photos";
+      if (!photoGroups.has(bucket)) photoGroups.set(bucket, new Map());
+      const paths = photoGroups.get(bucket);
+      if (!paths.has(record.photo_path)) paths.set(record.photo_path, []);
+      paths.get(record.photo_path).push({ userId: record.user_id, output });
+    }
+  }
+  const photoJobs = [];
+  for (const [bucket, paths] of photoGroups) {
+    const allPaths = [...paths.keys()];
+    for (let offset = 0; offset < allPaths.length; offset += 50) {
+      const batch = allPaths.slice(offset, offset + 50);
+      photoJobs.push((async () => {
+        try {
+          const { data, error } = await supabase.storage.from(bucket).createSignedUrls(batch, 600);
+          if (error) { console.warn("Personnel photo batch unavailable", error); return; }
+          for (const item of data || []) {
+            if (!item?.path || !item.signedUrl) continue;
+            for (const entry of paths.get(item.path) || []) entry.output[entry.userId] = item.signedUrl;
+          }
+        } catch (error) {
+          console.warn("Personnel photo batch failed", error);
+        }
+      })());
+    }
+  }
+  await Promise.race([
+    Promise.allSettled(photoJobs),
+    new Promise(resolve => setTimeout(resolve, 5000)),
+  ]);
+  state.personnelPhotoUrls = photoUrls;
   state.publicPersonnelPhotoUrls = publicPhotoUrls;
 
   if (!state.personnelView) state.personnelView = reviewer ? "admin" : "own";
