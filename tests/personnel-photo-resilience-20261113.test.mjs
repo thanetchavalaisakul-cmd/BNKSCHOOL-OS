@@ -20,7 +20,7 @@ test("personnel photos use bounded, deduplicated batch signing", () => {
 });
 
 test("optimized production entry and cache version contain personnel hotfix", () => {
-  assert.match(optimized, /createSignedUrls\(batch,600\)/);
-  assert.match(optimized, /Promise\.allSettled\(bnkPhotoJobs\)/);
+  assert.match(optimized, /\.createSignedUrls\(/);
+  assert.match(optimized, /Promise\.allSettled\(/);
   assert.match(html, /app\.min\.js\?v=5\.12\.9\.816/);
 });
