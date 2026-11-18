@@ -1,5 +1,6 @@
 -- BNK School OS: student suspension is a non-terminal attendance follow-up marker.
 -- It MUST NOT change student/enrollment lifecycle or remove names from registers.
+-- History FKs SET NULL on legitimate hard deletes; do not block existing disposal workflows.
 ALTER TABLE public.student_enrollments
   ADD COLUMN IF NOT EXISTS is_suspended boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS suspension_note text,
@@ -17,8 +18,9 @@ ALTER TABLE public.student_enrollments
 
 CREATE TABLE IF NOT EXISTS public.student_suspension_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  enrollment_id uuid NOT NULL REFERENCES public.student_enrollments(id) ON DELETE RESTRICT,
-  student_id uuid NOT NULL REFERENCES public.students(id) ON DELETE RESTRICT,
+  enrollment_id uuid REFERENCES public.student_enrollments(id) ON DELETE SET NULL,
+  student_id uuid REFERENCES public.students(id) ON DELETE SET NULL,
+  student_code_snapshot text NOT NULL,
   previous_suspended boolean NOT NULL,
   is_suspended boolean NOT NULL,
   suspension_note text,
@@ -31,7 +33,7 @@ ALTER TABLE public.student_suspension_events ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS student_suspension_events_read_scope ON public.student_suspension_events;
 CREATE POLICY student_suspension_events_read_scope ON public.student_suspension_events
   FOR SELECT TO authenticated
-  USING (private.can_view_student(student_id));
+  USING (private.can_view_student(student_id) OR private.can_manage_student_master());
 REVOKE ALL ON public.student_suspension_events FROM PUBLIC,anon,authenticated;
 GRANT SELECT ON public.student_suspension_events TO authenticated;
 
@@ -41,9 +43,11 @@ AS $function$
 BEGIN
   IF OLD.is_suspended IS DISTINCT FROM NEW.is_suspended THEN
     INSERT INTO public.student_suspension_events
-      (enrollment_id,student_id,previous_suspended,is_suspended,suspension_note,changed_by)
-    VALUES (NEW.id,NEW.student_id,OLD.is_suspended,NEW.is_suspended,
-            NEW.suspension_note,coalesce(NEW.suspension_updated_by,auth.uid()));
+      (enrollment_id,student_id,student_code_snapshot,previous_suspended,is_suspended,suspension_note,changed_by)
+    VALUES (NEW.id,NEW.student_id,
+            (SELECT st.student_code FROM public.students st WHERE st.id=NEW.student_id),
+            OLD.is_suspended,NEW.is_suspended,NEW.suspension_note,
+            coalesce(NEW.suspension_updated_by,auth.uid()));
   END IF;
   RETURN NEW;
 END;
