@@ -173,7 +173,7 @@ def patch_cache_key():
     source=path.read_text(encoding="utf-8")
     old='app.min.js?v=5.12.9.815'
     if old in source:
-        source=source.replace(old,'app.min.js?v=5.12.9.815-suspension-20261118',1)
+        source=source.replace(old,'app.min.js?v=5.12.9.816',1)
         path.write_text(source,encoding="utf-8")
 
 
