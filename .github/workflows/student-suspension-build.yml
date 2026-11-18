@@ -4,7 +4,7 @@ on:
     branches: [feature/student-suspension-followup-20261118]
     paths:
       - 'changes/patch_student_suspension_20261118.py'
-      - 'supabase/migrations/20261118111500_student_suspension_followup_marker.sql'
+      - 'supabase/migrations/20261118044257_student_suspension_followup_marker_20261118.sql'
       - 'tests/student-suspension-20261118.test.mjs'
       - '.github/workflows/student-suspension-build.yml'
       - 'app.js'
