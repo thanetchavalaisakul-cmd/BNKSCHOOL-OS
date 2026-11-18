@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 const read=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
-const migration=read("supabase/migrations/20261118111500_student_suspension_followup_marker.sql");
+const migration=read("supabase/migrations/20261118044257_student_suspension_followup_marker_20261118.sql");
 const app=read("app.js");
 const roster=read("modules/general-student-roster.js");
 
