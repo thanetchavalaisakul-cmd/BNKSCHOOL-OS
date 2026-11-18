@@ -25,6 +25,7 @@ export function createGeneralStudentRosterFeature(ctx){
     const q=String(state.generalStudentRosterSearch||"").trim().toLowerCase();
     return (state.generalStudentRosterRows||[]).filter(r=>{
       if(state.generalStudentRosterClassId&&r.class_id!==state.generalStudentRosterClassId)return false;
+      if(state.generalStudentRosterSuspensionOnly&&!r.is_suspended)return false;
       if(!q)return true;
       return [r.student_code,name(r),r.class_label,r.exit_note].some(v=>String(v||"").toLowerCase().includes(q));
     });
@@ -39,7 +40,11 @@ export function createGeneralStudentRosterFeature(ctx){
     ]);
     for(const r of results)if(r.error)throw r.error;
     state.generalStudentRosterClasses=results[0].data||[];
-    state.generalStudentRosterRows=results[1].data||[];
+    const flagged=await supabase.from("student_enrollments")
+      .select("id,is_suspended").eq("academic_year",p.year).eq("semester",p.semester).eq("is_suspended",true);
+    if(flagged.error)throw flagged.error;
+    const suspendedIds=new Set((flagged.data||[]).map(e=>e.id));
+    state.generalStudentRosterRows=(results[1].data||[]).map(r=>({...r,is_suspended:suspendedIds.has(r.enrollment_id)}));
     state.generalStudentRosterTransfers=results[2].data||[];
     state.generalStudentRosterError="";
     if(state.generalStudentRosterTab==="history"){
@@ -70,12 +75,12 @@ export function createGeneralStudentRosterFeature(ctx){
   }
   function filters(){
     const p=period(),years=[...new Set((state.generalStudentRosterClasses||[]).map(c=>String(c.academic_year)))].sort((a,b)=>Number(b)-Number(a)),classes=classOptions();
-    return '<section class="gsr-filter"><div class="gsr-filter-grid"><label>ปีการศึกษา<select class="select" id="gsr-year">'+years.map(y=>'<option value="'+esc(y)+'" '+(y===p.year?"selected":"")+'>'+esc(y)+'</option>').join("")+'</select></label><label>ภาคเรียน<select class="select" id="gsr-semester"><option value="1" '+(p.semester===1?"selected":"")+'>ภาคเรียนที่ 1</option><option value="2" '+(p.semester===2?"selected":"")+'>ภาคเรียนที่ 2</option></select></label><label>ห้องเรียน<select class="select" id="gsr-class"><option value="">ทุกห้อง</option>'+classes.map(c=>'<option value="'+c.id+'" '+(state.generalStudentRosterClassId===c.id?"selected":"")+'>'+esc(c.level_name+"/"+c.room_name)+'</option>').join("")+'</select></label></div><div class="gsr-filter-actions"><input class="input" id="gsr-search" value="'+esc(state.generalStudentRosterSearch||"")+'" placeholder="ค้นหาชื่อ / เลขประจำตัว / ห้องเรียน"><button class="btn btn-secondary" id="gsr-refresh">↻ รีเฟรช</button></div></section>';
+    return '<section class="gsr-filter"><div class="gsr-filter-grid"><label>ปีการศึกษา<select class="select" id="gsr-year">'+years.map(y=>'<option value="'+esc(y)+'" '+(y===p.year?"selected":"")+'>'+esc(y)+'</option>').join("")+'</select></label><label>ภาคเรียน<select class="select" id="gsr-semester"><option value="1" '+(p.semester===1?"selected":"")+'>ภาคเรียนที่ 1</option><option value="2" '+(p.semester===2?"selected":"")+'>ภาคเรียนที่ 2</option></select></label><label>ห้องเรียน<select class="select" id="gsr-class"><option value="">ทุกห้อง</option>'+classes.map(c=>'<option value="'+c.id+'" '+(state.generalStudentRosterClassId===c.id?"selected":"")+'>'+esc(c.level_name+"/"+c.room_name)+'</option>').join("")+'</select></label></div><div class="gsr-filter-actions"><input class="input" id="gsr-search" value="'+esc(state.generalStudentRosterSearch||"")+'" placeholder="ค้นหาชื่อ / เลขประจำตัว / ห้องเรียน"><label style="white-space:nowrap"><input type="checkbox" id="gsr-suspended-only" '+(state.generalStudentRosterSuspensionOnly?'checked':'')+'> เฉพาะแขวนลอย</label><button class="btn btn-secondary" id="gsr-refresh">↻ รีเฟรช</button></div></section>';
   }
   function rosterView(){
     const rows=filteredRows(),p=period();
     const actions='<div class="gsr-toolbar">'+(canAddStudents()?'<button class="btn btn-primary" id="gsr-add-student">＋ เพิ่มนักเรียน / รับย้ายเข้า</button>':"")+(canExport()?'<button class="btn btn-secondary" id="gsr-export-pdf">PDF</button><button class="btn btn-secondary" id="gsr-export-xlsx">Excel</button>':"")+'</div>';
-    return '<section class="gsr-card"><div class="gsr-card-head"><div><h3>บัญชีรายชื่อนักเรียน</h3><p>แสดงเฉพาะข้อมูลที่จำเป็นต่อการจัดการรายชื่อ ไม่แสดงเลขประชาชนและข้อมูลผู้ปกครอง</p></div>'+actions+'</div><div class="gsr-table-wrap"><table class="gsr-table"><thead><tr><th>เลขที่</th><th>เลขประจำตัว</th><th>ชื่อ–นามสกุล</th><th>ชั้น/ห้อง</th><th>สถานะ</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+(r.student_number||"—")+'</td><td><strong>'+esc(r.student_code)+'</strong></td><td>'+esc(name(r))+'</td><td>'+esc(r.class_label)+'</td><td><span class="gsr-status '+esc(r.enrollment_status)+'">'+esc(statusLabel(r.enrollment_status))+'</span></td></tr>').join("")+'</tbody></table>'+(rows.length?"":'<div class="gsr-empty">ไม่พบรายชื่อนักเรียนตามเงื่อนไขที่เลือก</div>')+'</div><div class="gsr-table-foot">พบ '+rows.length+' รายชื่อ · ปีการศึกษา '+esc(p.year)+' ภาคเรียนที่ '+p.semester+'</div></section>';
+    return '<section class="gsr-card"><div class="gsr-card-head"><div><h3>บัญชีรายชื่อนักเรียน</h3><p>แสดงเฉพาะข้อมูลที่จำเป็นต่อการจัดการรายชื่อ ไม่แสดงเลขประชาชนและข้อมูลผู้ปกครอง</p></div>'+actions+'</div><div class="gsr-table-wrap"><table class="gsr-table"><thead><tr><th>เลขที่</th><th>เลขประจำตัว</th><th>ชื่อ–นามสกุล</th><th>ชั้น/ห้อง</th><th>สถานะ</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+(r.student_number||"—")+'</td><td><strong>'+esc(r.student_code)+'</strong></td><td>'+esc(name(r))+'</td><td>'+esc(r.class_label)+'</td><td><span class="gsr-status '+esc(r.enrollment_status)+'">'+esc(statusLabel(r.enrollment_status))+(r.is_suspended?' · แขวนลอย':'')+'</span></td></tr>').join("")+'</tbody></table>'+(rows.length?"":'<div class="gsr-empty">ไม่พบรายชื่อนักเรียนตามเงื่อนไขที่เลือก</div>')+'</div><div class="gsr-table-foot">พบ '+rows.length+' รายชื่อ · ปีการศึกษา '+esc(p.year)+' ภาคเรียนที่ '+p.semester+'</div></section>';
   }
   function transfersView(){
     const rows=state.generalStudentRosterTransfers||[];
@@ -172,7 +177,7 @@ export function createGeneralStudentRosterFeature(ctx){
     return filteredRows().map(r=>({"เลขที่":r.student_number||"","เลขประจำตัวนักเรียน":r.student_code||"",
       "ชื่อ-นามสกุล":name(r),"เพศ":r.gender||"","ชั้น/ห้อง":r.class_label||"",
       "ปีการศึกษา":period().year,"ภาคเรียน":period().semester,
-      "สถานะ":statusLabel(r.enrollment_status),"เหตุผลการออก":r.exit_note||""}));
+      "สถานะ":statusLabel(r.enrollment_status),"สถานะติดตาม":r.is_suspended?"แขวนลอย":"","เหตุผลการออก":r.exit_note||""}));
   }
   async function exportXlsx(){
     if(!canExport())return;
@@ -182,7 +187,7 @@ export function createGeneralStudentRosterFeature(ctx){
   async function exportPdf(){
     if(!canExport())return;
     const rows=filteredRows();if(!rows.length)return toast("ไม่มีข้อมูล","ไม่มีรายชื่อสำหรับส่งออก","error");
-    const table='<table class="student-pdf-table"><thead><tr><th style="width:13mm">เลขที่</th><th style="width:28mm">เลขประจำตัว</th><th>ชื่อ–นามสกุล</th><th style="width:25mm">ชั้น/ห้อง</th><th style="width:27mm">สถานะ</th></tr></thead><tbody>'+rows.map(r=>'<tr><td class="center">'+(r.student_number||"—")+'</td><td>'+esc(r.student_code)+'</td><td>'+esc(name(r))+'</td><td class="center">'+esc(r.class_label)+'</td><td class="center">'+esc(statusLabel(r.enrollment_status))+'</td></tr>').join("")+'</tbody></table>';
+    const table='<table class="student-pdf-table"><thead><tr><th style="width:13mm">เลขที่</th><th style="width:28mm">เลขประจำตัว</th><th>ชื่อ–นามสกุล</th><th style="width:25mm">ชั้น/ห้อง</th><th style="width:27mm">สถานะ</th></tr></thead><tbody>'+rows.map(r=>'<tr><td class="center">'+(r.student_number||"—")+'</td><td>'+esc(r.student_code)+'</td><td>'+esc(name(r))+'</td><td class="center">'+esc(r.class_label)+'</td><td class="center">'+esc(statusLabel(r.enrollment_status)+(r.is_suspended?' · แขวนลอย':''))+'</td></tr>').join("")+'</tbody></table>';
     const p=period();await studentPdfBase("บัญชีรายชื่อนักเรียน","ฝ่ายบริหารงานทั่วไป · ปีการศึกษา "+p.year+" ภาคเรียนที่ "+p.semester,table,{landscape:false});
   }
   async function bind(){
@@ -195,6 +200,7 @@ export function createGeneralStudentRosterFeature(ctx){
     document.querySelector("#gsr-semester")?.addEventListener("change",async e=>{state.generalStudentRosterSemester=Number(e.currentTarget.value);state.generalStudentRosterClassId="";try{await load();await renderDashboard();}catch(err){toast("โหลดข้อมูลไม่สำเร็จ",err.message||String(err),"error");}});
     document.querySelector("#gsr-class")?.addEventListener("change",e=>{state.generalStudentRosterClassId=e.currentTarget.value||"";state.generalStudentRosterSkipNextLoad=true;renderDashboard();});
     document.querySelector("#gsr-status")?.addEventListener("change",e=>{state.generalStudentRosterStatus=e.currentTarget.value;state.generalStudentRosterSkipNextLoad=true;renderDashboard();});
+    document.querySelector("#gsr-suspended-only")?.addEventListener("change",e=>{state.generalStudentRosterSuspensionOnly=e.target.checked;state.generalStudentRosterSkipNextLoad=true;renderDashboard();});
     document.querySelector("#gsr-search")?.addEventListener("input",e=>{state.generalStudentRosterSearch=e.currentTarget.value;state.generalStudentRosterSkipNextLoad=true;const pos=e.currentTarget.selectionStart;renderDashboard().then(()=>{const input=document.querySelector("#gsr-search");if(input){input.focus();input.setSelectionRange(pos,pos);}});});
     document.querySelector("#gsr-refresh")?.addEventListener("click",async()=>{try{await load();await renderDashboard();}catch(err){toast("รีเฟรชไม่สำเร็จ",err.message||String(err),"error");}});
     document.querySelector("#gsr-add-student")?.addEventListener("click",()=>addStudentModal());
