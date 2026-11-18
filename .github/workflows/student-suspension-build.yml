@@ -1,0 +1,49 @@
+name: BNK student suspension feature build
+on:
+  push:
+    branches: [feature/student-suspension-followup-20261118]
+    paths:
+      - 'changes/patch_student_suspension_20261118.py'
+      - 'supabase/migrations/20261118111500_student_suspension_followup_marker.sql'
+      - 'tests/student-suspension-20261118.test.mjs'
+      - '.github/workflows/student-suspension-build.yml'
+      - 'app.js'
+      - 'modules/general-student-roster.js'
+      - 'index.html'
+permissions:
+  contents: write
+concurrency:
+  group: bnk-student-suspension-feature
+  cancel-in-progress: false
+jobs:
+  validate-and-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/student-suspension-followup-20261118
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Patch registry and academic follow-up source
+        run: python3 changes/patch_student_suspension_20261118.py
+      - name: Install pinned dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify syntax, bundle and regression tests
+        run: |
+          node --check app.js
+          node --check modules/general-student-roster.js
+          npm run verify
+          git diff --check
+      - name: Commit tested source and optimized bundle to feature branch
+        run: |
+          git add app.js app.min.js index.html modules/general-student-roster.js
+          if ! git diff --cached --quiet; then
+            git config user.name "BNK School OS Build"
+            git config user.email "bnk-school-os-build@users.noreply.github.com"
+            git commit -m "build: verified student suspension UI and bundle"
+            git push origin HEAD:feature/student-suspension-followup-20261118
+          fi
