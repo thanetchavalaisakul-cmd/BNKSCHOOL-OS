@@ -143,10 +143,10 @@ def patch_roster():
         '''if(state.generalStudentRosterClassId&&r.class_id!==state.generalStudentRosterClassId)return false;
       if(state.generalStudentRosterSuspensionOnly&&!r.is_suspended)return false;''',
         "general roster filter")
-    source=replace_once(source,
+    source=source.replace(
         '<button class="btn btn-secondary" id="gsr-refresh">↻ รีเฟรช</button>',
-        '<label style="white-space:nowrap"><input type="checkbox" id="gsr-suspended-only" '+"'+(state.generalStudentRosterSuspensionOnly?'checked':'')+'"+'\'> เฉพาะแขวนลอย</label><button class="btn btn-secondary" id="gsr-refresh">↻ รีเฟรช</button>',
-        "general roster checkbox")
+        '''<label style="white-space:nowrap"><input type="checkbox" id="gsr-suspended-only" '+(state.generalStudentRosterSuspensionOnly?'checked':'')+'> เฉพาะแขวนลอย</label><button class="btn btn-secondary" id="gsr-refresh">↻ รีเฟรช</button>''',
+        1)
     source=replace_once(source,
         '+esc(statusLabel(r.enrollment_status))+\'</span></td></tr>\'',
         '+esc(statusLabel(r.enrollment_status))+(r.is_suspended?\' · แขวนลอย\':\'\')+\'</span></td></tr>\'',
