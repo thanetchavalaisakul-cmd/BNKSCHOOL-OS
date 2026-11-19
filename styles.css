@@ -6352,3 +6352,20 @@ body.procurement-master-open{overflow:hidden!important}
   .leave-daily-session-row{grid-template-columns:minmax(0,1fr);gap:7px;}
   .leave-daily-session-row .select{min-height:42px;}
 }
+
+
+/* BNK 2026-11-19: Garuda for student follow-up letters is anchored to the
+   physical A4 page. The content below is auto-scaled and must not move it. */
+.student-followup-pdf-page.academic-transfer-official-document > img.student-followup-garuda-centered{
+  position:absolute!important;
+  left:50%!important;
+  top:16mm!important;
+  transform:translateX(-50%)!important;
+  width:27mm;
+  height:31mm;
+  margin:0!important;
+  display:block!important;
+  object-fit:contain!important;
+  pointer-events:none;
+  z-index:2;
+}
