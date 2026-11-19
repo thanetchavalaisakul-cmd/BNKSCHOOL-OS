@@ -90,7 +90,7 @@ async function loadTimetableDialogsFeature(){
 
 let bnkStudentDialogsFeaturePromise=null;
 async function loadStudentDialogsFeature(){
- bnkStudentDialogsFeaturePromise??=import("./modules/student-dialogs.js?v=5.12.9.58").then(mod=>mod.createStudentDialogsFeature({academicRegThaiDigits,buttonLoading,canManageStudentMasterUi,escapeHtml,loadStudentFollowupWorkspace,renderDashboard,state,studentCardCertifierSignatureDataUrl,studentFollowupCasesFor,studentFollowupMonthInput,studentFollowupStudentRows,studentFollowupToday,supabase,toast})).catch(error=>{bnkStudentDialogsFeaturePromise=null;throw error;});
+ bnkStudentDialogsFeaturePromise??=import("./modules/student-dialogs.js?v=5.12.9.59").then(mod=>mod.createStudentDialogsFeature({academicRegThaiDigits,buttonLoading,canManageStudentMasterUi,escapeHtml,loadStudentFollowupWorkspace,renderDashboard,state,studentCardCertifierSignatureDataUrl,studentFollowupCasesFor,studentFollowupMonthInput,studentFollowupStudentRows,studentFollowupToday,supabase,toast})).catch(error=>{bnkStudentDialogsFeaturePromise=null;throw error;});
  return bnkStudentDialogsFeaturePromise;
 }
 
@@ -584,6 +584,8 @@ const state = {
   studentFollowupAcademicYear: null,
   studentFollowupSemester: null,
   studentFollowupSearch: "",
+  studentFollowupView: "suspended",
+  studentFollowupCitizenIds: new Map(),
   selectedStudentFollowupBatchId: null,
   procurementCases: [],
   procurementAcademicYear: null,
@@ -8663,10 +8665,156 @@ function studentClassListSuspensionSuffix(row){
     e.class_id===selected?.id && e.enrollment_status==="active");
   return matching?.is_suspended?" (แขวนลอย)":"";
 }
-function studentSuspensionFollowupPanel(){
-  const pending=(state.studentFollowupStudents||[]).filter(s=>state.studentFollowupSuspendedIds?.has(s.student_id));
-  return `<section class="panel" style="border-left:4px solid #d97706"><div class="panel-head"><div class="panel-title-wrap"><h3>บัญชีนักเรียนแขวนลอย (${pending.length} คน)</h3><p>เชื่อมสถานะจากทะเบียนนักเรียน · ยังมีชื่อและเลขที่ตามเดิม · การออกหนังสือต้องตรวจสอบระยะเวลาขาดเรียนและเงื่อนไขที่กำหนดแยกต่างหาก</p></div></div>${pending.length?`<div class="table-wrap"><table class="table"><thead><tr><th>นักเรียน</th><th>ชั้น / ห้อง</th><th>สถานะ</th></tr></thead><tbody>${pending.map(x=>`<tr><td><strong>${escapeHtml(x.student_name)}</strong> <small class="table-muted">${escapeHtml(x.student_code||'')}</small></td><td>${escapeHtml(x.class_label||'—')}</td><td>${studentSuspensionBadge(true)}</td></tr>`).join('')}</tbody></table></div>`:'<p style="padding:0 20px 18px">ไม่มีนักเรียนแขวนลอยในช่วงที่เลือก</p>'}</section>`;
+function studentFollowupSuspendedRows(){
+  return (state.studentFollowupStudents||[]).filter(s=>state.studentFollowupSuspendedIds?.has(s.student_id));
 }
+
+function studentFollowupSuspendedExportRows(){
+  return studentFollowupSuspendedRows().map((s,i)=>[
+    String(i+1),
+    String(state.studentFollowupCitizenIds?.get(s.student_id)||""),
+    String(s.student_code||""),
+    String(s.student_name||""),
+    String(s.class_label||""),
+    "แขวนลอย"
+  ]);
+}
+
+function studentFollowupNavigationHtml(view){
+  return `<nav class="student-followup-view-tabs" aria-label="เมนูนักเรียนแขวนลอย" style="display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 20px">
+    <button type="button" class="btn ${view==='suspended'?'btn-primary':'btn-secondary'}" data-student-followup-view="suspended" aria-pressed="${view==='suspended'}">☷ บัญชีรายชื่อนักเรียนแขวนลอย</button>
+    <button type="button" class="btn ${view==='letters'?'btn-primary':'btn-secondary'}" data-student-followup-view="letters" aria-pressed="${view==='letters'}">▤ จัดทำหนังสือติดตามนักเรียน</button>
+  </nav>`;
+}
+
+function studentSuspensionFollowupPanel(){
+  const rows=studentFollowupSuspendedRows();
+  const canExport=canManageStudentMasterUi();
+  return `<section class="panel" style="border-left:4px solid #d97706">
+    <div class="panel-head" style="gap:12px;flex-wrap:wrap">
+      <div class="panel-title-wrap">
+        <h3>บัญชีรายชื่อนักเรียนแขวนลอย (${academicRegThaiDigits(rows.length)} คน)</h3>
+        <p>ดึงจากสถานะแขวนลอยในทะเบียนนักเรียนโดยตรง · นักเรียนยังคงอยู่ในชั้นเรียนตามปกติ</p>
+      </div>
+      <div class="action-row">
+        ${canExport?`<button type="button" id="student-followup-export-pdf" class="btn btn-secondary">↓ ส่งออก PDF</button>
+          <button type="button" id="student-followup-export-xlsx" class="btn btn-primary">↓ ส่งออก Excel</button>`:'<small class="table-muted">ข้อมูลเลขบัตรประชาชนและการส่งออกสงวนสิทธิ์ฝ่ายทะเบียน/งานวิชาการ</small>'}
+      </div>
+    </div>
+    <div class="table-wrap"><table class="table student-followup-table">
+      <thead><tr><th style="width:48px">ที่</th><th>เลขบัตรประชาชน / เลข G</th><th>เลขประจำตัวนักเรียน</th><th>ชื่อ–นามสกุล</th><th>ชั้น / ห้อง</th><th>สถานะ</th></tr></thead>
+      <tbody>${rows.length?rows.map((s,i)=>`<tr>
+        <td>${academicRegThaiDigits(i+1)}</td>
+        <td>${canExport?escapeHtml(state.studentFollowupCitizenIds?.get(s.student_id)||"—"):"สงวนสิทธิ์"}</td>
+        <td>${escapeHtml(s.student_code||"—")}</td>
+        <td><strong>${escapeHtml(s.student_name||"—")}</strong></td>
+        <td>${escapeHtml(s.class_label||"—")}</td>
+        <td>${studentSuspensionBadge(true)}</td>
+      </tr>`).join(""):'<tr><td colspan="6"><div class="empty"><strong>ไม่พบนักเรียนแขวนลอยในปีและภาคเรียนที่เลือก</strong><span>สถานะแขวนลอยกำหนดจากทะเบียนนักเรียนโดยครูประจำชั้นหรือผู้ดูแลทะเบียน</span></div></td></tr>'}</tbody>
+    </table></div>
+    <p style="padding:10px 18px;color:#64748b;font-size:12px">ข้อมูล ณ ${escapeHtml(studentFollowupThaiDate(studentFollowupToday()))} · แสดงเฉพาะนักเรียนที่ผู้ใช้มีสิทธิ์เข้าถึง</p>
+  </section>`;
+}
+
+function studentFollowupRosterPageHtml(){
+  const count=studentFollowupSuspendedRows().length;
+  return `<section class="student-followup-page">
+    <section class="student-followup-hero">
+      <div><span class="eyebrow">กลุ่มงานบริหารวิชาการ · Student Follow-up</span><h2>บัญชีรายชื่อนักเรียนแขวนลอย</h2>
+        <p>ดูบัญชีรายชื่อ ส่งออก PDF และ Excel หรือไปยังหน้าจัดทำหนังสือติดตามได้โดยไม่ต้องค้นหารายชื่อซ้ำ</p></div>
+      <div class="student-followup-hero-side"><span>รายชื่อที่ต้องติดตาม</span><strong>${academicRegThaiDigits(count)} คน</strong><small>ปี ${escapeHtml(state.studentFollowupAcademicYear)} ภาคเรียน ${academicRegThaiDigits(state.studentFollowupSemester)}</small></div>
+    </section>
+    ${studentFollowupNavigationHtml('suspended')}
+    <div class="student-followup-toolbar" style="margin-bottom:15px">
+      <div class="field"><label for="student-followup-year">ปีการศึกษา</label><select class="select" id="student-followup-year">${studentFollowupCurrentYearOptions()}</select></div>
+      <div class="field"><label for="student-followup-semester">ภาคเรียน</label><select class="select" id="student-followup-semester">
+        <option value="1" ${Number(state.studentFollowupSemester)===1?'selected':''}>๑</option>
+        <option value="2" ${Number(state.studentFollowupSemester)===2?'selected':''}>๒</option>
+        <option value="3" ${Number(state.studentFollowupSemester)===3?'selected':''}>๓</option>
+      </select></div>
+    </div>
+    ${studentSuspensionFollowupPanel()}
+  </section>`;
+}
+
+async function studentFollowupExportSuspendedXlsx(){
+  if(!canManageStudentMasterUi())return toast("ไม่มีสิทธิ์ส่งออก","เฉพาะผู้ดูแลทะเบียนหรือหัวหน้าฝ่ายวิชาการ","error");
+  const rows=studentFollowupSuspendedExportRows();
+  if(!rows.length)return toast("ไม่มีรายชื่อแขวนลอย","ตรวจสอบปีการศึกษาและภาคเรียน","error");
+  try{
+    await ensureXlsx();
+    const headers=["ที่","เลขบัตรประชาชน / เลข G","เลขประจำตัวนักเรียน","ชื่อ–นามสกุล","ชั้น / ห้อง","สถานะ"];
+    const aoa=[["บัญชีรายชื่อนักเรียนแขวนลอย"],[schoolName()],
+      [`ปีการศึกษา ${state.studentFollowupAcademicYear} ภาคเรียนที่ ${state.studentFollowupSemester}`],
+      [`ข้อมูล ณ ${studentFollowupThaiDate(studentFollowupToday())} · จำนวนทั้งหมด ${rows.length} คน`],
+      [],headers,...rows];
+    const sheet=XLSX.utils.aoa_to_sheet(aoa);
+    sheet["!cols"]=[{wch:8},{wch:25},{wch:23},{wch:38},{wch:16},{wch:16}];
+    sheet["!autofilter"]={ref:`A6:F${6+rows.length}`};
+    sheet["!merges"]=[{s:{r:0,c:0},e:{r:0,c:5}},{s:{r:1,c:0},e:{r:1,c:5}},
+      {s:{r:2,c:0},e:{r:2,c:5}},{s:{r:3,c:0},e:{r:3,c:5}}];
+    for(let i=0;i<rows.length;i++){
+      for(const col of ["B","C"]){
+        const cell=sheet[`${col}${i+7}`];
+        if(cell){cell.t="s";cell.v=String(cell.v??"");cell.z="@";}
+      }
+    }
+    const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,sheet,"แขวนลอย");
+    const bytes=XLSX.write(book,{bookType:"xlsx",type:"array"});
+    downloadBlob(new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),
+      `บัญชีนักเรียนแขวนลอย_${state.studentFollowupAcademicYear}_ภาค${state.studentFollowupSemester}.xlsx`);
+  }catch(err){console.error(err);toast("ส่งออก Excel ไม่สำเร็จ",err.message||String(err),"error");}
+}
+
+async function studentFollowupBuildSuspendedPdf(){
+  if(!canManageStudentMasterUi())throw new Error("ไม่มีสิทธิ์ส่งออกบัญชีรายชื่อนักเรียน");
+  const rows=studentFollowupSuspendedExportRows();
+  if(!rows.length)throw new Error("ไม่พบนักเรียนแขวนลอยในช่วงที่เลือก");
+  await ensureOfficialPdfFont("16pt");
+  const logo=await schoolLogoDataUrl();
+  const pages=[];
+  for(let offset=0;offset<rows.length;offset+=24)pages.push(rows.slice(offset,offset+24));
+  const host=document.createElement("div");
+  host.style.cssText="position:fixed;left:-12000px;top:0;pointer-events:none;width:210mm;z-index:-1";
+  const cols=["8%","21%","15%","32%","13%","11%"];
+  const cellStyle="border:1px solid #777;padding:2.1mm 1.2mm;vertical-align:middle;font-size:12pt;line-height:1.15;overflow-wrap:anywhere";
+  host.innerHTML=pages.map((group,idx)=>`<article class="student-followup-roster-pdf-page" style="width:210mm;height:297mm;background:#fff;box-sizing:border-box;padding:13mm 11mm;font-family:'${OFFICIAL_PDF_FONT}',sans-serif;color:#111">
+    <header style="text-align:center;margin-bottom:6mm">
+      ${logo?`<img src="${logo}" alt="ตราโรงเรียน" style="height:17mm;max-width:24mm;object-fit:contain;display:block;margin:0 auto 1mm">`:""}
+      <div style="font-size:19pt;font-weight:700;line-height:1.1">${escapeHtml(schoolName())}</div>
+      <div style="font-size:17pt;font-weight:700">บัญชีรายชื่อนักเรียนแขวนลอย</div>
+      <div style="font-size:13pt">ปีการศึกษา ${escapeHtml(state.studentFollowupAcademicYear)} ภาคเรียนที่ ${academicRegThaiDigits(state.studentFollowupSemester)}</div>
+      <div style="font-size:12pt">ข้อมูล ณ ${escapeHtml(studentFollowupThaiDate(studentFollowupToday()))} · ทั้งหมด ${academicRegThaiDigits(rows.length)} คน</div>
+    </header>
+    <table style="width:100%;border-collapse:collapse;table-layout:fixed">
+      <colgroup>${cols.map(w=>`<col style="width:${w}">`).join("")}</colgroup>
+      <thead><tr>${["ที่","เลขบัตรประชาชน / เลข G","เลขประจำตัวนักเรียน","ชื่อ–นามสกุล","ชั้น / ห้อง","สถานะ"].map(h=>`<th style="${cellStyle};font-weight:700;background:#eee;text-align:center">${h}</th>`).join("")}</tr></thead>
+      <tbody>${group.map(r=>`<tr>${r.map((v,j)=>`<td style="${cellStyle};${j===0||j>=4?'text-align:center;':''}">${escapeHtml(v||"—")}</td>`).join("")}</tr>`).join("")}</tbody>
+    </table>
+    <footer style="position:absolute;bottom:10mm;right:12mm;font-size:11pt;color:#444">หน้า ${idx+1} / ${pages.length}</footer>
+  </article>`).join("");
+  document.body.appendChild(host);
+  try{
+    await Promise.all([...host.querySelectorAll("img")].map(img=>img.complete?Promise.resolve():new Promise(done=>{img.onload=img.onerror=done;})));
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const pdf=new (await loadJsPDF())({orientation:"portrait",unit:"mm",format:"a4",compress:true});
+    const pageEls=[...host.querySelectorAll(".student-followup-roster-pdf-page")];
+    for(let i=0;i<pageEls.length;i++){
+      if(i)pdf.addPage("a4","portrait");
+      const canvas=await html2canvas(pageEls[i],{scale:2,useCORS:true,backgroundColor:"#fff",logging:false});
+      pdf.addImage(canvas.toDataURL("image/jpeg",0.96),"JPEG",0,0,210,297,undefined,"FAST");
+    }
+    return {blob:pdf.output("blob"),filename:`บัญชีนักเรียนแขวนลอย_${state.studentFollowupAcademicYear}_ภาค${state.studentFollowupSemester}.pdf`};
+  }finally{host.remove();}
+}
+
+async function studentFollowupExportSuspendedPdf(){
+  try{
+    const built=await studentFollowupBuildSuspendedPdf();
+    openPdfPreviewModal({title:"บัญชีรายชื่อนักเรียนแขวนลอย",subtitle:`${studentFollowupSuspendedRows().length} คน · ปีการศึกษา ${state.studentFollowupAcademicYear} ภาคเรียน ${state.studentFollowupSemester}`,blob:built.blob,filename:built.filename});
+  }catch(err){console.error(err);toast("ส่งออก PDF ไม่สำเร็จ",err.message||String(err),"error");}
+}
+
 document.addEventListener("change",event=>{
   if(event.target?.id!=="student-only-suspended")return;
   state.studentRegistrySuspensionOnly=!!event.target.checked;
@@ -12379,6 +12527,15 @@ async function loadStudentFollowupWorkspace(){
     .eq('academic_year',year).eq('semester',semester).eq('enrollment_status','active').eq('is_suspended',true);
   if(flaggedRes.error)throw flaggedRes.error;
   state.studentFollowupSuspendedIds=new Set((flaggedRes.data||[]).map(x=>x.student_id));
+  state.studentFollowupCitizenIds=new Map();
+  if(canManageStudentMasterUi()){
+    const visibleIds=studentFollowupSuspendedRows().map(s=>s.student_id);
+    if(visibleIds.length){
+      const identities=await supabase.from('students').select('id,citizen_id').in('id',visibleIds);
+      if(identities.error)throw identities.error;
+      state.studentFollowupCitizenIds=new Map((identities.data||[]).map(s=>[s.id,s.citizen_id]));
+    }
+  }
   state.studentFollowupBatches=batchesRes.data||[];
   const ids=state.studentFollowupBatches.map(x=>x.id);
   if(ids.length){const casesRes=await supabase.from('student_followup_cases').select('*').in('batch_id',ids).order('created_at');if(casesRes.error)throw casesRes.error;state.studentFollowupCases=casesRes.data||[];}else state.studentFollowupCases=[];
@@ -12389,9 +12546,10 @@ function studentFollowupBatchRow(b){
 }
 function studentFollowupWorkspaceHtml(){
   const batches=state.studentFollowupBatches||[],cases=state.studentFollowupCases||[],issued=batches.filter(x=>['issued','completed'].includes(x.status)).length,open=cases.filter(x=>x.followup_status!=='followed').length,canManage=studentFollowupCanManageUi();
+  if((state.studentFollowupView||'suspended')==='suspended')return studentFollowupRosterPageHtml();
   return `<section class="student-followup-page"><section class="student-followup-hero"><div><span class="eyebrow">กลุ่มงานบริหารวิชาการ · Student Follow-up</span><h2>ระบบติดตามนักเรียน</h2><p>จัดทำหนังสือแจ้งผู้ปกครองกรณีนักเรียนขาดเรียน เชื่อมรายชื่อนักเรียนกลาง และออกหนังสือราชการตามแบบโรงเรียน</p></div><div class="student-followup-hero-side"><span>หนังสือราชการ A4</span><strong>ตราครุฑ · เลขที่ ศธ. · TH Sarabun IT๙</strong><small>Build ${APP_BUILD}</small></div></section>
   <div class="stats-grid student-followup-stats"><article><span>ชุดหนังสือ</span><strong>${academicRegThaiDigits(batches.length)}</strong><small>ในช่วงที่เลือก</small></article><article><span>ออกหนังสือแล้ว</span><strong>${academicRegThaiDigits(issued)}</strong><small>ชุด</small></article><article><span>นักเรียนในรายการ</span><strong>${academicRegThaiDigits(cases.length)}</strong><small>คน</small></article><article><span>รอติดตามผล</span><strong>${academicRegThaiDigits(open)}</strong><small>คน</small></article></div>
-  ${studentSuspensionFollowupPanel()}
+  ${studentFollowupNavigationHtml('letters')}
   <section class="panel"><div class="panel-head"><div class="panel-title-wrap"><h3>ทะเบียนหนังสือติดตามนักเรียน</h3><p>เลือกปีการศึกษาและภาคเรียน แล้วสร้างหนังสือรายคนหรือออกเป็นชุดได้</p></div><div class="action-row">${canManage?`<button class="btn btn-ghost" id="student-followup-settings">ตั้งค่าเอกสาร</button>`:''}${studentFollowupCanCreateUi()?`<button class="btn btn-primary" id="student-followup-create">＋ สร้างชุดหนังสือ</button>`:''}</div></div>
   <div class="student-followup-toolbar"><div class="field"><label>ปีการศึกษา</label><select class="select" id="student-followup-year">${studentFollowupCurrentYearOptions()}</select></div><div class="field"><label>ภาคเรียน</label><select class="select" id="student-followup-semester"><option value="1" ${Number(state.studentFollowupSemester)===1?'selected':''}>๑</option><option value="2" ${Number(state.studentFollowupSemester)===2?'selected':''}>๒</option><option value="3" ${Number(state.studentFollowupSemester)===3?'selected':''}>๓</option></select></div><div class="field student-followup-search-field"><label>ค้นหา</label><input class="input" id="student-followup-search" value="${escapeHtml(state.studentFollowupSearch||'')}" placeholder="เลขชุด / เลขที่ ศธ. / ชื่อนักเรียน"></div></div>
   <div class="table-wrap"><table class="table student-followup-table"><thead><tr><th>ชุดหนังสือ / วันที่</th><th>เดือนที่ขาดเรียน</th><th>เลขที่ ศธ. / จำนวน</th><th>สถานะ</th><th>ดำเนินการ</th></tr></thead><tbody id="student-followup-list">${batches.length?batches.map(studentFollowupBatchRow).join(''):`<tr><td colspan="5"><div class="empty"><strong>ยังไม่มีหนังสือติดตามนักเรียน</strong><span>กด “สร้างชุดหนังสือ” เพื่อเริ่มรายการแรก</span></div></td></tr>`}</tbody></table></div></section></section>`;
@@ -12488,7 +12646,15 @@ async function studentFollowupBuildPdf(batch,cases){
 }
 async function studentFollowupOpenPdf(batch,cases=studentFollowupCasesFor(batch.id)){try{const built=await studentFollowupBuildPdf(batch,cases);openPdfPreviewModal({title:cases.length===1?'หนังสือติดตามนักเรียน — รายคน':'หนังสือติดตามนักเรียน — ทั้งชุด',subtitle:`${batch.batch_code} · ${cases.length} ฉบับ · ${studentFollowupDisplayDocNo(batch)}`,blob:built.blob,filename:built.filename});}catch(err){console.error(err);toast('สร้าง PDF ไม่สำเร็จ',err.message||String(err),'error');}}
 async function studentFollowupDelete(batch){if(batch.status!=='draft')return;if(!confirm(`ยืนยันลบ ${batch.batch_code} ?`))return;const {error}=await supabase.from('student_followup_batches').delete().eq('id',batch.id);if(error)return toast('ลบไม่สำเร็จ',error.message,'error');toast('ลบฉบับร่างแล้ว','','success');await loadStudentFollowupWorkspace();await renderDashboard();}
-function bindStudentFollowupEvents(){document.querySelector('#student-followup-year')?.addEventListener('change',async e=>{state.studentFollowupAcademicYear=Number(e.currentTarget.value);await loadStudentFollowupWorkspace();renderDashboard();});document.querySelector('#student-followup-semester')?.addEventListener('change',async e=>{state.studentFollowupSemester=Number(e.currentTarget.value);await loadStudentFollowupWorkspace();renderDashboard();});document.querySelector('#student-followup-search')?.addEventListener('input',studentFollowupApplySearch);document.querySelector('#student-followup-create')?.addEventListener('click',()=>studentFollowupFormModal());document.querySelector('#student-followup-settings')?.addEventListener('click',studentFollowupSettingsModal);document.querySelectorAll('[data-student-followup-detail]').forEach(b=>b.addEventListener('click',()=>studentFollowupDetailModal(studentFollowupBatchById(b.dataset.studentFollowupDetail))));document.querySelectorAll('[data-student-followup-edit]').forEach(b=>b.addEventListener('click',()=>studentFollowupFormModal(studentFollowupBatchById(b.dataset.studentFollowupEdit))));document.querySelectorAll('[data-student-followup-number]').forEach(b=>b.addEventListener('click',()=>studentFollowupNumberModal(studentFollowupBatchById(b.dataset.studentFollowupNumber))));document.querySelectorAll('[data-student-followup-pdf]').forEach(b=>b.addEventListener('click',()=>studentFollowupOpenPdf(studentFollowupBatchById(b.dataset.studentFollowupPdf))));document.querySelectorAll('[data-student-followup-issue]').forEach(b=>b.addEventListener('click',()=>studentFollowupIssue(studentFollowupBatchById(b.dataset.studentFollowupIssue))));studentFollowupApplySearch();}
+function bindStudentFollowupEvents(){
+  document.querySelectorAll('[data-student-followup-view]').forEach(b=>b.addEventListener('click',()=>{
+    const view=b.dataset.studentFollowupView;
+    if(view!=='suspended'&&view!=='letters')return;
+    state.studentFollowupView=view;renderDashboard();
+  }));
+  document.querySelector('#student-followup-export-pdf')?.addEventListener('click',studentFollowupExportSuspendedPdf);
+  document.querySelector('#student-followup-export-xlsx')?.addEventListener('click',studentFollowupExportSuspendedXlsx);
+  document.querySelector('#student-followup-year')?.addEventListener('change',async e=>{state.studentFollowupAcademicYear=Number(e.currentTarget.value);await loadStudentFollowupWorkspace();renderDashboard();});document.querySelector('#student-followup-semester')?.addEventListener('change',async e=>{state.studentFollowupSemester=Number(e.currentTarget.value);await loadStudentFollowupWorkspace();renderDashboard();});document.querySelector('#student-followup-search')?.addEventListener('input',studentFollowupApplySearch);document.querySelector('#student-followup-create')?.addEventListener('click',()=>studentFollowupFormModal());document.querySelector('#student-followup-settings')?.addEventListener('click',studentFollowupSettingsModal);document.querySelectorAll('[data-student-followup-detail]').forEach(b=>b.addEventListener('click',()=>studentFollowupDetailModal(studentFollowupBatchById(b.dataset.studentFollowupDetail))));document.querySelectorAll('[data-student-followup-edit]').forEach(b=>b.addEventListener('click',()=>studentFollowupFormModal(studentFollowupBatchById(b.dataset.studentFollowupEdit))));document.querySelectorAll('[data-student-followup-number]').forEach(b=>b.addEventListener('click',()=>studentFollowupNumberModal(studentFollowupBatchById(b.dataset.studentFollowupNumber))));document.querySelectorAll('[data-student-followup-pdf]').forEach(b=>b.addEventListener('click',()=>studentFollowupOpenPdf(studentFollowupBatchById(b.dataset.studentFollowupPdf))));document.querySelectorAll('[data-student-followup-issue]').forEach(b=>b.addEventListener('click',()=>studentFollowupIssue(studentFollowupBatchById(b.dataset.studentFollowupIssue))));studentFollowupApplySearch();}
 
 
 // ===== Plan & Budget / Procurement document engine (Build 5.0) =====
