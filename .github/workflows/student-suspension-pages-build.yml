@@ -6,6 +6,7 @@ on:
       - 'app.js'
       - 'modules/student-dialogs.js'
       - 'tests/student-suspension-pages-20261119.test.mjs'
+      - 'tests/module-boundaries.test.mjs'
       - 'index.html'
       - '.github/workflows/student-suspension-pages-build.yml'
 permissions:
