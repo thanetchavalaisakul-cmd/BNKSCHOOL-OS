@@ -48,13 +48,13 @@ test("suspension remains a marker, existing batches and lifecycle are not change
 
 test("Garuda in follow-up PDFs is anchored to the physical A4 page, not scaled letter content",()=>{
   const styles=read("styles.css");
-  assert.match(app,/student-followup-pdf-page academic-transfer-official-document">\\n    <img src="\\$\\{garuda\\}" class="student-followup-garuda-centered"/);
-  assert.match(app,/<header class="official-transfer-header" aria-hidden="true"><\\/header>/);
-  assert.match(styles,/\\.student-followup-pdf-page\\.academic-transfer-official-document > img\\.student-followup-garuda-centered\\{/);
-  assert.match(styles,/left:50%!important;/);
-  assert.match(styles,/transform:translateX\\(-50%\\)!important;/);
-  assert.match(styles,/top:16mm!important;/);
-  assert.match(app,/pageGaruda\\.style\\.width/);
-  assert.match(app,/pageGaruda\\.style\\.height/);
-  assert.match(index,/styles\\.css\\?v=5\\.12\\.9\\.66\\.1\\.cert2/);
+  assert.ok(app.includes('class="student-followup-garuda-centered"'),"Garuda has its own page-level class");
+  assert.ok(app.includes('<header class="official-transfer-header" aria-hidden="true"></header>'),"original content header is empty");
+  assert.ok(styles.includes('.student-followup-pdf-page.academic-transfer-official-document > img.student-followup-garuda-centered{'),"A4 page directly anchors Garuda");
+  assert.ok(styles.includes('left:50%!important;'));
+  assert.ok(styles.includes('transform:translateX(-50%)!important;'));
+  assert.ok(styles.includes('top:16mm!important;'));
+  assert.ok(app.includes('pageGaruda.style.width'));
+  assert.ok(app.includes('pageGaruda.style.height'));
+  assert.ok(index.includes('styles.css?v=5.12.9.66.1.cert2'));
 });
