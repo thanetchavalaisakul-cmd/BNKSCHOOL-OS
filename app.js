@@ -12583,8 +12583,9 @@ function studentFollowupPdfPageHtml(batch,c,garuda,signature,director){
   const phone=String(s.official_phone_text||'').trim(),email=String(s.official_email_text||'').trim();
   const motto=[s.motto_line_1,s.motto_line_2,s.motto_line_3].map(x=>String(x||'').trim()).filter(Boolean);
   return `<article class="student-followup-pdf-page academic-transfer-official-document">
+    <img src="${garuda}" class="student-followup-garuda-centered" alt="ตราครุฑ">
     <div class="official-transfer-content">
-      <header class="official-transfer-header"><img src="${garuda}" alt="ตราครุฑ"></header>
+      <header class="official-transfer-header" aria-hidden="true"></header>
       <div class="official-transfer-topline">
         <div class="official-transfer-number">ที่ ศธ. ${escapeHtml(doc)}</div>
         <div class="official-transfer-address">${addrHtml}</div>
@@ -12630,7 +12631,14 @@ async function studentFollowupBuildPdf(batch,cases){
     pages.forEach(page=>{
       const content=page.querySelector('.official-transfer-content');
       if(content)officialAlignAddressStartToDateEnd(content,'.official-transfer-address','.official-transfer-date');
-      academicTransferFitOfficialToOnePage(page);
+      const pageScale=academicTransferFitOfficialToOnePage(page);
+      // Center the Garuda against the A4 page, not the auto-scaled letter content.
+      // Keep its printed dimensions proportional to the existing fitted template.
+      const pageGaruda=page.querySelector('.student-followup-garuda-centered');
+      if(pageGaruda){
+        pageGaruda.style.width=`${(27*pageScale).toFixed(3)}mm`;
+        pageGaruda.style.height=`${(31*pageScale).toFixed(3)}mm`;
+      }
       void page.offsetHeight;
     });
     await new Promise(r=>requestAnimationFrame(r));
