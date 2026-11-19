@@ -8778,7 +8778,7 @@ async function studentFollowupBuildSuspendedPdf(){
   host.style.cssText="position:fixed;left:-12000px;top:0;pointer-events:none;width:210mm;z-index:-1";
   const cols=["8%","21%","15%","32%","13%","11%"];
   const cellStyle="border:1px solid #777;padding:2.1mm 1.2mm;vertical-align:middle;font-size:12pt;line-height:1.15;overflow-wrap:anywhere";
-  host.innerHTML=pages.map((group,idx)=>`<article class="student-followup-roster-pdf-page" style="width:210mm;height:297mm;background:#fff;box-sizing:border-box;padding:13mm 11mm;font-family:'${OFFICIAL_PDF_FONT}',sans-serif;color:#111">
+  host.innerHTML=pages.map((group,idx)=>`<article class="student-followup-roster-pdf-page" style="position:relative;width:210mm;height:297mm;background:#fff;box-sizing:border-box;padding:13mm 11mm;font-family:'${OFFICIAL_PDF_FONT}',sans-serif;color:#111">
     <header style="text-align:center;margin-bottom:6mm">
       ${logo?`<img src="${logo}" alt="ตราโรงเรียน" style="height:17mm;max-width:24mm;object-fit:contain;display:block;margin:0 auto 1mm">`:""}
       <div style="font-size:19pt;font-weight:700;line-height:1.1">${escapeHtml(schoolName())}</div>
