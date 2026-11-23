@@ -6,7 +6,7 @@
   if (!app || typeof MutationObserver === "undefined") return;
 
   const ROUTE_KEY = "bnk:ux:route:v1";
-  const WELCOME_KEY = "bnk:ux:welcome:v1";
+  const WELCOME_KEY = "bnk:ux:welcome:v2";
   const historyMarker = "bnkSchoolUxView";
   const safeRead = key => { try { return sessionStorage.getItem(key); } catch { return null; } };
   const safeWrite = (key, value) => { try { sessionStorage.setItem(key, value); } catch {} };
@@ -144,10 +144,14 @@
     const orbit = document.createElement("div");
     orbit.className = "bnk-welcome-orbit";
     orbit.setAttribute("aria-hidden", "true");
-    const letters = document.createElement("span");
-    letters.className = "bnk-welcome-monogram";
-    letters.textContent = "BNK";
-    orbit.appendChild(letters);
+    const schoolLogo = document.createElement("img");
+    schoolLogo.className = "bnk-welcome-school-logo";
+    schoolLogo.src = "./school-logo.png?v=20261029";
+    schoolLogo.alt = "ตราสัญลักษณ์โรงเรียนบ้านหนองเขียว";
+    schoolLogo.width = 88;
+    schoolLogo.height = 88;
+    schoolLogo.decoding = "async";
+    orbit.appendChild(schoolLogo);
     const brand = document.createElement("div");
     brand.className = "bnk-welcome-brand";
     brand.textContent = "BNK SCHOOL OS";

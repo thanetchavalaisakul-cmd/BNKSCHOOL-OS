@@ -45,10 +45,9 @@
   border-right-color:transparent;border-bottom-color:var(--success);
   border-left-color:var(--success);
 }
-.bnk-welcome-monogram {
-  display:grid;place-items:center;width:82px;height:82px;border-radius:50%;
-  background:var(--surface-2);border:1px solid var(--line);
-  color:var(--text);font-size:30px;font-weight:900;letter-spacing:.02em;
+.bnk-welcome-school-logo {
+  display:block;width:88px;height:88px;max-width:100%;object-fit:contain;
+  padding:3px;border-radius:50%;background:var(--surface-solid);
 }
 .bnk-welcome-brand {font-weight:900;letter-spacing:.09em;font-size:16px}
 .bnk-welcome-copy {color:var(--muted);font-size:13px}
