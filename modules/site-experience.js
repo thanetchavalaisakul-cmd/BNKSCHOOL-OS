@@ -15,6 +15,7 @@
   let initialized = false;
   let route = "dashboard";
   let suppressClick = false;
+  let awaitingRender = null;
   let pendingFrame = false;
   let welcomeElement = null;
   let welcomeTimeout = null;
@@ -65,9 +66,11 @@
   function activate(view, silent = false) {
     const button = findView(view);
     if (!button) return false; // Never bypass visibility/role permissions.
+    if (!silent && view !== route) recordHistory(view);
+    else { route = view; safeWrite(ROUTE_KEY, view); }
+    awaitingRender = view;
     suppressClick = true;
     try { button.click(); } finally { suppressClick = false; }
-    if (silent) { route = view; safeWrite(ROUTE_KEY, view); }
     return true;
   }
 
@@ -184,6 +187,7 @@
       const remembered = history.state?.[historyMarker] || safeRead(ROUTE_KEY);
       route = rendered;
       if (remembered !== rendered && findView(remembered)) {
+        awaitingRender = remembered;
         recordHistory(remembered, true);
         // Hand off to existing bound view handlers once initial rendering is complete.
         requestAnimationFrame(() => activate(remembered, true));
@@ -196,7 +200,8 @@
     const content = app.querySelector(".dashboard .content");
     if (!content) return;
     const actuallyRendered = activeRenderedRoute();
-    if (actuallyRendered && actuallyRendered !== route && !content.querySelector(".bnk-module-loading")) {
+    if (actuallyRendered && actuallyRendered === awaitingRender) awaitingRender = null;
+    if (actuallyRendered && actuallyRendered !== route && !awaitingRender && !content.querySelector(".bnk-module-loading")) {
       // Keep module links triggered by other existing internal controllers in sync.
       recordHistory(actuallyRendered, false);
     }
@@ -223,6 +228,7 @@
       safeDelete(ROUTE_KEY);
       safeDelete(WELCOME_KEY);
       route = "dashboard";
+      awaitingRender = null;
       initialized = false;
       hasShownWelcome = false;
       removeWelcome();
@@ -238,6 +244,7 @@
       event.stopImmediatePropagation();
       return;
     }
+    awaitingRender = view;
     recordHistory(view);
   }, true);
 
