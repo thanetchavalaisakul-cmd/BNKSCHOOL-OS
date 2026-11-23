@@ -36,7 +36,7 @@ test("suspended exports use shared roster and keep citizen/student codes as text
   assert.match(app,/await ensureOfficialPdfFont\("16pt"\)/);
   assert.match(app,/openPdfPreviewModal\(\{title:"บัญชีรายชื่อนักเรียนแขวนลอย"/);
   assert.match(app,/if\(!canManageStudentMasterUi\(\)\)/);
-  assert.match(index,/app\.min\.js\?v=5\.12\.9\.818/);
+  assert.match(index,/app\.min\.js\?v=5\.12\.9\.819/);
 });
 test("suspension remains a marker, existing batches and lifecycle are not changed",()=>{
   const migration=read("supabase/migrations/20261118044257_student_suspension_followup_marker_20261118.sql");
