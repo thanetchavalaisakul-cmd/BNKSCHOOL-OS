@@ -187,5 +187,5 @@ index=Path("index.html")
 html=index.read_text(encoding="utf-8")
 old='app.min.js?v=5.12.9.818'
 assert html.count(old)==1, "unexpected app bundle cache version"
-index.write_text(html.replace(old,'app.min.js?v=20261123.official-duty.1'),encoding="utf-8")
+index.write_text(html.replace(old,'app.min.js?v=5.12.9.819'),encoding="utf-8")
 print("Official duty integrated into existing leave UI, statistics, and A4 documents.")
