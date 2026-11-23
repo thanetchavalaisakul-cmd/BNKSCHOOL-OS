@@ -1,0 +1,40 @@
+name: Inspect BNK navigation structures
+on:
+  push:
+    branches: [feature/sitewide-motion-navigation-20261123]
+    paths: ['.github/workflows/bnk-ux-inspect-20261123.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect navigation and sign-in source (source only)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re
+          source=open('app.js',encoding='utf-8').read()
+          for term in [
+            r'function renderAuth\\(',r'function renderDashboard\\(',r'function showModuleLoadingScreen\\(',
+            r'function homeView\\(',r'function bootstrapAppInner\\(',r'function renderPending\\(',
+            r'function renderShell\\(',r'const state\\s*=',r'currentView: \\"dashboard\\"',
+            r'function navigation\\(',r'function dashboardShell\\(',r'function bindDashboardEvents\\('
+          ]:
+            # accept literal parenthesis; all content is source literals.
+            pat=term.replace('\\\\','\\')
+            m=re.search(pat,source)
+            if m:
+              print('===',term,'offset',m.start(),'===')
+              print(source[max(0,m.start()-300):m.start()+3800])
+            else:
+              print('===',term,'NOT FOUND ===')
+          pats=[r'window\\.addEventListener\\(\\s*[\"\\x27]popstate',r'location\\.hash',r'localStorage\\.getItem',r'function mainShell\\(',r'id=\\\"app\\\"',r'function login',r'function renderLogin']
+          for term in pats:
+            pat=term.replace('\\\\','\\')
+            m=re.search(pat,source)
+            if m:
+              print('===',term,'offset',m.start(),'===')
+              print(source[max(0,m.start()-240):m.start()+1000])
+          PY
