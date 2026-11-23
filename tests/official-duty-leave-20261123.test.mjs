@@ -7,7 +7,7 @@ const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 const migration = readFileSync(new URL("../supabase/migrations/20261123070000_official_duty_leave_type.sql", import.meta.url), "utf8");
 
 function extractFunction(name) {
-  const start = app.search(new RegExp("^function " + name + "\\(", "m"));
+  const start = app.search(new RegExp("^(?:async\\s+)?function " + name + "\\(", "m"));
   assert.notEqual(start, -1, "missing " + name);
   const next = app.slice(start + 1).search(/^(?:async\s+)?function \w+\(/m);
   return app.slice(start, next < 0 ? app.length : start + 1 + next);
