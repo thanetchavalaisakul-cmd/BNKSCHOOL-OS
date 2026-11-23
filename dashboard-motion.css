@@ -1,0 +1,53 @@
+/* BNK Signature Motion — dashboard-only enhancement.
+   Uses the site's existing palette, spacing, components and markup. */
+@media (prefers-reduced-motion: no-preference) {
+  .home-dashboard-v2.bnk-motion-ready .home-hero-v2 {
+    animation: bnk-home-arrive 560ms cubic-bezier(.22,1,.36,1) both;
+  }
+  .home-dashboard-v2.bnk-motion-ready .home-summary-card {
+    animation: bnk-home-arrive 580ms cubic-bezier(.22,1,.36,1) both;
+    animation-delay: calc(65ms + var(--bnk-motion-order, 0) * 65ms);
+  }
+  .home-dashboard-v2.bnk-motion-ready .home-module-card,
+  .home-dashboard-v2.bnk-motion-ready .home-task {
+    animation: bnk-home-arrive 470ms cubic-bezier(.22,1,.36,1) both;
+    animation-delay: calc(130ms + var(--bnk-motion-order, 0) * 35ms);
+  }
+  .home-dashboard-v2.bnk-motion-ready .home-ring {
+    animation: bnk-home-ring-appear 740ms cubic-bezier(.22,1,.36,1) 220ms both;
+  }
+  .home-dashboard-v2.bnk-motion-ready .home-progress i,
+  .home-dashboard-v2.bnk-motion-ready .home-bar-row i {
+    transform-origin: left center;
+    animation: bnk-home-fill 850ms cubic-bezier(.22,1,.36,1) 180ms both;
+  }
+}
+.home-dashboard-v2 .home-summary-card {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .home-dashboard-v2 .home-summary-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 34px rgba(15,23,42,.09);
+  }
+  .home-dashboard-v2 .home-module-card:active {
+    transform: scale(.99);
+  }
+}
+@keyframes bnk-home-arrive {
+  from { opacity: 0; translate: 0 11px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes bnk-home-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes bnk-home-ring-appear {
+  from { opacity: 0; transform: scale(.91) rotate(-12deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-dashboard-v2 .home-summary-card {
+    transition: none;
+  }
+}
