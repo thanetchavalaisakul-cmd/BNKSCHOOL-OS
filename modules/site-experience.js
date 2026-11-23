@@ -227,6 +227,9 @@
     if (signout) {
       safeDelete(ROUTE_KEY);
       safeDelete(WELCOME_KEY);
+      try {
+        history.replaceState({ ...(history.state || {}), [historyMarker]: "dashboard", bnkUxDepth: 0 }, "");
+      } catch {}
       route = "dashboard";
       awaitingRender = null;
       initialized = false;
