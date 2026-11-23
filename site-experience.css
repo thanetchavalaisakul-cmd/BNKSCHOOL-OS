@@ -1,0 +1,94 @@
+/* BNK School OS sitewide experience — preserve every existing theme color. */
+.bnk-ux-toolbar {
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  margin:0 0 14px;padding:8px 0;
+  color:var(--text);font-size:12px;
+}
+.bnk-ux-toolbar button {
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-height:34px;padding:6px 12px;border:1px solid var(--line);
+  border-radius:11px;background:var(--surface-solid);color:var(--text);
+  font:inherit;font-size:12px;font-weight:700;cursor:pointer;
+  box-shadow:var(--shadow-sm);
+}
+.bnk-ux-toolbar button:focus-visible {
+  outline:2px solid var(--primary);outline-offset:3px;
+}
+.bnk-ux-toolbar .bnk-ux-crumb {
+  min-width:0;max-width:min(60vw,470px);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--muted);font-weight:600;
+}
+.bnk-ux-toolbar .bnk-ux-crumb:before {
+  content:"/";margin-right:9px;color:var(--muted);
+}
+.bnk-welcome-overlay {
+  position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;
+  padding:24px;background:rgba(248,250,252,.88);backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+}
+.bnk-welcome-box {
+  position:relative;width:min(380px,100%);padding:34px 24px 22px;
+  display:grid;justify-items:center;text-align:center;gap:13px;
+  color:var(--text);background:var(--surface-solid);
+  border:1px solid var(--line);border-radius:25px;box-shadow:var(--shadow);
+}
+.bnk-welcome-orbit {position:relative;width:138px;height:138px;display:grid;place-items:center}
+.bnk-welcome-orbit:before,.bnk-welcome-orbit:after {
+  content:"";position:absolute;inset:0;border-radius:50%;
+  border:3px solid transparent;border-top-color:var(--primary);
+  border-right-color:var(--primary);
+  box-shadow:0 0 21px rgba(37,99,235,.12);
+}
+.bnk-welcome-orbit:after {
+  inset:16px;border-width:2px;border-top-color:transparent;
+  border-right-color:transparent;border-bottom-color:var(--success);
+  border-left-color:var(--success);
+}
+.bnk-welcome-monogram {
+  display:grid;place-items:center;width:82px;height:82px;border-radius:50%;
+  background:var(--surface-2);border:1px solid var(--line);
+  color:var(--text);font-size:30px;font-weight:900;letter-spacing:.02em;
+}
+.bnk-welcome-brand {font-weight:900;letter-spacing:.09em;font-size:16px}
+.bnk-welcome-copy {color:var(--muted);font-size:13px}
+.bnk-welcome-skip {
+  border:1px solid var(--line);border-radius:11px;padding:7px 16px;
+  color:var(--text);background:var(--surface-2);font:inherit;
+  font-size:12px;font-weight:700;cursor:pointer;
+}
+.bnk-welcome-skip:focus-visible {outline:2px solid var(--primary);outline-offset:3px}
+@media (prefers-reduced-motion: no-preference) {
+  .bnk-welcome-overlay {animation:bnk-ux-fade-in .25s ease-out both}
+  .bnk-welcome-box {animation:bnk-ux-appear .5s cubic-bezier(.22,1,.36,1) both}
+  .bnk-welcome-orbit:before {animation:bnk-ux-spin 5s linear infinite}
+  .bnk-welcome-orbit:after {animation:bnk-ux-spin 4s linear infinite reverse}
+  .bnk-ux-toolbar {animation:bnk-ux-appear .28s ease-out both}
+  .bnk-ux-toolbar button {transition:transform .17s ease,box-shadow .17s ease}
+  .bnk-ux-toolbar button:hover {transform:translateY(-2px)}
+  .bnk-ux-toolbar button:active,.dashboard .btn:active,.auth-card .btn:active {transform:scale(.98)}
+  .dashboard .nav-item,.dashboard .nav-child,.dashboard .btn {
+    transition:transform .18s ease,background .18s ease,box-shadow .18s ease;
+  }
+  .dashboard .content {animation:bnk-ux-appear .3s ease-out both}
+  .bnk-module-loading .bnk-loading-spinner {
+    box-shadow:0 0 0 5px rgba(14,116,144,.07);
+    animation:bnk-module-spin .8s linear infinite, bnk-ux-pulse 1.7s ease-in-out infinite;
+  }
+}
+@keyframes bnk-ux-spin {to{transform:rotate(360deg)}}
+@keyframes bnk-ux-fade-in {from{opacity:0}to{opacity:1}}
+@keyframes bnk-ux-appear {from{opacity:0;translate:0 7px}to{opacity:1;translate:0 0}}
+@keyframes bnk-ux-pulse {50%{box-shadow:0 0 0 8px rgba(14,116,144,.10)}}
+@media (prefers-reduced-motion: reduce) {
+  .bnk-welcome-overlay,.bnk-welcome-box,.bnk-welcome-orbit:before,.bnk-welcome-orbit:after,
+  .bnk-ux-toolbar,.dashboard .content,.bnk-module-loading .bnk-loading-spinner {
+    animation:none!important;
+  }
+}
+@media(max-width:560px) {
+  .bnk-ux-toolbar {gap:7px}
+  .bnk-ux-toolbar button {min-height:34px;padding:6px 10px;font-size:11px}
+  .bnk-ux-toolbar .bnk-ux-crumb {max-width:100%;flex-basis:100%;order:3}
+  .bnk-welcome-box {padding:24px 16px 18px}
+}
