@@ -26,7 +26,8 @@ jobs:
               for x in pos[:35]:
                   l=app.count('\n',0,x)+1
                   out.append('\n--- line '+str(l)+' ---\n'+app[max(0,x-450):min(len(app),x+900)])
-          Path('changes/official-duty-inspection.txt').write_text('\n'.join(out)[:800000],encoding='utf8')\n          Path('changes/official-duty-leave-section.txt').write_text(''.join(app.splitlines(keepends=True)[4400:5730]),encoding='utf8')
+          Path('changes/official-duty-inspection.txt').write_text('\n'.join(out)[:800000],encoding='utf8')
+          Path('changes/official-duty-leave-section.txt').write_text(''.join(app.splitlines(keepends=True)[4400:5730]),encoding='utf8')
           PY
       - name: Save extracted non-secret code context to branch
         run: |
