@@ -21,6 +21,10 @@ jobs:
         run: |
           node --check modules/dashboard-motion.js
           node --test tests/dashboard-signature-motion-20261123.test.mjs
+      - name: Welcome, navigation, and site animation regression
+        run: |
+          node --check modules/site-experience.js
+          node --test tests/site-experience-20261123.test.mjs
       - name: Local regression tests
         run: node --test tests/performance-regression.test.mjs
       - name: Leave weekday and school-open weekend checks
