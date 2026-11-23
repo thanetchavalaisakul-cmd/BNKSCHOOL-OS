@@ -4482,6 +4482,10 @@ function leaveStatusClass(status) {
   return "suspended";
 }
 
+function isOfficialDutyRequest(request) {
+  return request?.leave_type_code === "official_duty";
+}
+
 function leaveTypeByCode(code) {
   return state.leaveTypes.find(t => t.code === code) || null;
 }
@@ -4663,7 +4667,7 @@ function leaveTypeStatsForUser(userId, academicYear = leaveReportYear(), semeste
     && Number(r.academic_year) === Number(academicYear)
     && (semester === "all" || Number(r.semester) === Number(semester))
   );
-  return state.leaveTypes.map(type => {
+  return state.leaveTypes.filter(type => type.code !== "official_duty").map(type => {
     const rows = requests.filter(r => r.leave_type_code === type.code);
     return {
       code: type.code,
@@ -4675,7 +4679,7 @@ function leaveTypeStatsForUser(userId, academicYear = leaveReportYear(), semeste
 }
 
 function schoolLeaveSummaryRows() {
-  const approved = leavePeriodRequests({ approvedOnly: true });
+  const approved = leavePeriodRequests({ approvedOnly: true }).filter(r => !isOfficialDutyRequest(r));
   return [...state.leaveRoster]
     .sort((a,b) => String(a.full_name || a.email || "").localeCompare(String(b.full_name || b.email || ""), "th"))
     .map((profile, index) => {
@@ -4695,7 +4699,7 @@ function schoolLeaveSummaryRows() {
 
 function leavePeriodOverviewStats() {
   const rows = schoolLeaveSummaryRows();
-  const approved = leavePeriodRequests({ approvedOnly: true });
+  const approved = leavePeriodRequests({ approvedOnly: true }).filter(r => !isOfficialDutyRequest(r));
   const peopleWithLeave = rows.filter(r => r.times > 0).length;
   const totalPeople = rows.length;
   const totalDays = approved.reduce((sum,r)=>sum+Number(r.leave_days||0),0);
@@ -4898,7 +4902,7 @@ function canOpenOwnSubstituteFromLeave(request) {
 }
 
 function leaveHistoryTable(requests, showRequester = false) {
-  if (!requests.length) return `<div class="empty"><strong>ยังไม่มีรายการวันลา</strong><span>เมื่อมีคำขอลา รายการจะแสดงที่นี่</span></div>`;
+  if (!requests.length) return `<div class="empty"><strong>ยังไม่มีรายการลา / ไปราชการ</strong><span>เมื่อมีคำขอลา รายการจะแสดงที่นี่</span></div>`;
   return `<div class="table-wrap"><table class="table leave-table"><thead><tr>
     <th>ครั้งที่</th>${showRequester ? "<th>ผู้ลา</th>" : ""}<th>ประเภท</th><th>ช่วงวันที่</th><th>จำนวน</th><th>สถานที่/ติดต่อ</th><th>สถานะ</th><th>สอนแทน</th><th>การตรวจ/อนุมัติ</th><th></th>
   </tr></thead><tbody>
@@ -4913,7 +4917,7 @@ function leaveHistoryTable(requests, showRequester = false) {
         ${showRequester ? `<td><strong>${escapeHtml(r.requester_name)}</strong><br><span class="table-muted">${escapeHtml(r.requester_position || ROLE_LABEL[r.requester_role] || r.requester_role)}</span></td>` : ""}
         <td>${escapeHtml(leaveTypeName(r.leave_type_code,r.other_leave_text))}</td>
         <td>${thaiDateOnly(r.start_date)}<br><span class="table-muted">ถึง ${thaiDateOnly(r.end_date)}</span><br><span class="table-muted">${escapeHtml(leaveDailyScheduleLabel(r))}</span>${Array.isArray(r.weekend_working_dates)&&r.weekend_working_dates.length ? `<br><span class="table-muted">วันเปิดเรียน: ${escapeHtml(leaveWeekendDatesLabel(r.weekend_working_dates))}</span>` : ""}</td>
-        <td><strong>${Number(r.leave_days)} วัน</strong></td>
+        <td><strong>${Number(r.leave_days)} วัน</strong>${isOfficialDutyRequest(r)?`<br><span class="table-muted">ไปราชการ · ไม่หักวันลา</span>`:""}</td>
         <td>${escapeHtml(r.contact_during_leave || "—")}${r.contact_phone ? `<br><span class="table-muted">${escapeHtml(r.contact_phone)}</span>` : ""}</td>
         <td><span class="pill ${leaveStatusClass(r.status)}">${escapeHtml(LEAVE_STATUS_LABEL[r.status] || r.status)}</span></td>
         <td><div class="leave-substitute-cell">${leaveSubstituteStatusHtml(r)}${canOpenOwnSubstituteFromLeave(r) ? `<button class="btn btn-ghost" data-open-leave-substitute="${r.id}">จัดสอนแทน</button>` : ""}</div></td>
@@ -4931,12 +4935,14 @@ function leaveOwnDashboardHtml() {
   const pending = requests.filter(r => ["pending_personnel","pending_director"].includes(r.status)).length;
   const approved = requests.filter(r =>
     r.status === "approved"
+    && !isOfficialDutyRequest(r)
     && Number(r.academic_year) === Number(period.academicYear)
     && Number(r.semester) === Number(period.semester)
   ).length;
+  const officialApproved = requests.filter(r => isOfficialDutyRequest(r) && r.status === "approved" && Number(r.academic_year) === Number(period.academicYear) && Number(r.semester) === Number(period.semester)).length;
   return `<section class="leave-hero">
-    <div><span class="eyebrow dark">Personnel Leave</span><h2>วันลาของฉัน</h2><p>ยื่นคำขอ ติดตามสถานะ และดูประวัติวันลาของคุณ</p></div>
-    <button class="btn btn-primary" id="new-leave-request">＋ ยื่นคำขอลา</button>
+    <div><span class="eyebrow dark">Personnel Leave</span><h2>วันลา / ไปราชการของฉัน</h2><p>บันทึกการลาและการไปราชการ ติดตามสถานะ และจัดสอนแทนจากตารางสอนเดิม</p></div>
+    <button class="btn btn-primary" id="new-leave-request">＋ บันทึกลา / ไปราชการ</button>
   </section>
   ${leaveViewTabsHtml()}
   <div class="leave-quota-grid">
@@ -4952,10 +4958,11 @@ function leaveOwnDashboardHtml() {
   <div class="lesson-stat-grid leave-stat-grid">
     <article class="metric-card"><div class="metric-label">คำขอทั้งหมด</div><div class="metric-value">${requests.length}</div></article>
     <article class="metric-card"><div class="metric-label">อยู่ระหว่างอนุมัติ</div><div class="metric-value">${pending}</div></article>
-    <article class="metric-card"><div class="metric-label">อนุมัติภาคเรียนนี้</div><div class="metric-value">${approved}</div></article>
+    <article class="metric-card"><div class="metric-label">อนุมัติการลาภาคเรียนนี้</div><div class="metric-value">${approved}</div></article>
+    <article class="metric-card"><div class="metric-label">ไปราชการที่อนุมัติ</div><div class="metric-value">${officialApproved}</div></article>
     <article class="metric-card"><div class="metric-label">รายการล่าสุด</div><div class="metric-value compact">${requests[0] ? Number(requests[0].leave_days)+" วัน" : "—"}</div></article>
   </div>
-  <section class="panel" style="margin-top:18px"><div class="panel-head"><div class="panel-title-wrap"><h3>ประวัติวันลา</h3><p>จำนวนครั้ง/วันในโควตาจะนับเฉพาะรายการที่อนุมัติแล้วและประเภทที่กำหนดให้นับโควตา</p></div><button class="btn btn-ghost" id="refresh-leave">↻ รีเฟรช</button></div>${leaveHistoryTable(requests,false)}</section>`;
+  <section class="panel" style="margin-top:18px"><div class="panel-head"><div class="panel-title-wrap"><h3>ประวัติการลา / ไปราชการ</h3><p>จำนวนครั้ง/วันในโควตาจะนับเฉพาะรายการที่อนุมัติแล้วและประเภทที่กำหนดให้นับโควตา</p></div><button class="btn btn-ghost" id="refresh-leave">↻ รีเฟรช</button></div>${leaveHistoryTable(requests,false)}</section>`;
 }
 
 function leaveReportAcademicYears() {
@@ -5045,7 +5052,7 @@ function leaveIndividualReportSectionHtml() {
   const selectedId = state.leaveReportPersonId || state.leaveRoster[0].id;
   const person = state.leaveRoster.find(p=>p.id===selectedId) || state.leaveRoster[0];
   const requests = leavePeriodRequests({userId:person.id}).sort((a,b)=>new Date(b.start_date)-new Date(a.start_date));
-  const approved = requests.filter(r=>r.status==="approved");
+  const approved = requests.filter(r=>r.status==="approved" && !isOfficialDutyRequest(r));
   const typeStats = leaveTypeStatsForUser(person.id);
   const totalDays = approved.reduce((sum,r)=>sum+Number(r.leave_days||0),0);
   return `<section class="panel leave-individual-report">
@@ -5142,25 +5149,26 @@ function leaveDetailHtml(request) {
     </div>
     <section class="leave-detail-hero">
       <div><span class="pill ${leaveStatusClass(request.status)}">${escapeHtml(LEAVE_STATUS_LABEL[request.status] || request.status)}</span><h2>${escapeHtml(leaveTypeName(request.leave_type_code,request.other_leave_text))}</h2><p>${escapeHtml(request.requester_name)} · ${escapeHtml(request.requester_position || ROLE_LABEL[request.requester_role] || request.requester_role)}</p></div>
-      <div class="leave-days-big"><small>จำนวนวันลา</small><strong>${Number(request.leave_days)}</strong><span>วัน</span></div>
+      <div class="leave-days-big"><small>${isOfficialDutyRequest(request)?"ระยะเวลาไปราชการ · ไม่หักวันลา":"จำนวนวันลา"}</small><strong>${Number(request.leave_days)}</strong><span>วัน</span></div>
     </section>
     <div class="detail-grid leave-detail-grid">
-      ${planField("วันที่เริ่มลา",thaiDateOnly(request.start_date))}
+      ${planField(isOfficialDutyRequest(request)?"วันที่เริ่มไปราชการ":"วันที่เริ่มลา",thaiDateOnly(request.start_date))}
       ${planField("วันที่สิ้นสุด",thaiDateOnly(request.end_date))}
-      ${planField("ช่วงเวลาการลา",leaveDailyScheduleLabel(request))}
+      ${planField(isOfficialDutyRequest(request)?"ช่วงเวลาปฏิบัติราชการ":"ช่วงเวลาการลา",leaveDailyScheduleLabel(request))}
       ${Array.isArray(request.weekend_working_dates)&&request.weekend_working_dates.length ? planField("ลาในวันหยุดที่โรงเรียนเปิดเรียน",leaveWeekendDatesLabel(request.weekend_working_dates)) : ""}
       ${planField("ปีการศึกษา",String(request.academic_year || "—"))}
       ${planField("ภาคเรียนที่",String(request.semester || "—"))}
       ${planField("มีผลต่อตารางสอน",request.affects_teaching_schedule ? "ต้องจัดการตารางสอน/ผู้สอนแทน" : "ไม่ต้องจัดผู้สอนแทน")}
       ${planField("สถานะการจัดสอนแทน",request.affects_teaching_schedule ? (()=>{const p=leaveSubstituteProgress(request.id); return !p.total ? "ไม่พบคาบ / รอตาราง Published" : p.complete ? `จัดครบ ${p.assigned}/${p.total} คาบ` : `จัดแล้ว ${p.assigned}/${p.total} คาบ`;})() : "ไม่ต้องจัด")}
     </div>
-    <div class="long-detail"><h4>เหตุผลการลา</h4><p>${escapeHtml(request.reason)}</p></div>
+    <div class="long-detail"><h4>${isOfficialDutyRequest(request)?"ภารกิจ/การอบรมที่ได้รับมอบหมาย":"เหตุผลการลา"}</h4><p>${escapeHtml(request.reason)}</p></div>
     <div class="detail-grid leave-detail-grid">
-      ${planField("สถานที่/ที่อยู่ระหว่างลา",request.contact_during_leave || "—")}
+      ${planField(isOfficialDutyRequest(request)?"สถานที่ไปราชการ":"สถานที่/ที่อยู่ระหว่างลา",request.contact_during_leave || "—")}
       ${planField("เบอร์ติดต่อระหว่างลา",request.contact_phone || "—")}
       ${planField("หัวหน้าบุคคล",request.personnel_reviewer_name || (leavePersonnelSkipped(request) ? `${request.requester_name} · ข้ามขั้นตอน (เป็นผู้ยื่นคำขอเอง)` : "—"))}
       ${planField("ผู้บริหาร",request.director_reviewer_name || "—")}
     </div>
+    ${isOfficialDutyRequest(request)?`<div class="drive-permission-warning leave-policy-note"><strong>ไปราชการ (ไม่ใช่วันลา)</strong><span>ไม่หักโควตาวันลา · เมื่อส่งคำขอและมีคาบสอน ระบบจะเชื่อมรายการไปยังการจัดสอนแทนเดิม</span></div>`:""}
     <section class="leave-quota-mini">
       <strong>สรุปโควตาปี ${Number(request.leave_year)+543}</strong>
       <span>อนุมัติแล้ว ${quota.usedTimes}/${quota.maxTimes} ครั้ง · ${Number(quota.usedDays.toFixed(1))}/${quota.maxDays} วัน</span>
@@ -5197,12 +5205,12 @@ function leaveRequestModal(request = null) {
     ? {...r.daily_leave_sessions}
     : {};
   modal.innerHTML = `<div class="modal modal-wide">
-    <div class="modal-head"><div><h3>${request ? "แก้ไขคำขอลา" : "ยื่นคำขอลา"}</h3><p>นับวันจันทร์–ศุกร์ตามปกติ และเลือกวันหยุดที่โรงเรียนเปิดเรียนได้</p></div><button class="modal-close">×</button></div>
+    <div class="modal-head"><div><h3>${request ? "แก้ไขรายการลา/ไปราชการ" : "บันทึกลา/ไปราชการ"}</h3><p>นับวันจันทร์–ศุกร์ตามปกติ และเลือกวันหยุดที่โรงเรียนเปิดเรียนได้</p></div><button class="modal-close">×</button></div>
     <form id="leave-form" class="form-grid">
       <div class="form-row">
-        <div class="field"><label>ประเภทการลา</label><select class="select" name="leave_type_code" id="leave-type-code" required>
-          <option value="">เลือกประเภทการลา</option>
-          ${state.leaveTypes.map(t => `<option value="${escapeHtml(t.code)}" ${r.leave_type_code===t.code?"selected":""}>${escapeHtml(t.name_th)}${t.counts_against_quota ? " · นับโควตา" : ""}</option>`).join("")}
+        <div class="field"><label>ประเภทการลา / ไปราชการ</label><select class="select" name="leave_type_code" id="leave-type-code" required>
+          <option value="">เลือกประเภทการลา / ไปราชการ</option>
+          ${state.leaveTypes.map(t => `<option value="${escapeHtml(t.code)}" ${r.leave_type_code===t.code?"selected":""}>${escapeHtml(t.name_th)}${t.code==="official_duty" ? " · ไม่หักวันลา" : (t.counts_against_quota ? " · นับโควตา" : "")}</option>`).join("")}
         </select></div>
         <div class="field" id="leave-other-field"><label>รายละเอียดประเภทอื่น <span class="helper">(เมื่อเลือก “ลาอื่น ๆ”)</span></label><input class="input" name="other_leave_text" maxlength="160" value="${escapeHtml(r.other_leave_text || "")}" placeholder="ระบุประเภทการลา"></div>
       </div>
@@ -5210,7 +5218,8 @@ function leaveRequestModal(request = null) {
         <div class="field"><label>ปีการศึกษา</label><input class="input" name="academic_year" type="number" min="2500" max="2700" required value="${defaultPeriod.academicYear}"></div>
         <div class="field"><label>ภาคเรียน</label><select class="select" name="semester" required><option value="1" ${defaultPeriod.semester===1?"selected":""}>ภาคเรียนที่ 1</option><option value="2" ${defaultPeriod.semester===2?"selected":""}>ภาคเรียนที่ 2</option></select></div>
       </div>
-      <div class="field"><label>เหตุผล / รายละเอียดการลา</label><textarea class="input textarea" name="reason" required>${escapeHtml(r.reason || "")}</textarea></div>
+      <div class="drive-permission-warning leave-policy-note" id="leave-official-duty-note" style="display:none"><strong>ไปราชการ · ไม่หักโควตาวันลา</strong><span>ใช้สำหรับงานที่โรงเรียนมอบหมาย เช่น อบรม ประชุม หรือภารกิจนอกสถานศึกษา ระบุภารกิจ/เลขคำสั่งและสถานที่ เมื่อส่งคำขอ รายการคาบที่ได้รับผลกระทบจะเชื่อมไปยังระบบสอนแทนเดิม</span></div>
+      <div class="field"><label id="leave-reason-label">เหตุผล / รายละเอียดการลา</label><textarea class="input textarea" name="reason" required>${escapeHtml(r.reason || "")}</textarea></div>
       <div class="form-row">
         <div class="field"><label>ตั้งแต่วันที่</label><input class="input" name="start_date" id="leave-start-date" type="date" required value="${escapeHtml(r.start_date || "")}"></div>
         <div class="field"><label>ถึงวันที่</label><input class="input" name="end_date" id="leave-end-date" type="date" required value="${escapeHtml(r.end_date || "")}"></div>
@@ -5229,7 +5238,7 @@ function leaveRequestModal(request = null) {
       </div>
       <div class="leave-days-preview" id="leave-days-preview"><span>จำนวนวันลา · ไม่นับเสาร์–อาทิตย์</span><strong>${r.leave_days ? formatLeaveDays(r.leave_days) : "—"} วัน</strong></div>
       <div class="form-row">
-        <div class="field"><label>สถานที่/ที่อยู่ระหว่างลา <span class="helper">(ถ้ามี)</span></label><input class="input" name="contact_during_leave" maxlength="240" value="${escapeHtml(r.contact_during_leave || "")}"></div>
+        <div class="field"><label id="leave-location-label">สถานที่/ที่อยู่ระหว่างลา (ถ้ามี)</label><input class="input" name="contact_during_leave" maxlength="240" value="${escapeHtml(r.contact_during_leave || "")}"></div>
         <div class="field"><label>เบอร์ติดต่อระหว่างลา <span class="helper">(ถ้ามี)</span></label><input class="input" name="contact_phone" maxlength="40" value="${escapeHtml(r.contact_phone || state.profile.phone || "")}"></div>
       </div>
       <label class="leave-teaching-check"><input type="checkbox" name="affects_teaching_schedule" ${defaultAffects ? "checked" : ""}><span><strong>มีตารางสอน/ภารกิจการสอนที่ต้องจัดแทน</strong><small>เมื่อส่งคำขอ ระบบจะสร้างรายการสอนแทนจากตาราง Published ทันที และคุณสามารถจัดครูสอนแทนได้โดยไม่ต้องรออนุมัติใบลา</small></span></label>
@@ -5287,7 +5296,8 @@ function leaveRequestModal(request = null) {
     const weekendDates=effectiveWeekendDates(start,end);
     const days=leaveDailyWorkingDays(start,end,weekendDates,selectedDailySessions,session);
     const hasSpecial=leaveSpecialWeekendDates(start,end,currentLeavePeriod().academicYear,currentLeavePeriod().semester).length>0;
-    const previewLabel=hasSpecial
+    const official=modal.querySelector("#leave-type-code").value==="official_duty";
+    const previewLabel=official?"ระยะเวลาปฏิบัติราชการ · ไม่หักโควตาวันลา":hasSpecial
       ?"จำนวนวันลา · รวมวันเปิดเรียนกรณีพิเศษที่ผู้ดูแลกำหนดแล้ว"
       :weekendDates.length
         ?"จำนวนวันลา · คำนวณรวมวันที่โรงเรียนเปิดเรียน"
@@ -5338,6 +5348,11 @@ function leaveRequestModal(request = null) {
     const other=modal.querySelector("#leave-type-code").value==="other";
     modal.querySelector("[name='other_leave_text']").required=other;
     modal.querySelector("#leave-other-field").classList.toggle("leave-field-muted",!other);
+    const official=modal.querySelector("#leave-type-code").value==="official_duty";
+    modal.querySelector("#leave-official-duty-note").style.display=official?"block":"none";
+    modal.querySelector("#leave-reason-label").textContent=official?"ภารกิจ / การอบรม / เลขคำสั่งที่ได้รับมอบหมาย":"เหตุผล / รายละเอียดการลา";
+    modal.querySelector("#leave-location-label").textContent=official?"สถานที่ไปราชการ (ถ้ามี)":"สถานที่/ที่อยู่ระหว่างลา (ถ้ามี)";
+    modal.querySelector("#leave-day-schedule-title").textContent=official?"กำหนดช่วงเวลาไปราชการแยกเป็นรายวัน":"กำหนดช่วงเวลาการลาแยกเป็นรายวัน";
   };
   modal.querySelector("#leave-weekend-enabled").addEventListener("change",refresh);
   modal.querySelector("#leave-weekend-add").addEventListener("click",()=>{
@@ -5619,21 +5634,22 @@ function buildLeaveA4Html(request,assets={}) {
       <div class="a4-school-meta">${escapeHtml(schoolAddress())}</div>
       <div class="a4-school-meta">${escapeHtml(educationOffice())}</div>
     </header>
-    <div class="leave-print-title">แบบคำขอ${escapeHtml(leaveTypeName(request.leave_type_code,request.other_leave_text))}</div>
+    <div class="leave-print-title">${isOfficialDutyRequest(request)?"แบบบันทึกการไปราชการ":"แบบคำขอ"+escapeHtml(leaveTypeName(request.leave_type_code,request.other_leave_text))}</div>
     <div class="leave-print-ref"><span>เลขคำขอ #${request.request_no}</span><span>สถานะ: ${escapeHtml(status)}</span></div>
     <div class="leave-print-grid">
-      <div><span>ชื่อผู้ลา</span><strong>${escapeHtml(request.requester_name)}</strong></div>
+      <div><span>${isOfficialDutyRequest(request)?"ผู้ไปราชการ":"ชื่อผู้ลา"}</span><strong>${escapeHtml(request.requester_name)}</strong></div>
       <div><span>ตำแหน่ง</span><strong>${escapeHtml(request.requester_position||ROLE_LABEL[request.requester_role]||request.requester_role)}</strong></div>
       <div><span>ตั้งแต่วันที่</span><strong>${thaiDateOnly(request.start_date)}</strong></div>
       <div><span>ถึงวันที่</span><strong>${thaiDateOnly(request.end_date)}</strong></div>
-      <div><span>ช่วงเวลาการลา</span><strong>${escapeHtml(leaveDailyScheduleLabel(request))}</strong></div>
+      <div><span>${isOfficialDutyRequest(request)?"ช่วงเวลาไปราชการ":"ช่วงเวลาการลา"}</span><strong>${escapeHtml(leaveDailyScheduleLabel(request))}</strong></div>
       ${Array.isArray(request.weekend_working_dates)&&request.weekend_working_dates.length ? `<div><span>ลาในวันหยุดที่โรงเรียนเปิดเรียน</span><strong>${escapeHtml(leaveWeekendDatesLabel(request.weekend_working_dates))}</strong></div>` : ""}
-      <div><span>จำนวนวันลา</span><strong>${formatLeaveDays(request.leave_days)} วัน</strong></div>
+      <div><span>${isOfficialDutyRequest(request)?"ระยะเวลาไปราชการ (ไม่หักวันลา)":"จำนวนวันลา"}</span><strong>${formatLeaveDays(request.leave_days)} วัน</strong></div>
       <div><span>ปีการศึกษา / ภาคเรียน</span><strong>${escapeHtml(String(request.academic_year||"—"))} / ภาคเรียนที่ ${escapeHtml(String(request.semester||"—"))}</strong></div>
     </div>
-    <section class="leave-print-section"><h2>เหตุผลการลา</h2><div>${escapeHtml(request.reason)}</div></section>
-    <section class="leave-print-section"><h2>สถานที่/ช่องทางติดต่อระหว่างลา</h2><div>${escapeHtml(request.contact_during_leave||"—")} ${request.contact_phone?`· โทร ${escapeHtml(request.contact_phone)}`:""}</div></section>
+    <section class="leave-print-section"><h2>${isOfficialDutyRequest(request)?"ภารกิจที่ได้รับมอบหมาย":"เหตุผลการลา"}</h2><div>${escapeHtml(request.reason)}</div></section>
+    <section class="leave-print-section"><h2>${isOfficialDutyRequest(request)?"สถานที่ไปราชการ / ช่องทางติดต่อ":"สถานที่/ช่องทางติดต่อระหว่างลา"}</h2><div>${escapeHtml(request.contact_during_leave||"—")} ${request.contact_phone?`· โทร ${escapeHtml(request.contact_phone)}`:""}</div></section>
 
+    ${isOfficialDutyRequest(request)?`<div class="leave-print-quota">รายการนี้เป็นการไปราชการตามภารกิจที่ได้รับมอบหมาย ไม่ใช่การลา และไม่หักโควตาวันลา</div>`:""}
     <section class="leave-print-section leave-print-stats-wrap">
       <h2>สถิติการลา ภาคเรียนที่ ${escapeHtml(String(request.semester||"—"))} ปีการศึกษา ${escapeHtml(String(request.academic_year||"—"))}</h2>
       <table class="leave-print-stats-table">
@@ -5659,7 +5675,7 @@ function buildLeaveA4Html(request,assets={}) {
     </section>
 
     <div class="leave-print-signatures">
-      ${leaveSignatureLine("ผู้ลา",request.requester_name,submitted,"ผู้ยื่นคำขอผ่านระบบ",docImages.requester||null)}
+      ${leaveSignatureLine(isOfficialDutyRequest(request)?"ผู้ไปราชการ":"ผู้ลา",request.requester_name,submitted,"ผู้ยื่นคำขอผ่านระบบ",docImages.requester||null)}
       ${personnelSkipped
         ? leaveSignatureLine("หัวหน้ากลุ่มงานบริหารงานบุคคล",request.requester_name,null,"ข้ามขั้นตอน เนื่องจากเป็นผู้ยื่นคำขอเอง — ส่งตรงผู้บริหาร")
         : leaveSignatureLine("หัวหน้ากลุ่มงานบริหารงานบุคคล",request.personnel_reviewer_name,request.personnel_reviewed_at,request.personnel_reviewed_at?"ตรวจในระบบแล้ว":"รอการตรวจ",docImages.personnel_head||null)}
@@ -5708,7 +5724,7 @@ function leaveReportSignature(title, name = "") {
 function buildSchoolLeaveReportHtml(assets={}) {
   const rows=schoolLeaveSummaryRows();
   const stats=leavePeriodOverviewStats();
-  const activeTypes=state.leaveTypes;
+  const activeTypes=state.leaveTypes.filter(t => t.code !== "official_duty");
   const signers=leaveReportSigners();
   return `<article class="a4-document"><div class="a4-document-inner">
     <header class="a4-doc-head">
